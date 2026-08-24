@@ -52,9 +52,9 @@ refactor.
    array into a FlashFX scene document. Never put layout maths in JSX.
 3. **`src/doc/**` is pure.** Zero React, zero DOM. It runs in Node for tests and for the phase-2
    converter.
-4. **The document is authoritative; source text is a projection.** The filmstrip can reorder and
-   delete, which a text blob cannot represent. The pane shows `serialize(doc)`; editing it
-   re-parses and diffs (`rebuild`) to carry slide ids and role overrides forward.
+4. **The document is authoritative.** Slides are an explicit list in the left pane, not
+   blank-line-separated prose — pasting still splits on blank lines, but after that the list is
+   the editing surface. `serialize`/`rebuild` remain for the paste path only.
 5. **Two colour systems, never mixed.** FlashFX tokens paint the app chrome; the user's brand kit
    paints the slides. A slide may be cream-on-hot-pink inside the navy app — that is correct.
 
@@ -76,4 +76,13 @@ refactor.
 
 - Server-side Playwright export (`server/`). Export currently prints the same component tree via
   the browser's own renderer — correct markup, PDF only, no PNG sequence.
-- Logo upload, format switcher, `src/doc` validation/migration, the phase-2 FlashFX converter.
+- Image upload (the `image` slot renders a placeholder), format switcher, template validation,
+  the phase-2 FlashFX converter.
+
+## Canvas elements
+
+Beyond template-driven content, a slide carries `overlays: Overlay[]` — hand-placed text, icons
+and shapes. Position and size are **fractions of the slide**, never pixels, so an overlay survives
+a format change the way template content does. Overlays are emitted last and paint above the
+template layout; they never alter it. Per-block `style` overrides (font, size, weight, colour,
+align, case) sit on top of what the template chose for that one block.

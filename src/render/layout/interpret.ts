@@ -36,7 +36,7 @@ import {
   type TypeStyle,
 } from "../../doc/template.js";
 import { blockText } from "../../doc/parse.js";
-import { effectiveRole, type Block, type BrandKit, type Slide } from "../../doc/types.js";
+import { effectiveRole, type Block, type BrandKit, type Overlay, type Slide } from "../../doc/types.js";
 import { derivePatternColour, guardContrast, resolvePalette, roleColour, type Palette } from "../colour.js";
 import { fitText, measureWidth } from "./fit.js";
 import type { Format, LayoutNode } from "./node.js";
@@ -274,10 +274,66 @@ export function interpret(
     }
   }
 
+  // ── overlays: hand-placed elements, above the template layout ───────────
+  for (const overlay of slide.overlays ?? []) {
+    nodes.push(overlayNode(overlay, slide, format, z++));
+  }
+
   placedBoxes.clear();
   regionBoxes.clear();
   globalDropped.clear();
   return nodes;
+}
+
+/** Fractions of the slide → logical px, so overlays survive a format change. */
+function overlayNode(o: Overlay, slide: Slide, format: Format, z: number): LayoutNode {
+  const x = o.x * format.w;
+  const y = o.y * format.h;
+  const w = o.w * format.w;
+  const h = o.h * format.h;
+  const base = {
+    id: `${slide.id}-ov-${o.id}`,
+    x, y, w, h, z,
+    band: "content" as const,
+    color: o.colour,
+    overlayId: o.id,
+    ...(o.opacity !== undefined ? { opacity: o.opacity } : {}),
+  };
+
+  if (o.kind === "text") {
+    const size = o.fontSize ?? 40;
+    return {
+      ...base,
+      kind: "text",
+      text: o.text ?? "",
+      fontSize: size,
+      lineHeight: size * 1.25,
+      weight: o.weight ?? 400,
+      tracking: o.tracking ?? 0,
+      align: o.align ?? "left",
+      family: o.family ?? "sans",
+      uppercase: o.uppercase ?? false,
+    };
+  }
+
+  if (o.kind === "icon") {
+    return {
+      ...base,
+      kind: "icon",
+      glyph: o.glyph as LayoutNode["glyph"],
+      strokeWidth: o.strokeWidth ?? 2,
+    };
+  }
+
+  return {
+    ...base,
+    kind: "shape",
+    shape: o.shape ?? "rect",
+    radius: o.radius ?? 0,
+    filled: o.filled ?? true,
+    strokeWidth: o.strokeWidth ?? 4,
+    fill: o.filled === false ? undefined : o.colour,
+  };
 }
 
 // Scratch state for decoration attach, cleared at the end of every interpret().
@@ -521,15 +577,26 @@ function emitSlot(
 
   const ts = spec.type;
   const face = brand.type[ts.face];
-  let colour = roleColour(spec.colour, palette);
-  colour = guardContrast(colour, ground, palette);
-  const weight = ts.weight === "inherit" ? face.weight : ts.weight;
-  const tracking = ts.tracking === "inherit" ? face.tracking : ts.tracking;
-  const upper = ts.case === "inherit" ? face.case === "upper" : ts.case === "upper";
+  // Per-block overrides win over the template's decision for this one block.
+  const override = p.routed.blocks[0]?.style;
+  let colour = override?.colour ?? guardContrast(roleColour(spec.colour, palette), ground, palette);
+  const weight = override?.weight ?? (ts.weight === "inherit" ? face.weight : ts.weight);
+  const tracking = override?.tracking ?? (ts.tracking === "inherit" ? face.tracking : ts.tracking);
+  const upper =
+    override?.case !== undefined
+      ? override.case === "upper"
+      : ts.case === "inherit"
+        ? face.case === "upper"
+        : ts.case === "upper";
+  const family = override?.family ?? face.family;
+  if (override?.fontSize) {
+    p.fontSize = override.fontSize;
+    p.lineHeight = override.fontSize * leadingOf(ts, override.fontSize);
+  }
 
   // Centre veto: long centred text flips its TEXT alignment, box stays centred.
   let align: "left" | "center" | "right" =
-    ts.align === "inherit" ? region.align : ts.align;
+    override?.align ?? (ts.align === "inherit" ? region.align : ts.align);
   const veto = page.invariants.centreVetoOverLines;
   if (align === "center" && veto !== null && p.lines > veto) align = region.align === "center" ? "left" : region.align;
 
@@ -580,7 +647,7 @@ function emitSlot(
         x: p.x + indent, y, w: p.w - indent, h: itemLines * p.lineHeight,
         z: z++, band: "content", color: colour, text: item,
         fontSize: p.fontSize, lineHeight: p.lineHeight, weight, tracking,
-        align, family: face.family, uppercase: upper,
+        align, family, uppercase: upper,
         slot: p.slot,
         blockId: p.routed.blocks[0]?.id,
         itemIndex: i,
@@ -599,7 +666,7 @@ function emitSlot(
     x: p.x, y: p.y, w: p.w, h: p.h, z: z++, band: p.slot === "handle" || p.slot === "number" ? "furniture" : "content",
     color: colour, text,
     fontSize: p.fontSize, lineHeight: p.lineHeight, weight, tracking,
-    align, family: face.family, uppercase: upper,
+    align, family, uppercase: upper,
     slot: p.slot,
     blockId: p.routed.blocks[0]?.id,
     overflow: overflowing || p.overflow,

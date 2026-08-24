@@ -1,47 +1,164 @@
-import { useCallback, useEffect, useRef, useState, type PointerEvent } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type PointerEvent } from "react";
 
 import { newId } from "../doc/ids.js";
+import type { Block, BlockStyle, FlashCCDocument, Overlay, Slide, SlideRole } from "../doc/types.js";
+import { FORMATS, type LayoutNode } from "../render/layout/node.js";
 import { saveTemplate } from "../state/persist.js";
-import type { Block, FlashCCDocument, Slide, SlideRole } from "../doc/types.js";
-import { FORMATS, type LayoutNode } from "../render/layout/computeLayout.js";
 import { useDocument } from "../state/useDocument.js";
 import { BrandKitSheet } from "./BrandKitSheet.js";
 import { ExportSheet } from "./ExportSheet.js";
 import { Filmstrip } from "./Filmstrip.js";
+import { FirstRunBar } from "./FirstRunBar.js";
+import { Inspector } from "./Inspector.js";
+import { SlideList } from "./SlideList.js";
 import { SlideStage } from "./SlideStage.js";
-import { SourcePane } from "./SourcePane.js";
 import { TopBar } from "./TopBar.js";
 
-const MIN_SOURCE_W = 280;
-const MAX_SOURCE_W = 720;
+const MIN_LIST_W = 240;
+const MAX_LIST_W = 520;
 
-type Props = {
-  initial: FlashCCDocument;
-  onHome: () => void;
-};
+type Props = { initial: FlashCCDocument; onHome: () => void };
 
 export function Editor({ initial, onHome }: Props) {
   const api = useDocument(initial);
   const { doc } = api;
 
   const [index, setIndex] = useState(0);
+  const [selectedId, setSelectedId] = useState<string | null>(null);
   const [sheet, setSheet] = useState<"none" | "brand" | "export">("none");
-  const [sourceWidth, setSourceWidth] = useState(400);
+  const [listWidth, setListWidth] = useState(300);
   const dragging = useRef(false);
 
   const format = FORMATS[doc.format] ?? { w: 1080, h: 1350 };
   const current = Math.min(index, Math.max(0, doc.slides.length - 1));
   const slide = doc.slides[current];
 
-  // ── keyboard, first-class path (R14) ──────────────────────────────────────
+  const selectedOverlay = useMemo(
+    () => slide?.overlays?.find((o) => o.id === selectedId) ?? null,
+    [slide, selectedId],
+  );
+  const selectedBlock = useMemo(
+    () => (selectedOverlay ? null : (slide?.blocks.find((b) => b.id === selectedId) ?? null)),
+    [slide, selectedId, selectedOverlay],
+  );
+
+  /* ── slide + block mutations ───────────────────────────────────────────── */
+
+  const patchSlide = useCallback(
+    (i: number, fn: (s: Slide) => Slide, coalesce?: string) => {
+      api.setSlides(
+        doc.slides.map((s, n) => (n === i ? fn(s) : s)),
+        coalesce,
+      );
+    },
+    [api, doc.slides],
+  );
+
+  const setBlockText = useCallback(
+    (i: number, blockId: string, text: string) =>
+      patchSlide(
+        i,
+        (s) => ({
+          ...s,
+          blocks: s.blocks.map((b) => (b.id !== blockId || b.type === "list" ? b : { ...b, text })),
+        }),
+        `text:${blockId}`,
+      ),
+    [patchSlide],
+  );
+
+  const setItemText = useCallback(
+    (i: number, blockId: string, itemIndex: number, text: string) =>
+      patchSlide(
+        i,
+        (s) => ({
+          ...s,
+          blocks: s.blocks.map((b) =>
+            b.id === blockId && b.type === "list"
+              ? { ...b, items: b.items.map((it, n) => (n === itemIndex ? text : it)) }
+              : b,
+          ),
+        }),
+        `item:${blockId}:${itemIndex}`,
+      ),
+    [patchSlide],
+  );
+
+  const setBlockStyle = useCallback(
+    (patch: BlockStyle, coalesce?: string) => {
+      if (!selectedBlock) return;
+      patchSlide(
+        current,
+        (s) => ({
+          ...s,
+          blocks: s.blocks.map((b) =>
+            b.id === selectedBlock.id ? { ...b, style: { ...b.style, ...patch } } : b,
+          ),
+        }),
+        coalesce,
+      );
+    },
+    [current, patchSlide, selectedBlock],
+  );
+
+  const addSlideAt = useCallback(
+    (at: number) => {
+      const blank: Slide = {
+        id: newId("sld"),
+        role: "body",
+        blocks: [{ id: newId("blk"), type: "paragraph", text: "New slide" }],
+      };
+      api.setSlides([...doc.slides.slice(0, at), blank, ...doc.slides.slice(at)]);
+      setIndex(at);
+    },
+    [api, doc.slides],
+  );
+
+  const addBlock = useCallback(
+    (i: number) => {
+      const block: Block = { id: newId("blk"), type: "paragraph", text: "New text" };
+      patchSlide(i, (s) => ({ ...s, blocks: [...s.blocks, block] }));
+      setSelectedId(block.id);
+    },
+    [patchSlide],
+  );
+
+  /* ── overlays ──────────────────────────────────────────────────────────── */
+
+  const addOverlay = useCallback(
+    (overlay: Overlay) =>
+      patchSlide(current, (s) => ({ ...s, overlays: [...(s.overlays ?? []), overlay] })),
+    [current, patchSlide],
+  );
+
+  const updateOverlay = useCallback(
+    (id: string, patch: Partial<Overlay>, coalesce?: string) =>
+      patchSlide(
+        current,
+        (s) => ({
+          ...s,
+          overlays: (s.overlays ?? []).map((o) => (o.id === id ? { ...o, ...patch } : o)),
+        }),
+        coalesce,
+      ),
+    [current, patchSlide],
+  );
+
+  const deleteOverlay = useCallback(() => {
+    if (!selectedId) return;
+    patchSlide(current, (s) => ({
+      ...s,
+      overlays: (s.overlays ?? []).filter((o) => o.id !== selectedId),
+    }));
+    setSelectedId(null);
+  }, [current, patchSlide, selectedId]);
+
+  /* ── keyboard ──────────────────────────────────────────────────────────── */
+
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
-      const target = e.target as HTMLElement | null;
-      const typing =
-        target?.tagName === "INPUT" ||
-        target?.tagName === "TEXTAREA" ||
-        target?.isContentEditable === true;
-
+      const t = e.target as HTMLElement | null;
+      const typing = t?.tagName === "INPUT" || t?.tagName === "TEXTAREA" || t?.isContentEditable === true;
       const mod = e.metaKey || e.ctrlKey;
 
       if (mod && e.key.toLowerCase() === "z") {
@@ -70,34 +187,31 @@ export function Editor({ initial, onHome }: Props) {
       if (e.key === "ArrowRight") {
         e.preventDefault();
         setIndex((i) => Math.min(doc.slides.length - 1, i + 1));
+        setSelectedId(null);
       } else if (e.key === "ArrowLeft") {
         e.preventDefault();
         setIndex((i) => Math.max(0, i - 1));
+        setSelectedId(null);
       } else if (e.key === "Delete" || e.key === "Backspace") {
         e.preventDefault();
-        api.deleteSlide(current);
-      } else if (e.key === "Escape") {
-        setSheet("none");
+        if (selectedOverlay) deleteOverlay();
+        else api.deleteSlide(current);
       }
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [api, current, doc.slides.length]);
+  }, [api, current, deleteOverlay, doc.slides.length, selectedOverlay]);
 
-  // ── direct manipulation: edit on the slide, source pane follows (R9) ──────
   const onEdit = useCallback(
     (node: LayoutNode, text: string) => {
       if (!slide || !node.blockId) return;
-      const next = doc.slides.map((s, i) => {
-        if (i !== current) return s;
-        return {
-          ...s,
-          blocks: s.blocks.map((b) => applyEdit(b, node, text)),
-        };
-      });
-      api.setSlides(next, `edit:${node.blockId}:${node.itemIndex ?? ""}`);
+      patchSlide(
+        current,
+        (s) => ({ ...s, blocks: s.blocks.map((b) => applyEdit(b, node, text)) }),
+        `edit:${node.blockId}:${node.itemIndex ?? ""}`,
+      );
     },
-    [api, current, doc.slides, slide],
+    [current, patchSlide, slide],
   );
 
   const onSplit = useCallback(() => {
@@ -112,8 +226,7 @@ export function Editor({ initial, onHome }: Props) {
     e.currentTarget.setPointerCapture(e.pointerId);
   };
   const onPointerMove = (e: PointerEvent<HTMLDivElement>) => {
-    if (!dragging.current) return;
-    setSourceWidth(Math.min(MAX_SOURCE_W, Math.max(MIN_SOURCE_W, e.clientX)));
+    if (dragging.current) setListWidth(Math.min(MAX_LIST_W, Math.max(MIN_LIST_W, e.clientX)));
   };
   const onPointerUp = (e: PointerEvent<HTMLDivElement>) => {
     dragging.current = false;
@@ -131,21 +244,33 @@ export function Editor({ initial, onHome }: Props) {
         onExport={() => setSheet("export")}
       />
 
+      <FirstRunBar />
+
       <div className="relative flex min-h-0 flex-1">
-        <div style={{ width: sourceWidth }} className="flex min-h-0 shrink-0">
-          <SourcePane
-            text={doc.source}
-            onTextChange={api.setSource}
-            granularity={doc.granularity}
-            onGranularityChange={api.setGranularity}
-            blockCount={doc.slides.length}
+        <div style={{ width: listWidth }} className="flex min-h-0 shrink-0">
+          <SlideList
+            slides={doc.slides}
+            currentIndex={current}
+            selectedId={selectedId}
+            onSelect={(i, blockId) => {
+              setIndex(i);
+              setSelectedId(blockId ?? null);
+            }}
+            onBlockText={setBlockText}
+            onItemText={setItemText}
+            onAddSlideAt={addSlideAt}
+            onAddBlock={addBlock}
+            onDuplicate={api.duplicateSlide}
+            onDelete={api.deleteSlide}
+            onMove={api.moveSlide}
+            onPaste={api.replaceSource}
           />
         </div>
 
         <div
           role="separator"
           aria-orientation="vertical"
-          aria-label="Resize source pane"
+          aria-label="Resize slide list"
           onPointerDown={onPointerDown}
           onPointerMove={onPointerMove}
           onPointerUp={onPointerUp}
@@ -160,9 +285,24 @@ export function Editor({ initial, onHome }: Props) {
           brand={doc.brandKit}
           format={format}
           slideNumber={current + 1}
+          selectedId={selectedId}
+          onSelect={setSelectedId}
           onRoleChange={(role: SlideRole | undefined) => api.setRoleOverride(current, role)}
           onEdit={onEdit}
+          onAddOverlay={addOverlay}
+          onUpdateOverlay={updateOverlay}
           onSplit={onSplit}
+        />
+
+        <Inspector
+          brand={doc.brandKit}
+          overlay={selectedOverlay}
+          block={selectedBlock}
+          onOverlay={(patch, coalesce) => {
+            if (selectedId) updateOverlay(selectedId, patch, coalesce);
+          }}
+          onBlockStyle={setBlockStyle}
+          onDeleteOverlay={deleteOverlay}
         />
 
         {sheet === "brand" ? (
@@ -172,7 +312,12 @@ export function Editor({ initial, onHome }: Props) {
             onChange={api.setBrandKit}
             onTemplateChange={api.setTemplate}
             onSaveAsTemplate={() => {
-              const copy = { ...doc.template, id: newId("tpl"), name: `${doc.template.name} copy`, origin: { kind: "user" as const, from: doc.template.id } };
+              const copy = {
+                ...doc.template,
+                id: newId("tpl"),
+                name: `${doc.template.name} copy`,
+                origin: { kind: "user" as const, from: doc.template.id },
+              };
               saveTemplate(copy);
               api.setTemplate(copy);
             }}
@@ -190,10 +335,13 @@ export function Editor({ initial, onHome }: Props) {
         brand={doc.brandKit}
         format={format}
         currentIndex={current}
-        onSelect={setIndex}
+        onSelect={(i) => {
+          setIndex(i);
+          setSelectedId(null);
+        }}
         onDuplicate={api.duplicateSlide}
         onDelete={api.deleteSlide}
-        onAdd={api.addSlide}
+        onAdd={() => addSlideAt(doc.slides.length)}
         onMove={api.moveSlide}
       />
     </div>
@@ -206,7 +354,6 @@ function applyEdit(block: Block, node: LayoutNode, text: string): Block {
     return { ...block, items: block.items.map((it, i) => (i === node.itemIndex ? text : it)) };
   }
   if (block.type === "list") return block;
-  if (block.type === "quote") return { ...block, text };
   return { ...block, text };
 }
 

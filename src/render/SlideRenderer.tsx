@@ -43,6 +43,7 @@ export function SlideRenderer({ nodes, format, editingId = null, onEditStart, on
           );
         }
         if (node.kind === "icon") return <IconNode key={node.id} node={node} />;
+        if (node.kind === "shape") return <ShapeNode key={node.id} node={node} />;
         if (node.kind === "image") return <ImageNode key={node.id} node={node} />;
         return <BoxNode key={node.id} node={node} />;
       })}
@@ -59,6 +60,7 @@ const frame = (node: LayoutNode): CSSProperties => ({
   top: node.y,
   width: node.w,
   height: node.h,
+  ...(node.opacity !== undefined ? { opacity: node.opacity } : {}),
 });
 
 function BoxNode({ node }: { node: LayoutNode }) {
@@ -81,6 +83,46 @@ function BoxNode({ node }: { node: LayoutNode }) {
   }
 
   return <div style={style} />;
+}
+
+function ShapeNode({ node }: { node: LayoutNode }) {
+  const stroke = node.strokeWidth ?? 4;
+  const filled = node.filled !== false;
+  const paint = filled
+    ? { fill: node.color, stroke: "none" }
+    : { fill: "none", stroke: node.color, strokeWidth: stroke };
+
+  if (node.shape === "ellipse") {
+    return (
+      <svg style={frame(node)} viewBox="0 0 100 100" preserveAspectRatio="none">
+        <ellipse cx="50" cy="50" rx={filled ? 50 : 48} ry={filled ? 50 : 48} {...paint} vectorEffect="non-scaling-stroke" />
+      </svg>
+    );
+  }
+  if (node.shape === "triangle") {
+    return (
+      <svg style={frame(node)} viewBox="0 0 100 100" preserveAspectRatio="none">
+        <polygon points="50,2 98,98 2,98" {...paint} vectorEffect="non-scaling-stroke" />
+      </svg>
+    );
+  }
+  if (node.shape === "line") {
+    return (
+      <div
+        style={{ ...frame(node), height: stroke, background: node.color, borderRadius: stroke / 2 }}
+      />
+    );
+  }
+  return (
+    <div
+      style={{
+        ...frame(node),
+        borderRadius: node.radius ?? 0,
+        background: filled ? node.color : "transparent",
+        border: filled ? "none" : `${stroke}px solid ${node.color}`,
+      }}
+    />
+  );
 }
 
 function IconNode({ node }: { node: LayoutNode }) {
@@ -161,6 +203,7 @@ function TextNode({
     wordBreak: "break-word",
     outline: "none",
     cursor: editable ? "text" : "default",
+    ...(node.opacity !== undefined ? { opacity: node.opacity } : {}),
   };
 
   if (editing && onEditCommit) {

@@ -2,7 +2,7 @@ import type { Align, IconId, SlotName } from "../../doc/template.js";
 import type { FontRole } from "../../doc/types.js";
 
 export type ZBand = "background" | "media" | "decor" | "content" | "furniture";
-export type NodeKind = "rect" | "line" | "icon" | "image" | "text";
+export type NodeKind = "rect" | "line" | "icon" | "image" | "text" | "shape";
 
 /**
  * The emission format. `computeLayout` returns these and nothing else; React only
@@ -22,6 +22,11 @@ export type LayoutNode = {
   parentId?: string | undefined;
   slot?: SlotName | undefined;
   decorId?: string | undefined;
+  /** Set on hand-placed elements so the canvas can select and drag them. */
+  overlayId?: string | undefined;
+  shape?: "rect" | "ellipse" | "line" | "triangle" | undefined;
+  filled?: boolean | undefined;
+  opacity?: number | undefined;
   fill?: string | undefined;
   radius?: number | undefined;
   text?: string | undefined;
