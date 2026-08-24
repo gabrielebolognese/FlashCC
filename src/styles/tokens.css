@@ -1,0 +1,41 @@
+/* FlashFX design tokens — verbatim from DESIGN_SYSTEM.md.
+   Single source of truth. tailwind.config.ts only points at these. */
+
+:root {
+  /* Surface ladder — depth via a lighter step, never a shadow */
+  --bg-sunken:  #070f1c;  /* deepest — app backdrop, timeline well */
+  --bg:         #0a1424;  /* base canvas / page */
+  --surface-1:  #0e1b2e;  /* cards, inputs, sidebars */
+  --surface-2:  #142338;  /* panels, modals */
+  --surface-3:  #1a2a42;  /* raised rows, menus */
+  --surface-4:  #21344e;  /* controls, chips */
+  --surface-5:  #2a3f5c;  /* strongest edge / hover top */
+
+  /* Lines — white-alpha, adapt to any surface */
+  --hairline:   rgba(255,255,255,0.08);  /* default divider/border */
+  --border:     rgba(255,255,255,0.14);  /* stronger input border */
+
+  /* Accent — the gold, used sparingly */
+  --accent:       #d9a521;               /* primary action, selection, active */
+  --accent-hover: #f0bd45;
+  --accent-wash:  rgba(217,165,33,0.12); /* accent background tint */
+  --accent-dim:   #a87d18;               /* accent border */
+  --on-accent:    #12161c;               /* text/icon ON gold */
+
+  /* Text — hierarchy via value step, not color */
+  --text-primary:   #e6edf6;  /* headings, key values */
+  --text-secondary: #94a3b8;  /* body, labels */
+  --text-tertiary:  #64748b;  /* captions, meta */
+  --text-muted:     #475569;  /* disabled, placeholder */
+
+  /* Semantic */
+  --success: #3dbe7a;
+  --danger:  #e5545a;
+  --info:    #4c86d6;
+  --live:    #ff3b5c;  /* "recording"/scrub red — distinct from selection gold */
+
+  /* Brand gold — hero moments only (logo mark, the one hero CTA per screen) */
+  --brand-gold: linear-gradient(135deg, #f7b500, #e09000);
+  --brand-gold-hover: #ffc83d;
+  --on-brand-gold: #0a0f16;
+}

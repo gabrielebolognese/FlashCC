@@ -1,0 +1,83 @@
+@import "./tokens.css";
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  html,
+  body,
+  #root {
+    height: 100%;
+  }
+
+  body {
+    background: var(--bg);
+    color: var(--text-secondary);
+    font-family: theme("fontFamily.sans");
+    font-size: 12px;
+    line-height: 16px;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+
+  /* R4: nothing that responds to the pointer animates. No transition on colour,
+     background, or border anywhere — hover and selection are instantaneous. */
+  * {
+    transition-property: none;
+  }
+
+  /* R3: keyboard focus gets the double gold ring; pointer focus gets nothing. */
+  :focus {
+    outline: none;
+  }
+
+  :focus-visible {
+    outline: none;
+    box-shadow: theme("boxShadow.focus");
+  }
+
+  ::selection {
+    background: var(--accent-wash);
+    color: var(--text-primary);
+  }
+}
+
+@layer utilities {
+  /* Horizontal scroll for the filmstrip — present but quiet. */
+  .scroll-quiet {
+    scrollbar-width: thin;
+    scrollbar-color: var(--surface-4) transparent;
+  }
+
+  .scroll-quiet::-webkit-scrollbar {
+    height: 8px;
+    width: 8px;
+  }
+
+  .scroll-quiet::-webkit-scrollbar-track {
+    background: transparent;
+  }
+
+  .scroll-quiet::-webkit-scrollbar-thumb {
+    background: var(--surface-4);
+    border-radius: 999px;
+  }
+}
+
+/* Export prints the same component tree the preview uses (ExportSheet). */
+#print-root {
+  display: none;
+}
+
+@media print {
+  #root {
+    display: none !important;
+  }
+  #print-root {
+    display: block !important;
+  }
+  body {
+    background: #fff;
+  }
+}
