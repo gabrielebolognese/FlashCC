@@ -1,9 +1,15 @@
+import { migrateBrandKit, migrateDocument } from "../doc/migrate.js";
 import { blockText } from "../doc/parse.js";
-import type { FlashCCDocument, ProjectSummary } from "../doc/types.js";
+import type { Template, TemplateSummary } from "../doc/template.js";
+import { STARTERS } from "../doc/templates/starters.js";
+import type { BrandKit, FlashCCDocument, ProjectSummary } from "../doc/types.js";
 
 const INDEX_KEY = "flashcc:index";
 const DOC_KEY = (id: string) => `flashcc:doc:${id}`;
 const BRAND_KEY = "flashcc:brandkit:last";
+const TPL_KEY = (id: string) => `flashcc:template:${id}`;
+const TPL_INDEX_KEY = "flashcc:templates";
+const TPL_LAST_KEY = "flashcc:template:last";
 
 function safeRead<T>(key: string): T | null {
   try {
@@ -14,13 +20,17 @@ function safeRead<T>(key: string): T | null {
   }
 }
 
-function safeWrite(key: string, value: unknown): void {
+/** Returns false on quota failure so the caller can surface a real signal. */
+function safeWrite(key: string, value: unknown): boolean {
   try {
     localStorage.setItem(key, JSON.stringify(value));
+    return true;
   } catch {
-    /* quota or private mode — autosave is best-effort and silent (R15) */
+    return false;
   }
 }
+
+/* ── projects ─────────────────────────────────────────────────────────── */
 
 export function listProjects(): ProjectSummary[] {
   const index = safeRead<ProjectSummary[]>(INDEX_KEY) ?? [];
@@ -28,14 +38,12 @@ export function listProjects(): ProjectSummary[] {
 }
 
 export function loadDocument(id: string): FlashCCDocument | null {
-  const doc = safeRead<FlashCCDocument>(DOC_KEY(id));
-  if (!doc || doc.version !== 1 || !Array.isArray(doc.slides)) return null;
-  return doc;
+  return migrateDocument(safeRead<unknown>(DOC_KEY(id)));
 }
 
-export function saveDocument(doc: FlashCCDocument): void {
+export function saveDocument(doc: FlashCCDocument): boolean {
   const stamped: FlashCCDocument = { ...doc, updatedAt: new Date().toISOString() };
-  safeWrite(DOC_KEY(doc.id), stamped);
+  const ok = safeWrite(DOC_KEY(doc.id), stamped);
 
   const first = stamped.slides[0];
   const preview = first ? first.blocks.map(blockText).join(" ").slice(0, 120) : "";
@@ -47,12 +55,14 @@ export function saveDocument(doc: FlashCCDocument): void {
     preview,
     accent: stamped.brandKit.palette.accent,
     background: stamped.brandKit.palette.background,
+    templateName: stamped.template.name,
   };
 
   const index = safeRead<ProjectSummary[]>(INDEX_KEY) ?? [];
-  const next = [summary, ...index.filter((p) => p.id !== stamped.id)];
-  safeWrite(INDEX_KEY, next);
+  safeWrite(INDEX_KEY, [summary, ...index.filter((p) => p.id !== stamped.id)]);
   safeWrite(BRAND_KEY, stamped.brandKit);
+  safeWrite(TPL_LAST_KEY, stamped.template.id);
+  return ok;
 }
 
 export function deleteProject(id: string): void {
@@ -68,6 +78,56 @@ export function deleteProject(id: string): void {
   );
 }
 
-export function lastBrandKit(): FlashCCDocument["brandKit"] | null {
-  return safeRead<FlashCCDocument["brandKit"]>(BRAND_KEY);
+export function lastBrandKit(): BrandKit | null {
+  return migrateBrandKit(safeRead<unknown>(BRAND_KEY));
+}
+
+/* ── template library ─────────────────────────────────────────────────── */
+
+/** Starters are code, not storage. The library is starters + whatever the user saved. */
+export function listTemplates(): Template[] {
+  const index = safeRead<TemplateSummary[]>(TPL_INDEX_KEY) ?? [];
+  const user: Template[] = [];
+  for (const entry of index) {
+    const t = safeRead<Template>(TPL_KEY(entry.id));
+    if (t && t.schema === 1) user.push(t);
+  }
+  return [...user, ...STARTERS];
+}
+
+export function loadTemplate(id: string): Template | null {
+  const stored = safeRead<Template>(TPL_KEY(id));
+  if (stored && stored.schema === 1) return stored;
+  return STARTERS.find((t) => t.id === id) ?? null;
+}
+
+export function saveTemplate(template: Template): boolean {
+  const ok = safeWrite(TPL_KEY(template.id), template);
+  const index = safeRead<TemplateSummary[]>(TPL_INDEX_KEY) ?? [];
+  const summary: TemplateSummary = {
+    id: template.id,
+    name: template.name,
+    teaches: template.teaches,
+    origin: template.origin,
+    updatedAt: new Date().toISOString(),
+  };
+  safeWrite(TPL_INDEX_KEY, [summary, ...index.filter((t) => t.id !== template.id)]);
+  return ok;
+}
+
+export function deleteTemplate(id: string): void {
+  try {
+    localStorage.removeItem(TPL_KEY(id));
+  } catch {
+    /* ignore */
+  }
+  const index = safeRead<TemplateSummary[]>(TPL_INDEX_KEY) ?? [];
+  safeWrite(
+    TPL_INDEX_KEY,
+    index.filter((t) => t.id !== id),
+  );
+}
+
+export function lastTemplateId(): string | null {
+  return safeRead<string>(TPL_LAST_KEY);
 }

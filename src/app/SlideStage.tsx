@@ -1,12 +1,14 @@
 import { Maximize2 } from "lucide-react";
 import { useLayoutEffect, useRef, useState } from "react";
 
+import type { Template } from "../doc/template.js";
 import { effectiveRole, ROLES, type BrandKit, type Slide, type SlideRole } from "../doc/types.js";
 import { computeLayout, type Format, type LayoutNode } from "../render/layout/computeLayout.js";
 import { nodeKey, SlideRenderer } from "../render/SlideRenderer.js";
 
 type Props = {
   slide: Slide | undefined;
+  template: Template;
   brand: BrandKit;
   format: Format;
   slideNumber: number;
@@ -21,6 +23,7 @@ type Props = {
  */
 export function SlideStage({
   slide,
+  template,
   brand,
   format,
   slideNumber,
@@ -55,7 +58,7 @@ export function SlideStage({
     return <div ref={hostRef} className="relative min-w-0 flex-1 bg-sunken" />;
   }
 
-  const nodes = computeLayout(slide, brand, format, slideNumber);
+  const nodes = computeLayout(template, slide, brand, format, slideNumber);
   const overflowing = nodes.some((n) => n.overflow);
   const role = effectiveRole(slide);
 
@@ -69,7 +72,6 @@ export function SlideStage({
           >
             <SlideRenderer
               nodes={nodes}
-              brand={brand}
               format={format}
               editingId={editingId}
               onEditStart={(node) => setEditingId(nodeKey(node))}

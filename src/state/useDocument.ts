@@ -109,6 +109,11 @@ export function useDocument(initial: FlashCCDocument) {
     [commit, doc],
   );
 
+  const setTemplate = useCallback(
+    (template: FlashCCDocument["template"]) => commit({ ...doc, template }),
+    [commit, doc],
+  );
+
   const setName = useCallback(
     (name: string) => commit({ ...doc, name }, "name"),
     [commit, doc],
@@ -171,6 +176,7 @@ export function useDocument(initial: FlashCCDocument) {
     setGranularity,
     setSlides,
     setBrandKit,
+    setTemplate,
     setName,
     duplicateSlide,
     deleteSlide,

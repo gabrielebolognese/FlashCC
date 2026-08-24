@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState, type PointerEvent } from "react";
 
 import { newId } from "../doc/ids.js";
+import { saveTemplate } from "../state/persist.js";
 import type { Block, FlashCCDocument, Slide, SlideRole } from "../doc/types.js";
 import { FORMATS, type LayoutNode } from "../render/layout/computeLayout.js";
 import { useDocument } from "../state/useDocument.js";
@@ -155,6 +156,7 @@ export function Editor({ initial, onHome }: Props) {
 
         <SlideStage
           slide={slide}
+          template={doc.template}
           brand={doc.brandKit}
           format={format}
           slideNumber={current + 1}
@@ -166,7 +168,14 @@ export function Editor({ initial, onHome }: Props) {
         {sheet === "brand" ? (
           <BrandKitSheet
             brand={doc.brandKit}
+            template={doc.template}
             onChange={api.setBrandKit}
+            onTemplateChange={api.setTemplate}
+            onSaveAsTemplate={() => {
+              const copy = { ...doc.template, id: newId("tpl"), name: `${doc.template.name} copy`, origin: { kind: "user" as const, from: doc.template.id } };
+              saveTemplate(copy);
+              api.setTemplate(copy);
+            }}
             onClose={() => setSheet("none")}
           />
         ) : null}
@@ -177,6 +186,7 @@ export function Editor({ initial, onHome }: Props) {
 
       <Filmstrip
         slides={doc.slides}
+        template={doc.template}
         brand={doc.brandKit}
         format={format}
         currentIndex={current}

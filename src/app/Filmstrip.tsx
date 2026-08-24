@@ -1,6 +1,7 @@
 import { Copy, Plus, Trash2 } from "lucide-react";
 import { useState } from "react";
 
+import type { Template } from "../doc/template.js";
 import type { BrandKit, Slide } from "../doc/types.js";
 import { computeLayout, type Format } from "../render/layout/computeLayout.js";
 import { SlideRenderer } from "../render/SlideRenderer.js";
@@ -10,6 +11,7 @@ const THUMB_H = 68;
 
 type Props = {
   slides: Slide[];
+  template: Template;
   brand: BrandKit;
   format: Format;
   currentIndex: number;
@@ -22,6 +24,7 @@ type Props = {
 
 export function Filmstrip({
   slides,
+  template,
   brand,
   format,
   currentIndex,
@@ -81,8 +84,7 @@ export function Filmstrip({
                 style={{ width: format.w, height: format.h, transform: `scale(${scale})` }}
               >
                 <SlideRenderer
-                  nodes={computeLayout(slide, brand, format, i + 1)}
-                  brand={brand}
+                  nodes={computeLayout(template, slide, brand, format, i + 1)}
                   format={format}
                 />
               </div>

@@ -77,8 +77,7 @@ export function ExportSheet({ doc, format, onClose }: Props) {
               {doc.slides.map((slide, i) => (
                 <div key={slide.id} style={{ breakAfter: "page", width: format.w, height: format.h }}>
                   <SlideRenderer
-                    nodes={computeLayout(slide, doc.brandKit, format, i + 1)}
-                    brand={doc.brandKit}
+                    nodes={computeLayout(doc.template, slide, doc.brandKit, format, i + 1)}
                     format={format}
                   />
                 </div>

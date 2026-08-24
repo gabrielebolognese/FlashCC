@@ -81,3 +81,10 @@
     background: #fff;
   }
 }
+
+/* R3: the only signifier that slide text is editable. Brand-derived, not an app token —
+   an app colour inside a slide would break the two-colour-systems invariant. */
+.fcc-editable:hover {
+  box-shadow: inset 0 0 0 1px currentColor;
+  opacity: 0.92;
+}

@@ -1,4 +1,5 @@
 /** Semantic document model. No pixels, no CSS, no DOM. See docs/document-schema.md. */
+import type { Template } from "./template.js";
 
 export type SlideRole = "cover" | "body" | "list" | "quote" | "cta";
 export type Granularity = "few" | "balanced" | "many";
@@ -30,28 +31,27 @@ export type TypeRoleSpec = {
   case: "none" | "upper";
 };
 
-export type BackgroundTreatment =
-  | { kind: "solid" }
-  | { kind: "gradient"; to: string; angle: number }
-  | { kind: "grid"; opacity: number };
-
+/**
+ * v2: the brand kit owns COLOUR and TYPEFACE only. Margin, background treatment and
+ * handle placement moved to the Template, which owns structure and decoration.
+ * One template renders correctly in any brand; that split is the brand lock.
+ */
 export type BrandKit = {
   palette: { background: string; text: string; accent: string; muted: string };
   type: { display: TypeRoleSpec; body: TypeRoleSpec };
   handle: string;
-  handlePlacement: Corner | "none";
-  background: BackgroundTreatment;
-  safeMargin: number;
 };
 
 export type FlashCCDocument = {
-  version: 1;
+  version: 2;
   id: string;
   name: string;
   format: FormatId;
   granularity: Granularity;
   source: string;
   brandKit: BrandKit;
+  /** Embedded as a snapshot: a deleted library template cannot brick a saved carousel. */
+  template: Template;
   slides: Slide[];
   createdAt: string;
   updatedAt: string;
@@ -66,6 +66,7 @@ export type ProjectSummary = {
   preview: string;
   accent: string;
   background: string;
+  templateName: string;
 };
 
 export const effectiveRole = (slide: Slide): SlideRole => slide.roleOverride ?? slide.role;

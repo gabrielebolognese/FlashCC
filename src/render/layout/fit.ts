@@ -65,3 +65,13 @@ export function fitText(
     overflow: true,
   };
 }
+
+/** Width of `chars` characters at `fontSize`. Used to cap a box to a measure. */
+export function measureWidth(
+  chars: number,
+  fontSize: number,
+  family: FontRole,
+  tracking: number,
+): number {
+  return chars * fontSize * ((ADVANCE[family] ?? 0.52) + tracking);
+}
