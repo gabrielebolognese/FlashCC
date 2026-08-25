@@ -15,7 +15,7 @@ type Screen =
   | { view: "start" }
   | { view: "frameworks"; theme: keyof typeof THEMES }
   | { view: "ai"; structure: Structure; theme: keyof typeof THEMES }
-  | { view: "compose"; structure: Structure; theme: keyof typeof THEMES }
+  | { view: "compose"; structure: Structure; theme: keyof typeof THEMES; texts?: string[] }
   | { view: "studio"; doc: Doc };
 
 export function App() {
@@ -38,6 +38,9 @@ export function App() {
         onWriteMyself={() =>
           setScreen({ view: "compose", structure: screen.structure, theme: screen.theme })
         }
+        onDrafted={(texts) =>
+          setScreen({ view: "compose", structure: screen.structure, theme: screen.theme, texts })
+        }
       />
     );
   }
@@ -47,6 +50,7 @@ export function App() {
       <Compose
         structure={screen.structure}
         initialTheme={screen.theme}
+        initialTexts={screen.texts}
         onBack={() => setScreen({ view: "ai", structure: screen.structure, theme: screen.theme })}
         onGenerate={({ texts, roles, themeId }) => {
           const theme = THEMES[themeId]!;

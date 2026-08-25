@@ -1,0 +1,11 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "rootDir": ".",
+    "lib": ["ES2023"],
+    "types": ["node"],
+    "jsx": "preserve",
+    "noEmit": true
+  },
+  "include": ["server/**/*", "scripts/**/*"]
+}

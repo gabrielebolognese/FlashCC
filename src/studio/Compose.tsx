@@ -22,15 +22,20 @@ const mk = (slot: Slot, text = ""): Field => {
 export function Compose({
   structure,
   initialTheme = "ink",
+  initialTexts,
   onGenerate,
   onBack,
 }: {
   structure: Structure;
   initialTheme?: keyof typeof THEMES;
+  /** Copy drafted upstream, one entry per slot. */
+  initialTexts?: string[] | undefined;
   onGenerate: (result: ComposeResult) => void;
   onBack: () => void;
 }) {
-  const [fields, setFields] = useState<Field[]>(() => structure.slots.map((slot) => mk(slot)));
+  const [fields, setFields] = useState<Field[]>(() =>
+    structure.slots.map((slot, i) => mk(slot, initialTexts?.[i] ?? "")),
+  );
   const [themeId, setThemeId] = useState<keyof typeof THEMES>(initialTheme);
   const [showing, setShowing] = useState<string | null>(null);
   const dragFrom = useRef<number | null>(null);

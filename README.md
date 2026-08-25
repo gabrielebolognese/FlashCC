@@ -2,22 +2,26 @@
 
 Fast and easy carousel creator website.
 
-Turn a post you already wrote into an on-brand carousel in under 30 seconds, with almost no
-decisions to make. You bring the words — FlashCC does layout, brand, and export. It never writes,
-rewrites, or suggests copy. There is no AI in it.
+Describe a post and get a drafted, editable carousel — or write every slide yourself. Pick one of
+four frameworks, draft it with Claude or by hand, then arrange it on a real canvas where every
+element is a layer you can drag, resize and restyle.
 
-**Constraint is the product.** Competing tools lose on template sprawl and option overload.
-FlashCC has very few controls, and the brand kit is set once and cannot drift per slide, so output
-is consistent by construction.
+**The framework is the product.** A carousel is one of four shapes, each with its own hook, and
+most tools leave you to guess which. FlashCC picks the shape first, says what each slide is for,
+and drafts to that structure.
 
 ## Setup
 
 ```bash
 npm install
-npm run dev
+cp .env.example .env    # add ANTHROPIC_API_KEY for drafting
+npm run dev             # starts the app and the drafting server together
 ```
 
 Then open the printed localhost URL.
+
+Drafting needs an `ANTHROPIC_API_KEY`; everything else works without one. The key stays on the
+drafting server and never reaches the browser.
 
 ## Scripts
 

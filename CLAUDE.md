@@ -4,10 +4,15 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project context
 
-**FlashCC** (Carousel Creator) turns a post the user has already written into an on-brand
-carousel. The user brings the words; FlashCC does layout, brand, and render. It never writes,
-rewrites, or suggests copy. No AI in v1. Constraint is the product — very few controls, and the
-brand kit is set once and cannot drift per slide.
+**FlashCC** (Carousel Creator) drafts a carousel from a brief and lets the user arrange it on a
+canvas. Four frameworks (problem-solve, showcase, educational, story), each with its own per-slot
+guidance in `src/studio/structures.ts`.
+
+**AI drafting is part of the product** — this reversed an earlier "no AI" position, so ignore that
+line if you find it anywhere else. `server/index.ts` holds the API key and calls `claude-opus-5`
+through `client.messages.parse()` with a zod output format. The browser only ever talks to
+`/api/draft` on its own origin: **the key must never reach the bundle.** Everything except drafting
+works with no key set, and the UI degrades to "write it yourself" when the server says it has none.
 
 Sibling project to **FlashFX**, whose visual language it uses — but it does **not** import or
 depend on the FlashFX engine (no WebGPU, no compositor, no keyframes).
