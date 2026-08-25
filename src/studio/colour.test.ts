@@ -2,6 +2,8 @@ import { describe, expect, it } from "vitest";
 
 import { buildSlides } from "./compositions.js";
 import { bestText, contrast, fadeToContrast, isValidHex, luminance, mix, textFor } from "./colour.js";
+import { FONT_FORMATS, FONT_SOURCES } from "./fonts.js";
+import { allFonts, FONTS, fontStack, registerFont, unregisterFont } from "./model.js";
 import { CUSTOM_GROUND, DEFAULT_PREFS, groundFor, styleFromPrefs, type Prefs } from "./onboarding.js";
 
 const prefs = (patch: Partial<Prefs> = {}): Prefs => ({ ...DEFAULT_PREFS, ...patch });
@@ -111,3 +113,40 @@ function hsl(h: number, s: number, l: number): string {
   };
   return `#${[f(0), f(8), f(4)].map((x) => x.toString(16).padStart(2, "0")).join("")}`;
 }
+
+describe("fonts", () => {
+  it("ships eight built-ins with unique ids, labels and stacks", () => {
+    expect(FONTS).toHaveLength(8);
+    expect(new Set(FONTS.map((f) => f.id)).size).toBe(8);
+    expect(new Set(FONTS.map((f) => f.label)).size).toBe(8);
+    expect(new Set(FONTS.map((f) => f.stack)).size).toBe(8);
+  });
+
+  it("ends every stack in a generic family, so nothing falls back to nothing", () => {
+    for (const f of FONTS) {
+      expect(f.stack, f.label).toMatch(/(sans-serif|serif|monospace)$/);
+    }
+  });
+
+  it("resolves an unknown id to the first built-in rather than undefined", () => {
+    expect(fontStack("nope")).toBe(FONTS[0]!.stack);
+    expect(fontStack(undefined)).toBe(FONTS[0]!.stack);
+    expect(fontStack("slab")).toContain("Rockwell");
+  });
+
+  it("lets a registered font win over the built-ins, and gives it back on unregister", () => {
+    registerFont({ id: "mine", label: "Mine", stack: '"FCC Mine", sans-serif' });
+    expect(allFonts().some((f) => f.id === "mine")).toBe(true);
+    expect(fontStack("mine")).toContain("FCC Mine");
+
+    unregisterFont("mine");
+    expect(allFonts().some((f) => f.id === "mine")).toBe(false);
+    expect(fontStack("mine")).toBe(FONTS[0]!.stack);
+  });
+
+  it("names a real format and a real source for every entry", () => {
+    for (const f of FONT_FORMATS) expect(f.ext).toMatch(/^\.(woff2|woff|ttf|otf)$/);
+    for (const s of FONT_SOURCES) expect(s.url).toMatch(/^[a-z0-9.-]+\.[a-z]{2,}$/);
+    expect(FONT_FORMATS[0]?.ext, "woff2 should lead — it is the smallest").toBe(".woff2");
+  });
+});

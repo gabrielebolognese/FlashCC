@@ -3,7 +3,7 @@ import { useEffect, useMemo, useState } from "react";
 
 import { buildSlides } from "./compositions.js";
 import { LayerView } from "./LayerView.js";
-import { FONTS } from "./model.js";
+import { allFonts } from "./model.js";
 import type { BuildOptions } from "./compositions.js";
 import { customFrom, DEFAULT_STYLE, type Style } from "./styles.js";
 
@@ -351,7 +351,7 @@ function Picker({
     <div className="flex h-10 items-center gap-3 rounded-xl border border-hairline bg-surface-1 px-3">
       <span className="w-20 shrink-0 text-body text-secondary">{label}</span>
       <div className="flex flex-1 gap-1">
-        {FONTS.map((f) => (
+        {allFonts().map((f) => (
           <button
             key={f.id}
             type="button"

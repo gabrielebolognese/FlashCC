@@ -94,15 +94,40 @@ export const FORMATS = [
   { id: "story", label: "9:16", w: 1080, h: 1920 },
 ] as const;
 
-export const FONTS = [
+export type FontChoice = { id: string; label: string; stack: string; custom?: boolean };
+
+/** Faces that exist on essentially every machine, so nothing has to be downloaded. */
+export const FONTS: FontChoice[] = [
   { id: "sans", label: "Sans", stack: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif' },
   { id: "serif", label: "Serif", stack: 'Georgia, "Times New Roman", Times, serif' },
   { id: "mono", label: "Mono", stack: '"SF Mono", ui-monospace, "Cascadia Code", Consolas, monospace' },
   { id: "display", label: "Display", stack: '"Segoe UI", "Helvetica Neue", Arial, sans-serif' },
-] as const;
+  { id: "grotesk", label: "Grotesk", stack: '"Helvetica Neue", Helvetica, Arial, sans-serif' },
+  { id: "slab", label: "Slab", stack: 'Rockwell, "Roboto Slab", "Courier New", Georgia, serif' },
+  { id: "elegant", label: "Elegant", stack: 'Didot, "Bodoni MT", "Playfair Display", Garamond, Georgia, serif' },
+  { id: "impact", label: "Impact", stack: 'Impact, Haettenschweiler, "Arial Narrow Bold", "Arial Black", sans-serif' },
+];
+
+/**
+ * Faces the user uploaded. Registered at runtime, so `fontStack` has to consult this
+ * before the built-ins — a layer only ever stores the id.
+ */
+const runtime = new Map<string, FontChoice>();
+
+export function registerFont(font: FontChoice): void {
+  runtime.set(font.id, { ...font, custom: true });
+}
+
+export function unregisterFont(id: string): void {
+  runtime.delete(id);
+}
+
+export const allFonts = (): FontChoice[] => [...FONTS, ...runtime.values()];
 
 export const fontStack = (id: string | undefined): string =>
-  FONTS.find((f) => f.id === id)?.stack ?? FONTS[0].stack;
+  (id ? runtime.get(id)?.stack : undefined) ??
+  FONTS.find((f) => f.id === id)?.stack ??
+  FONTS[0]!.stack;
 
 export const DEFAULT_PALETTE = [
   "#0f172a", "#ffffff", "#d9a521", "#e5545a", "#3dbe7a",

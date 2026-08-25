@@ -14,7 +14,7 @@ import {
 import type { ReactNode } from "react";
 
 import { IconButton } from "../ui/IconButton.js";
-import { FONTS, type Layer } from "./model.js";
+import { allFonts, type Layer } from "./model.js";
 import type { Studio } from "./useStudio.js";
 
 /** Properties for the current selection. Nothing selected → the slide itself. */
@@ -102,7 +102,7 @@ export function Properties({ studio }: { studio: Studio }) {
               onChange={(e) => set({ fontFamily: e.target.value })}
               className="h-7 w-full rounded-md border border-hairline bg-surface-1 px-1.5 text-caption text-primary outline-none"
             >
-              {FONTS.map((f) => (
+              {allFonts().map((f) => (
                 <option key={f.id} value={f.id}>
                   {f.label}
                 </option>

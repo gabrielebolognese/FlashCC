@@ -3,7 +3,8 @@ import { useEffect, useMemo, useState, type CSSProperties, type ReactNode } from
 
 import { buildSlides } from "./compositions.js";
 import { SlidePreview } from "./SlidePreview.js";
-import { FONTS } from "./model.js";
+import { allFonts } from "./model.js";
+import { FontUpload } from "./FontUpload.js";
 import { textFor } from "./colour.js";
 import {
   ACCENTS,
@@ -132,23 +133,30 @@ const QUESTIONS: Question[] = [
     title: "How should headings read?",
     note: "The face on hooks, headings and statements.",
     render: (p, set) => (
-      <div className="flex flex-wrap gap-2.5">
-        {FONTS.map((f) => (
-          <button
-            key={f.id}
-            type="button"
-            onClick={() => set({ displayFont: f.id, bodyFont: f.id === "mono" ? "mono" : p.bodyFont })}
-            style={{ fontFamily: f.stack }}
-            className={[
-              "fcc-lift h-16 min-w-[124px] flex-1 rounded-2xl border px-4 text-[19px] font-semibold",
-              p.displayFont === f.id
-                ? "fcc-selected border-accent-dim bg-accent-wash text-primary"
-                : "border-hairline text-tertiary hover:border-surface-5 hover:text-secondary",
-            ].join(" ")}
-          >
-            {f.label}
-          </button>
-        ))}
+      <div>
+        <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+          {allFonts().map((f) => (
+            <button
+              key={f.id}
+              type="button"
+              onClick={() => set({ displayFont: f.id, bodyFont: f.id === "mono" ? "mono" : p.bodyFont })}
+              style={{ fontFamily: f.stack }}
+              className={[
+                "fcc-lift flex h-16 flex-col items-center justify-center rounded-2xl border px-2",
+                p.displayFont === f.id
+                  ? "fcc-selected border-accent-dim bg-accent-wash text-primary"
+                  : "border-hairline text-tertiary hover:border-surface-5 hover:text-secondary",
+              ].join(" ")}
+            >
+              <span className="text-[21px] font-semibold leading-6">Aa</span>
+              <span className="mt-0.5 max-w-full truncate text-[10px] font-medium opacity-70">
+                {f.label}
+              </span>
+            </button>
+          ))}
+        </div>
+
+        <FontUpload onAdded={(id) => set({ displayFont: id })} />
       </div>
     ),
   },
