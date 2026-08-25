@@ -5,6 +5,7 @@
  * are not stored and ignored. Skipping is a first-class path: the defaults are the
  * same ones the app would have used anyway.
  */
+import { textFor } from "./colour.js";
 import type { Theme } from "./presets.js";
 import { STYLES, type Style } from "./styles.js";
 
@@ -12,8 +13,10 @@ export type DecorLevel = "none" | "normal" | "bold";
 export type ImageUse = "always" | "sometimes" | "never";
 
 export type Prefs = {
-  /** Key into GROUNDS. Dark and light are the plain two; the rest are tinted. */
+  /** Key into GROUNDS, or CUSTOM_GROUND to use customBg. */
   ground: string;
+  /** Used only when ground is CUSTOM_GROUND. Text is derived from it. */
+  customBg?: string | undefined;
   accent: string;
   displayFont: string;
   bodyFont: string;
@@ -101,9 +104,24 @@ export const GROUNDS: Ground[] = [...MAIN_GROUNDS, ...MORE_GROUNDS];
 export const groundById = (id: string): Ground =>
   GROUNDS.find((g) => g.id === id) ?? MAIN_GROUNDS[0]!;
 
+export const CUSTOM_GROUND = "custom";
+
+/**
+ * The ground actually in force. A custom background derives its own text and muted
+ * colours, so the user picks one colour and cannot end up with unreadable slides.
+ */
+export function groundFor(prefs: Prefs): Ground {
+  if (prefs.ground === CUSTOM_GROUND && prefs.customBg) {
+    const bg = prefs.customBg;
+    const { fg, muted } = textFor(bg);
+    return { id: CUSTOM_GROUND, name: "Custom", bg, fg, muted };
+  }
+  return groundById(prefs.ground);
+}
+
 /** The answers, as a style that sits first in the gallery. */
 export function styleFromPrefs(prefs: Prefs): Style {
-  const g = groundById(prefs.ground);
+  const g = groundFor(prefs);
   const theme: Theme = {
     bg: g.bg,
     fg: g.fg,

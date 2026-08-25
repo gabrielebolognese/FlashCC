@@ -4,8 +4,10 @@ import { useEffect, useMemo, useState, type CSSProperties, type ReactNode } from
 import { buildSlides } from "./compositions.js";
 import { SlidePreview } from "./SlidePreview.js";
 import { FONTS } from "./model.js";
+import { textFor } from "./colour.js";
 import {
   ACCENTS,
+  CUSTOM_GROUND,
   DEFAULT_PREFS,
   MAIN_GROUNDS,
   MORE_GROUNDS,
@@ -66,7 +68,7 @@ const QUESTIONS: Question[] = [
         </div>
 
         <div className="mb-2 mt-5 text-overline uppercase text-tertiary">Or a tint</div>
-        <div className="grid grid-cols-3 gap-2">
+        <div className="mb-2.5 grid grid-cols-3 gap-2">
           {MORE_GROUNDS.map((g) => (
             <button
               key={g.id}
@@ -90,6 +92,8 @@ const QUESTIONS: Question[] = [
             </button>
           ))}
         </div>
+
+        <CustomGround prefs={p} onPick={set} />
       </div>
     ),
   },
@@ -493,6 +497,64 @@ function Choices<T extends string>({
           ) : null}
         </button>
       ))}
+    </div>
+  );
+}
+
+/**
+ * Any background at all. Text and muted are derived to the maximum-contrast pole
+ * rather than chosen, so one decision cannot produce an unreadable deck.
+ */
+function CustomGround({
+  prefs,
+  onPick,
+}: {
+  prefs: Prefs;
+  onPick: (p: Partial<Prefs>) => void;
+}) {
+  const bg = prefs.customBg ?? "#1a1330";
+  const { fg, muted } = textFor(bg);
+  const active = prefs.ground === CUSTOM_GROUND;
+
+  return (
+    <div
+      className={[
+        "fcc-lift flex items-center gap-3 rounded-xl border px-2.5 py-2",
+        active ? "fcc-selected border-accent-dim bg-accent-wash" : "border-hairline",
+      ].join(" ")}
+    >
+      <label
+        className="grid h-9 w-9 shrink-0 cursor-pointer place-items-center rounded-lg border border-white/10 text-[11px] font-semibold"
+        style={{ background: bg, color: fg }}
+        title="Choose any background"
+      >
+        Aa
+        <input
+          type="color"
+          value={bg}
+          onChange={(e) => onPick({ customBg: e.target.value, ground: CUSTOM_GROUND })}
+          className="absolute h-0 w-0 opacity-0"
+        />
+      </label>
+
+      <button
+        type="button"
+        onClick={() => onPick({ ground: CUSTOM_GROUND, customBg: bg })}
+        className="min-w-0 flex-1 text-left"
+      >
+        <span className="block text-caption font-semibold text-primary">Any colour</span>
+        <span className="block text-[11px] text-tertiary">
+          Text picks itself for contrast
+        </span>
+      </button>
+
+      {/* what the derived pair will actually look like */}
+      <span
+        className="hidden shrink-0 rounded-lg px-2 py-1 text-[10px] sm:block"
+        style={{ background: bg, color: muted }}
+      >
+        muted
+      </span>
     </div>
   );
 }
