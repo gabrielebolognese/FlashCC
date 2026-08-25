@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useMemo, useState } from "react";
 
 import { AiChat } from "./studio/AiChat.js";
 import { buildSlides } from "./studio/compositions.js";
@@ -10,12 +10,22 @@ import { Start } from "./studio/Start.js";
 import { saveDoc } from "./studio/storage.js";
 import { Studio } from "./studio/Studio.js";
 import type { Structure } from "./studio/structures.js";
+import {
+  decorScale,
+  hasOnboarded,
+  loadPrefs,
+  stylesFor,
+  wantsImages,
+  type Prefs,
+} from "./studio/onboarding.js";
 import { StylePicker } from "./studio/StylePicker.js";
+import { Welcome } from "./studio/Welcome.js";
 import type { Style } from "./studio/styles.js";
 
 type Draft = { structure: Structure; texts: string[]; roles: string[] };
 
 type Screen =
+  | { view: "welcome" }
   | { view: "start" }
   | { view: "frameworks"; theme: keyof typeof THEMES }
   | { view: "ai"; structure: Structure; theme: keyof typeof THEMES }
@@ -24,7 +34,32 @@ type Screen =
   | { view: "studio"; doc: Doc };
 
 export function App() {
-  const [screen, setScreen] = useState<Screen>({ view: "start" });
+  // First run gets the welcome; everyone else goes straight in.
+  const [screen, setScreen] = useState<Screen>(() =>
+    hasOnboarded() ? { view: "start" } : { view: "welcome" },
+  );
+  const [prefs, setPrefs] = useState<Prefs | null>(() => loadPrefs());
+
+  // The answers become the gallery's first style and two real build settings.
+  const styles = useMemo(() => stylesFor(prefs), [prefs]);
+  const build = useMemo(
+    () =>
+      prefs
+        ? { images: wantsImages(prefs.images), decor: decorScale(prefs.decor) }
+        : {},
+    [prefs],
+  );
+
+  if (screen.view === "welcome") {
+    return (
+      <Welcome
+        onDone={(answered) => {
+          if (answered) setPrefs(answered);
+          setScreen({ view: "start" });
+        }}
+      />
+    );
+  }
 
   if (screen.view === "frameworks") {
     return (
@@ -74,6 +109,8 @@ export function App() {
       <StylePicker
         texts={draft.texts}
         roles={draft.roles}
+        styles={styles}
+        build={build}
         onBack={() =>
           setScreen({
             view: "compose",
@@ -90,7 +127,7 @@ export function App() {
               t.bg, t.fg, t.accent, t.muted,
               "#ffffff", "#000000", "#e5545a", "#3dbe7a", "#4c86d6", "#db2777",
             ],
-            slides: buildSlides(draft.texts, t, draft.roles),
+            slides: buildSlides(draft.texts, t, draft.roles, build),
           };
           saveDoc(doc);
           setScreen({ view: "studio", doc });

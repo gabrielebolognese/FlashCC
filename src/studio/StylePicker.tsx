@@ -4,7 +4,8 @@ import { useEffect, useMemo, useState } from "react";
 import { buildSlides } from "./compositions.js";
 import { LayerView } from "./LayerView.js";
 import { FONTS } from "./model.js";
-import { customFrom, DEFAULT_STYLE, STYLES, type Style } from "./styles.js";
+import type { BuildOptions } from "./compositions.js";
+import { customFrom, DEFAULT_STYLE, type Style } from "./styles.js";
 
 const W = 1080;
 const H = 1350;
@@ -63,18 +64,20 @@ function StyleCard({
   style,
   texts,
   roles,
+  build,
   selected,
   onPick,
 }: {
   style: Style;
   texts: string[];
   roles: string[];
+  build: BuildOptions;
   selected: boolean;
   onPick: () => void;
 }) {
   const slide = useMemo(
-    () => buildSlides(texts.slice(0, 1), style.theme, roles.slice(0, 1))[0],
-    [style, texts, roles],
+    () => buildSlides(texts.slice(0, 1), style.theme, roles.slice(0, 1), build)[0],
+    [style, texts, roles, build],
   );
   const scale = CARD_H / H;
 
@@ -108,17 +111,22 @@ function StyleCard({
 export function StylePicker({
   texts,
   roles,
+  styles,
+  build,
   onUse,
   onBack,
 }: {
   texts: string[];
   roles: string[];
+  /** The gallery, with the user's own style first when they have one. */
+  styles: Style[];
+  build: BuildOptions;
   onUse: (style: Style) => void;
   onBack: () => void;
 }) {
   const [loading, setLoading] = useState(true);
   const [custom, setCustom] = useState<Style | null>(null);
-  const [picked, setPicked] = useState<string>(DEFAULT_STYLE.id);
+  const [picked, setPicked] = useState<string>(styles[0]?.id ?? DEFAULT_STYLE.id);
 
   useEffect(() => {
     const t = window.setTimeout(() => setLoading(false), LOAD_MS);
@@ -133,6 +141,7 @@ export function StylePicker({
         style={custom}
         texts={texts}
         roles={roles}
+        build={build}
         onChange={setCustom}
         onCancel={() => setCustom(null)}
         onUse={() => onUse(custom)}
@@ -160,7 +169,7 @@ export function StylePicker({
         <div className="flex-1" />
         <button
           type="button"
-          onClick={() => onUse(STYLES.find((s) => s.id === picked) ?? DEFAULT_STYLE)}
+          onClick={() => onUse(styles.find((s) => s.id === picked) ?? styles[0] ?? DEFAULT_STYLE)}
           style={{ background: "var(--brand-gold)", color: "var(--on-brand-gold)" }}
           className="flex h-9 items-center gap-2 rounded-xl px-4 text-body-strong shadow-overlay hover:brightness-110"
         >
@@ -171,12 +180,13 @@ export function StylePicker({
       <div className="scroll-quiet fcc-rise min-h-0 flex-1 overflow-y-auto">
         <div className="mx-auto max-w-[1160px] px-6 py-8">
           <div className="flex flex-wrap gap-5">
-            {STYLES.map((s) => (
+            {styles.map((s) => (
               <StyleCard
                 key={s.id}
                 style={s}
                 texts={texts}
                 roles={roles}
+                build={build}
                 selected={picked === s.id}
                 onPick={() => setPicked(s.id)}
               />
@@ -185,7 +195,7 @@ export function StylePicker({
 
           <button
             type="button"
-            onClick={() => setCustom(customFrom(STYLES.find((s) => s.id === picked) ?? DEFAULT_STYLE))}
+            onClick={() => setCustom(customFrom(styles.find((s) => s.id === picked) ?? styles[0] ?? DEFAULT_STYLE))}
             className="mt-10 flex h-16 w-full items-center justify-center gap-3 rounded-3xl border border-dashed border-hairline text-[17px] font-semibold text-secondary transition-[border-color,background-color,color] duration-instant ease-out hover:border-accent-dim hover:bg-accent-wash hover:text-accent"
           >
             <Palette size={19} strokeWidth={2.2} />
@@ -203,6 +213,7 @@ function CustomStyle({
   style,
   texts,
   roles,
+  build,
   onChange,
   onCancel,
   onUse,
@@ -210,6 +221,7 @@ function CustomStyle({
   style: Style;
   texts: string[];
   roles: string[];
+  build: BuildOptions;
   onChange: (s: Style) => void;
   onCancel: () => void;
   onUse: () => void;
@@ -218,8 +230,8 @@ function CustomStyle({
     onChange({ ...style, theme: { ...style.theme, ...patch } });
 
   const slide = useMemo(
-    () => buildSlides(texts.slice(0, 1), style.theme, roles.slice(0, 1))[0],
-    [style, texts, roles],
+    () => buildSlides(texts.slice(0, 1), style.theme, roles.slice(0, 1), build)[0],
+    [style, texts, roles, build],
   );
   const scale = 460 / H;
 

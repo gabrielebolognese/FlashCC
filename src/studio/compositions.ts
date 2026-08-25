@@ -26,7 +26,8 @@ const BAND_GAP = 56;
 export type Region = { x: number; y: number; w: number; h: number };
 export type ImagePlacement = "above" | "below";
 
-type Ctx = { text: string; index: number; total: number; theme: Theme };
+/** `decor` scales every accent rule: 0 removes them, 1 is normal, 1.8 is bold. */
+type Ctx = { text: string; index: number; total: number; theme: Theme; decor: number };
 
 /**
  * Fit text to a box by actually wrapping it.
@@ -60,6 +61,10 @@ const rect = (at: Region, fill: string, extra: Partial<Layer> = {}): Layer => ({
   ...extra,
 });
 
+/** An accent rule, scaled by the decoration setting and omitted entirely at zero. */
+const accent = (decor: number, at: Region, fill: string, extra: Partial<Layer> = {}): Layer[] =>
+  decor <= 0 ? [] : [rect({ ...at, h: Math.round(at.h * decor) }, fill, extra)];
+
 /** Split a block into a lead line and the rest. */
 function lead(t: string): [string, string] {
   const nl = t.indexOf("\n");
@@ -84,15 +89,15 @@ const TITLE: Composition = {
   id: "title",
   label: "Title",
   image: "above",
-  build: ({ text: t, theme }, r) => {
+  build: ({ text: t, theme, decor }, r) => {
     const LH = 1.06;
-    const RULE = 56; // rule + the air under it
+    const RULE = decor > 0 ? 56 : 0; // rule + the air under it
     const f = fit(t, { w: r.w, h: r.h - RULE }, [104, 40], LH, { letterSpacing: -0.02 });
     // Bottom-anchored, so a taller block grows upward — and is clamped so the rule
     // above it never leaves the region either.
     const y = clampY(r.y + r.h - f.height, f.height, r.y + RULE, r.h - RULE);
     return [
-      rect({ x: r.x, y: y - 46, w: 132, h: 10 }, theme.accent, { name: "Rule", radius: 5 }),
+      ...accent(decor, { x: r.x, y: y - 46, w: 132, h: 10 }, theme.accent, { name: "Rule", radius: 5 }),
       text(t, { x: r.x, y, w: r.w, h: f.height }, theme.fg, {
         fontSize: f.fontSize,
         fontWeight: 700,
@@ -108,9 +113,9 @@ const UNDERLINE: Composition = {
   id: "underline",
   label: "Underlined",
   image: "below",
-  build: ({ text: t, theme }, r) => {
+  build: ({ text: t, theme, decor }, r) => {
     const LH = 1.15;
-    const RULE = 32;
+    const RULE = decor > 0 ? 32 : 0;
     const f = fit(t, { w: r.w, h: r.h - RULE }, [70, 30], LH);
     return [
       text(t, { x: r.x, y: r.y, w: r.w, h: f.height }, theme.fg, {
@@ -119,7 +124,10 @@ const UNDERLINE: Composition = {
         lineHeight: LH,
         name: "Text",
       }),
-      rect({ x: r.x, y: r.y + f.height + 28, w: r.w, h: 4 }, theme.accent, { name: "Underline", radius: 2 }),
+      ...accent(decor, { x: r.x, y: r.y + f.height + 28, w: r.w, h: 4 }, theme.accent, {
+        name: "Underline",
+        radius: 2,
+      }),
     ];
   },
 };
@@ -179,7 +187,7 @@ const NUMBERED: Composition = {
   id: "numbered",
   label: "Numbered",
   image: "below",
-  build: ({ text: t, index, theme }, r) => {
+  build: ({ text: t, index, theme, decor }, r) => {
     const LH = 1.4;
     const numH = 110;
     const HEAD = numH + 24 + 6 + 36; // numeral, tick and the air around them
@@ -194,7 +202,10 @@ const NUMBERED: Composition = {
         letterSpacing: -0.04,
         name: "Number",
       }),
-      rect({ x: r.x, y: y + numH + 24, w: 72, h: 6 }, theme.accent, { name: "Tick", radius: 3 }),
+      ...accent(decor, { x: r.x, y: y + numH + 24, w: 72, h: 6 }, theme.accent, {
+        name: "Tick",
+        radius: 3,
+      }),
       text(t, { x: r.x, y: y + HEAD, w: r.w, h: f.height }, theme.fg, {
         fontSize: f.fontSize,
         fontWeight: 500,
@@ -209,13 +220,15 @@ const QUOTE: Composition = {
   id: "quote",
   label: "Quote",
   image: "above",
-  build: ({ text: t, theme }, r) => {
+  build: ({ text: t, theme, decor }, r) => {
     const LH = 1.25;
     const INDENT = 44;
     const f = fit(t, { w: r.w - INDENT, h: r.h }, [62, 26], LH);
     const y = clampY(centred(r, f.height), f.height, r.y, r.h);
     return [
-      rect({ x: r.x, y, w: 8, h: f.height }, theme.accent, { name: "Bar", radius: 4 }),
+      ...(decor > 0
+        ? [rect({ x: r.x, y, w: Math.round(8 * decor), h: f.height }, theme.accent, { name: "Bar", radius: 4 })]
+        : []),
       text(t, { x: r.x + INDENT, y, w: r.w - INDENT, h: f.height }, theme.fg, {
         fontSize: f.fontSize,
         fontWeight: 500,
@@ -310,8 +323,14 @@ export const compositionLabel = (index: number, total: number, role?: string): s
   compositionFor(index, total, role).label;
 
 /** The picture band and the text region it leaves behind. */
-export function bandsFor(placement: ImagePlacement): { image: Region; textRegion: Region } {
+export function bandsFor(
+  placement: ImagePlacement,
+  withImage = true,
+): { image: Region; textRegion: Region } {
   const innerH = H - M * 2;
+  const full = { x: M, y: M, w: COL, h: innerH };
+  // No pictures: the text gets the whole safe box rather than a band of dead space.
+  if (!withImage) return { image: full, textRegion: full };
   if (placement === "above") {
     return {
       image: { x: M, y: M, w: COL, h: BAND },
@@ -339,7 +358,22 @@ function applyFonts(layer: Layer, theme: Theme): Layer {
   return font ? { ...layer, fontFamily: font } : layer;
 }
 
-export function buildSlides(texts: string[], theme: Theme, roles?: string[]): Slide[] {
+export type BuildOptions = {
+  /** Reserve a picture band on every slide. */
+  images?: boolean | undefined;
+  /** 0 removes accent rules, 1 is normal, 1.8 is bold. */
+  decor?: number | undefined;
+};
+
+export function buildSlides(
+  texts: string[],
+  theme: Theme,
+  roles?: string[],
+  options: BuildOptions = {},
+): Slide[] {
+  const images = options.images ?? true;
+  const decor = options.decor ?? 1;
+
   const kept: { text: string; role: string | undefined }[] = [];
   texts.forEach((t, i) => {
     if (t.trim()) kept.push({ text: t.trim(), role: roles?.[i] });
@@ -348,17 +382,16 @@ export function buildSlides(texts: string[], theme: Theme, roles?: string[]): Sl
 
   return kept.map((k, i) => {
     const comp = compositionFor(i, kept.length, k.role);
-    const { image, textRegion } = bandsFor(comp.image);
+    const { image, textRegion } = bandsFor(comp.image, images);
+    const built = comp
+      .build({ text: k.text, index: i, total: kept.length, theme, decor }, textRegion)
+      .map((l) => applyFonts(l, theme));
+
     // Picture first so it sits behind the text, which is what you want if either
     // ends up dragged over the other later.
     return {
       ...makeSlide(theme.bg, comp.id === "title" ? "Hook" : `Slide ${i + 1}`),
-      layers: [
-        imagePlaceholder(image, theme),
-        ...comp
-          .build({ text: k.text, index: i, total: kept.length, theme }, textRegion)
-          .map((l) => applyFonts(l, theme)),
-      ],
+      layers: images ? [imagePlaceholder(image, theme), ...built] : built,
     };
   });
 }
