@@ -329,6 +329,16 @@ export function imagePlaceholder(at: Region, theme: Theme, name = "Image"): Laye
   return { ...makeLayer("image", at, theme.muted), name, radius: 12, fit: "cover" };
 }
 
+/**
+ * The style's typefaces, applied by the job a layer does rather than by editing every
+ * composition: prose takes the body face, everything else takes display.
+ */
+function applyFonts(layer: Layer, theme: Theme): Layer {
+  if (layer.kind !== "text") return layer;
+  const font = layer.name === "Body" ? theme.bodyFont : theme.displayFont;
+  return font ? { ...layer, fontFamily: font } : layer;
+}
+
 export function buildSlides(texts: string[], theme: Theme, roles?: string[]): Slide[] {
   const kept: { text: string; role: string | undefined }[] = [];
   texts.forEach((t, i) => {
@@ -345,7 +355,9 @@ export function buildSlides(texts: string[], theme: Theme, roles?: string[]): Sl
       ...makeSlide(theme.bg, comp.id === "title" ? "Hook" : `Slide ${i + 1}`),
       layers: [
         imagePlaceholder(image, theme),
-        ...comp.build({ text: k.text, index: i, total: kept.length, theme }, textRegion),
+        ...comp
+          .build({ text: k.text, index: i, total: kept.length, theme }, textRegion)
+          .map((l) => applyFonts(l, theme)),
       ],
     };
   });

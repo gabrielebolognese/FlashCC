@@ -7,7 +7,15 @@
  */
 import { makeLayer, makeSlide, uid, type Doc, type Layer, type Slide } from "./model.js";
 
-export type Theme = { bg: string; fg: string; accent: string; muted: string };
+export type Theme = {
+  bg: string;
+  fg: string;
+  accent: string;
+  muted: string;
+  /** FONTS ids. Display carries headings and statements; body carries prose. */
+  displayFont?: string | undefined;
+  bodyFont?: string | undefined;
+};
 
 export const THEMES: Record<string, Theme> = {
   ink: { bg: "#12161c", fg: "#f4f6f8", accent: "#d9a521", muted: "#8b96a5" },
