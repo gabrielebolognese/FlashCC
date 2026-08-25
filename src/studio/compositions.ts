@@ -12,6 +12,7 @@
  */
 import { makeLayer, makeSlide, type Layer, type Slide } from "./model.js";
 import type { Theme } from "./presets.js";
+import { clampY, fitToBox, ladder, type Measure } from "./text.js";
 
 const W = 1080;
 const H = 1350;
@@ -28,12 +29,26 @@ export type ImagePlacement = "above" | "below";
 type Ctx = { text: string; index: number; total: number; theme: Theme };
 
 /**
- * Area-based auto-size: text roughly fills its box regardless of length, so a
- * six-word slide is big and a sixty-word slide is readable.
+ * Fit text to a box by actually wrapping it.
+ *
+ * Everything here goes through this: the size comes off a ladder, and the HEIGHT is
+ * the wrapped line count times the leading, never a guess from character count. That
+ * is what stops a long hook running off the artboard.
  */
-function autoSize(text: string, max: number, min: number, ideal: number): number {
-  const n = Math.max(1, text.trim().length);
-  return Math.round(Math.max(min, Math.min(max, max * Math.sqrt(ideal / n))));
+function fit(
+  t: string,
+  box: { w: number; h: number },
+  range: [max: number, min: number],
+  lineHeight: number,
+  m: Measure = {},
+) {
+  return fitToBox(t, {
+    maxWidth: box.w,
+    maxHeight: box.h,
+    sizes: ladder(range[0], range[1]),
+    lineHeight,
+    ...m,
+  });
 }
 
 function text(t: string, at: Region, fill: string, extra: Partial<Layer> = {}): Layer {
@@ -70,15 +85,18 @@ const TITLE: Composition = {
   label: "Title",
   image: "above",
   build: ({ text: t, theme }, r) => {
-    const size = autoSize(t, 104, 46, 46);
-    const h = Math.min(r.h - 60, Math.max(150, Math.ceil(t.length / 18) * size * 1.06));
-    const y = r.y + r.h - h;
+    const LH = 1.06;
+    const RULE = 56; // rule + the air under it
+    const f = fit(t, { w: r.w, h: r.h - RULE }, [104, 40], LH, { letterSpacing: -0.02 });
+    // Bottom-anchored, so a taller block grows upward — and is clamped so the rule
+    // above it never leaves the region either.
+    const y = clampY(r.y + r.h - f.height, f.height, r.y + RULE, r.h - RULE);
     return [
       rect({ x: r.x, y: y - 46, w: 132, h: 10 }, theme.accent, { name: "Rule", radius: 5 }),
-      text(t, { x: r.x, y, w: r.w, h }, theme.fg, {
-        fontSize: size,
+      text(t, { x: r.x, y, w: r.w, h: f.height }, theme.fg, {
+        fontSize: f.fontSize,
         fontWeight: 700,
-        lineHeight: 1.06,
+        lineHeight: LH,
         letterSpacing: -0.02,
         name: "Title",
       }),
@@ -91,16 +109,17 @@ const UNDERLINE: Composition = {
   label: "Underlined",
   image: "below",
   build: ({ text: t, theme }, r) => {
-    const size = autoSize(t, 70, 34, 80);
-    const h = Math.min(r.h - 40, Math.max(size * 1.15, Math.ceil(t.length / 22) * size * 1.15));
+    const LH = 1.15;
+    const RULE = 32;
+    const f = fit(t, { w: r.w, h: r.h - RULE }, [70, 30], LH);
     return [
-      text(t, { x: r.x, y: r.y, w: r.w, h }, theme.fg, {
-        fontSize: size,
+      text(t, { x: r.x, y: r.y, w: r.w, h: f.height }, theme.fg, {
+        fontSize: f.fontSize,
         fontWeight: 700,
-        lineHeight: 1.15,
+        lineHeight: LH,
         name: "Text",
       }),
-      rect({ x: r.x, y: r.y + h + 28, w: r.w, h: 4 }, theme.accent, { name: "Underline", radius: 2 }),
+      rect({ x: r.x, y: r.y + f.height + 28, w: r.w, h: 4 }, theme.accent, { name: "Underline", radius: 2 }),
     ];
   },
 };
@@ -113,20 +132,22 @@ const HEADING_BODY: Composition = {
     const [head, rest] = lead(ctx.text);
     if (!rest) return UNDERLINE.build(ctx, r);
     const { theme } = ctx;
-    const hs = autoSize(head, 58, 34, 40);
-    const bs = autoSize(rest, 40, 26, 220);
-    const hh = Math.max(hs * 1.2, Math.ceil(head.length / 26) * hs * 1.2);
-    const bh = Math.max(bs * 1.5, Math.ceil(rest.length / 44) * bs * 1.45);
-    const y = centred(r, hh + 32 + bh);
+    const GAP = 32;
+    // The heading gets at most 40% of the region; the body takes what is left, so a
+    // long heading cannot squeeze the body off the slide.
+    const hf = fit(head, { w: r.w, h: r.h * 0.4 }, [58, 30], 1.15);
+    const bf = fit(rest, { w: r.w, h: r.h - hf.height - GAP }, [40, 22], 1.45);
+    const total = hf.height + GAP + bf.height;
+    const y = clampY(centred(r, total), total, r.y, r.h);
     return [
-      text(head, { x: r.x, y, w: r.w, h: hh }, theme.fg, {
-        fontSize: hs,
+      text(head, { x: r.x, y, w: r.w, h: hf.height }, theme.fg, {
+        fontSize: hf.fontSize,
         fontWeight: 700,
         lineHeight: 1.15,
         name: "Heading",
       }),
-      text(rest, { x: r.x, y: y + hh + 32, w: r.w, h: bh }, theme.muted, {
-        fontSize: bs,
+      text(rest, { x: r.x, y: y + hf.height + GAP, w: r.w, h: bf.height }, theme.muted, {
+        fontSize: bf.fontSize,
         fontWeight: 400,
         lineHeight: 1.45,
         name: "Body",
@@ -140,13 +161,13 @@ const STATEMENT: Composition = {
   label: "Statement",
   image: "below",
   build: ({ text: t, theme }, r) => {
-    const size = autoSize(t, 76, 34, 70);
-    const h = Math.min(r.h, Math.max(size * 1.2, Math.ceil(t.length / 22) * size * 1.18));
+    const LH = 1.18;
+    const f = fit(t, { w: r.w, h: r.h }, [76, 30], LH);
     return [
-      text(t, { x: r.x, y: centred(r, h), w: r.w, h }, theme.fg, {
-        fontSize: size,
+      text(t, { x: r.x, y: clampY(centred(r, f.height), f.height, r.y, r.h), w: r.w, h: f.height }, theme.fg, {
+        fontSize: f.fontSize,
         fontWeight: 700,
-        lineHeight: 1.18,
+        lineHeight: LH,
         align: "center",
         name: "Statement",
       }),
@@ -159,10 +180,12 @@ const NUMBERED: Composition = {
   label: "Numbered",
   image: "below",
   build: ({ text: t, index, theme }, r) => {
-    const size = autoSize(t, 46, 26, 150);
-    const th = Math.max(size * 1.4, Math.ceil(t.length / 34) * size * 1.4);
+    const LH = 1.4;
     const numH = 110;
-    const y = centred(r, numH + 24 + 6 + 36 + th);
+    const HEAD = numH + 24 + 6 + 36; // numeral, tick and the air around them
+    const f = fit(t, { w: r.w, h: r.h - HEAD }, [46, 22], LH);
+    const total = HEAD + f.height;
+    const y = clampY(centred(r, total), total, r.y, r.h);
     return [
       text(String(index + 1).padStart(2, "0"), { x: r.x, y, w: 240, h: numH }, theme.accent, {
         fontSize: 100,
@@ -172,10 +195,10 @@ const NUMBERED: Composition = {
         name: "Number",
       }),
       rect({ x: r.x, y: y + numH + 24, w: 72, h: 6 }, theme.accent, { name: "Tick", radius: 3 }),
-      text(t, { x: r.x, y: y + numH + 24 + 6 + 36, w: r.w, h: th }, theme.fg, {
-        fontSize: size,
+      text(t, { x: r.x, y: y + HEAD, w: r.w, h: f.height }, theme.fg, {
+        fontSize: f.fontSize,
         fontWeight: 500,
-        lineHeight: 1.4,
+        lineHeight: LH,
         name: "Text",
       }),
     ];
@@ -187,15 +210,16 @@ const QUOTE: Composition = {
   label: "Quote",
   image: "above",
   build: ({ text: t, theme }, r) => {
-    const size = autoSize(t, 62, 28, 90);
-    const h = Math.min(r.h, Math.max(size * 1.25, Math.ceil(t.length / 24) * size * 1.25));
-    const y = centred(r, h);
+    const LH = 1.25;
+    const INDENT = 44;
+    const f = fit(t, { w: r.w - INDENT, h: r.h }, [62, 26], LH);
+    const y = clampY(centred(r, f.height), f.height, r.y, r.h);
     return [
-      rect({ x: r.x, y, w: 8, h }, theme.accent, { name: "Bar", radius: 4 }),
-      text(t, { x: r.x + 44, y, w: r.w - 44, h }, theme.fg, {
-        fontSize: size,
+      rect({ x: r.x, y, w: 8, h: f.height }, theme.accent, { name: "Bar", radius: 4 }),
+      text(t, { x: r.x + INDENT, y, w: r.w - INDENT, h: f.height }, theme.fg, {
+        fontSize: f.fontSize,
         fontWeight: 500,
-        lineHeight: 1.25,
+        lineHeight: LH,
         italic: true,
         name: "Quote",
       }),
@@ -208,17 +232,18 @@ const BLOCK: Composition = {
   label: "Colour block",
   image: "above",
   build: ({ text: t, theme }, r) => {
-    const size = autoSize(t, 68, 30, 80);
-    const h = Math.max(size * 1.2, Math.ceil(t.length / 22) * size * 1.2);
-    const padY = Math.min(64, Math.max(28, (r.h - h) / 2));
-    const blockH = Math.min(r.h, h + padY * 2);
-    const y = centred(r, blockH);
+    const LH = 1.2;
+    const MIN_PAD = 28;
+    const f = fit(t, { w: r.w, h: r.h - MIN_PAD * 2 }, [68, 26], LH);
+    const padY = Math.min(64, Math.max(MIN_PAD, (r.h - f.height) / 2));
+    const blockH = Math.min(r.h, f.height + padY * 2);
+    const y = clampY(centred(r, blockH), blockH, r.y, r.h);
     return [
       rect({ x: 0, y, w: W, h: blockH }, theme.accent, { name: "Block" }),
-      text(t, { x: r.x, y: y + (blockH - h) / 2, w: r.w, h }, theme.bg, {
-        fontSize: size,
+      text(t, { x: r.x, y: y + (blockH - f.height) / 2, w: r.w, h: f.height }, theme.bg, {
+        fontSize: f.fontSize,
         fontWeight: 700,
-        lineHeight: 1.2,
+        lineHeight: LH,
         align: "center",
         name: "Text",
       }),
@@ -231,13 +256,15 @@ const CAPS: Composition = {
   label: "Caps",
   image: "below",
   build: ({ text: t, theme }, r) => {
-    const size = autoSize(t, 56, 24, 90);
-    const h = Math.min(r.h, Math.max(size * 1.3, Math.ceil(t.length / 20) * size * 1.3));
+    const LH = 1.3;
+    // Measured uppercased and tracked out, since that is what actually renders.
+    const m: Measure = { letterSpacing: 0.06, uppercase: true };
+    const f = fit(t, { w: r.w, h: r.h }, [56, 22], LH, m);
     return [
-      text(t, { x: r.x, y: centred(r, h), w: r.w, h }, theme.fg, {
-        fontSize: size,
+      text(t, { x: r.x, y: clampY(centred(r, f.height), f.height, r.y, r.h), w: r.w, h: f.height }, theme.fg, {
+        fontSize: f.fontSize,
         fontWeight: 700,
-        lineHeight: 1.3,
+        lineHeight: LH,
         letterSpacing: 0.06,
         uppercase: true,
         align: "center",
