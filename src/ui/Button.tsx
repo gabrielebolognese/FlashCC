@@ -23,7 +23,7 @@ export function Button({ children, onClick, icon: Icon, hero = false, disabled =
       disabled={disabled}
       style={hero ? { background: "var(--brand-gold)", color: "var(--on-brand-gold)" } : undefined}
       className={[
-        "flex h-7 items-center gap-1.5 rounded-md px-3 text-body-strong",
+        "flex h-8 items-center gap-1.5 rounded-xl px-3.5 text-body-strong",
         hero
           ? "hover:brightness-110"
           : "border border-hairline bg-surface-1 text-secondary hover:bg-surface-3 hover:text-primary",

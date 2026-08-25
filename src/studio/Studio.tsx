@@ -5,11 +5,13 @@ import { createPortal } from "react-dom";
 import { Button } from "../ui/Button.js";
 import { IconButton } from "../ui/IconButton.js";
 import { Canvas } from "./Canvas.js";
+import { Filmstrip } from "./Filmstrip.js";
 import { LayersPanel } from "./LayersPanel.js";
 import { LayerView } from "./LayerView.js";
 import type { Doc } from "./model.js";
 import { Properties } from "./Properties.js";
-import { slidesFromText } from "./presets.js";
+import { buildSlides } from "./compositions.js";
+import { THEMES } from "./presets.js";
 import { Toolbar } from "./Toolbar.js";
 import { useStudio } from "./useStudio.js";
 
@@ -78,9 +80,11 @@ export function Studio({ initial, onHome }: { initial: Doc; onHome: () => void }
         <Properties studio={studio} />
       </div>
 
+      <Filmstrip studio={studio} />
+
       {pasteOpen ? (
         <div className="absolute inset-0 z-modal grid place-items-center" style={{ background: "rgba(0,0,0,.6)", backdropFilter: "blur(4px)" }}>
-          <div className="w-[520px] rounded-xl border border-hairline bg-surface-2 shadow-modal">
+          <div className="w-[560px] rounded-2xl border border-hairline bg-surface-2 shadow-modal">
             <header className="flex h-11 items-center gap-2 border-b border-hairline px-3">
               <span className="text-title text-primary">Paste a post</span>
               <div className="flex-1" />
@@ -110,7 +114,10 @@ export function Studio({ initial, onHome }: { initial: Doc; onHome: () => void }
                 hero
                 onClick={() => {
                   if (pasted.trim()) {
-                    const slides = slidesFromText(pasted, "ink");
+                    const slides = buildSlides(
+                      pasted.replace(/\r\n?/g, "\n").split(/\n\s*\n/).map((t) => t.trim()).filter(Boolean),
+                      THEMES.ink!,
+                    );
                     studio.replaceDoc({ ...doc, slides: [...doc.slides, ...slides] });
                   }
                   setPasted("");

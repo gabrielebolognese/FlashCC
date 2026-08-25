@@ -22,7 +22,7 @@ export function IconButton({ icon: Icon, label, onClick, active = false, danger 
       aria-label={label}
       onClick={onClick}
       className={[
-        "grid h-7 w-7 place-items-center rounded-md",
+        "grid h-7 w-7 place-items-center rounded-lg",
         "hover:bg-white/[0.06]",
         active ? "text-accent" : "text-tertiary hover:text-primary",
         danger ? "hover:text-danger" : "",

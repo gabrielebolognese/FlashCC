@@ -1,65 +1,23 @@
-import { Copy, Eye, EyeOff, Image, Lock, Minus, Plus, Square, Trash2, Type, Unlock } from "lucide-react";
+import { Eye, EyeOff, Image, Lock, Minus, Square, Type, Unlock } from "lucide-react";
 import { useState } from "react";
 
-import { IconButton } from "../ui/IconButton.js";
 import type { Layer } from "./model.js";
 import type { Studio } from "./useStudio.js";
 
 const KIND_ICON = { text: Type, image: Image, line: Minus } as const;
 
-/** Slides on top, layers for the current slide below. Top of the list is front. */
+/** Layers for the current slide. Top of the list is front, as in every editor. */
 export function LayersPanel({ studio }: { studio: Studio }) {
-  const { doc, slide, index, selection, setSelection } = studio;
+  const { slide, selection, setSelection } = studio;
   const [dragFrom, setDragFrom] = useState<number | null>(null);
 
   const layers = slide?.layers ?? [];
   const reversed = [...layers].reverse();
 
   return (
-    <div className="flex w-[224px] shrink-0 flex-col border-r border-hairline bg-surface-1">
-      {/* slides */}
-      <div className="flex h-9 shrink-0 items-center justify-between border-b border-hairline px-2.5">
-        <span className="text-overline uppercase text-tertiary">Slides</span>
-        <IconButton icon={Plus} label="Add slide" onClick={() => studio.addSlide()} />
-      </div>
-
-      <div className="scroll-quiet max-h-[176px] shrink-0 overflow-y-auto border-b border-hairline p-1.5">
-        {doc.slides.map((s, i) => (
-          <div
-            key={s.id}
-            draggable
-            onDragStart={() => setDragFrom(i)}
-            onDragOver={(e) => e.preventDefault()}
-            onDrop={() => {
-              if (dragFrom !== null) studio.moveSlide(dragFrom, i);
-              setDragFrom(null);
-            }}
-            onClick={() => {
-              studio.setSlideIndex(i);
-              setSelection([]);
-            }}
-            className={[
-              "group mb-1 flex cursor-pointer items-center gap-2 rounded-md border p-1",
-              i === index ? "border-accent bg-surface-3" : "border-transparent hover:bg-white/[0.04]",
-            ].join(" ")}
-          >
-            <div
-              className="h-8 w-[26px] shrink-0 rounded-sm border border-hairline"
-              style={{ background: s.background }}
-            />
-            <span className="flex-1 truncate text-caption text-secondary">{i + 1}</span>
-            <div className="hidden group-hover:flex">
-              <IconButton icon={Copy} label="Duplicate slide" onClick={() => studio.duplicateSlide(i)} />
-              {doc.slides.length > 1 ? (
-                <IconButton icon={Trash2} label="Delete slide" danger onClick={() => studio.deleteSlide(i)} />
-              ) : null}
-            </div>
-          </div>
-        ))}
-      </div>
-
+    <div className="flex w-[212px] shrink-0 flex-col border-r border-hairline bg-surface-1">
       {/* layers */}
-      <div className="flex h-9 shrink-0 items-center justify-between border-b border-hairline px-2.5">
+      <div className="flex h-9 shrink-0 items-center justify-between border-b border-hairline px-3">
         <span className="text-overline uppercase text-tertiary">Layers</span>
         <span className="text-caption text-muted">{layers.length}</span>
       </div>
@@ -134,7 +92,7 @@ function LayerRow({
       onClick={(e) => onSelect(e.shiftKey)}
       onDoubleClick={() => setEditing(true)}
       className={[
-        "group flex h-7 cursor-pointer items-center gap-1.5 rounded-md px-1.5",
+        "group flex h-8 cursor-pointer items-center gap-1.5 rounded-lg px-2",
         selected ? "bg-accent-wash text-accent" : "text-secondary hover:bg-white/[0.04]",
         layer.visible ? "" : "opacity-50",
       ].join(" ")}
