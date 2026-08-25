@@ -1,7 +1,7 @@
-import { ArrowRight, X } from "lucide-react";
+import { ArrowRight, HelpCircle, X } from "lucide-react";
 import { useEffect, useState } from "react";
 
-import { STRUCTURES, type Structure } from "./structures.js";
+import { DEFAULT_STRUCTURE, STRUCTURES, type Structure } from "./structures.js";
 
 /** A square preview of the shape, drawn from the framework's own slot count. */
 function ShapeMark({ slots, accent }: { slots: number; accent: string }) {
@@ -100,6 +100,23 @@ export function Frameworks({
                   </div>
                 ))}
               </div>
+
+              {/* The escape hatch. Choosing wrong here is the expensive mistake, so
+                  not choosing has to lead somewhere rather than stall. */}
+              <button
+                type="button"
+                onClick={() => onPick(DEFAULT_STRUCTURE)}
+                className="fcc-lift mt-5 flex w-full items-center justify-center gap-3 rounded-3xl border border-dashed border-hairline px-6 py-4 text-center hover:border-accent-dim hover:bg-accent-wash"
+              >
+                <HelpCircle size={18} strokeWidth={2} className="shrink-0 text-tertiary" />
+                <span className="min-w-0">
+                  <span className="block text-[15px] font-semibold text-primary">Not sure</span>
+                  <span className="mt-0.5 block text-caption text-tertiary">
+                    Start on {DEFAULT_STRUCTURE.name} — it works on people who have never
+                    heard of you
+                  </span>
+                </span>
+              </button>
             </div>
           </div>
         )}
