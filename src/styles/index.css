@@ -269,3 +269,20 @@
     transform: none;
   }
 }
+
+/* Typewriter caret. Blinks only once the line has finished typing. */
+@keyframes fcc-blink {
+  0%, 45% { opacity: 1; }
+  55%, 100% { opacity: 0; }
+}
+
+.fcc-caret {
+  animation: fcc-blink 1.05s steps(1, end) infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .fcc-caret {
+    animation: none;
+    opacity: 0;
+  }
+}

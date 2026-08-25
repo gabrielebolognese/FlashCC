@@ -4,9 +4,11 @@ import { AiChat } from "./studio/AiChat.js";
 import { BulkCreate } from "./studio/BulkCreate.js";
 import { buildSlides } from "./studio/compositions.js";
 import { Compose } from "./studio/Compose.js";
+import { FirstRun } from "./studio/FirstRun.js";
 import { Frameworks } from "./studio/Frameworks.js";
 import { makeDoc, type Doc } from "./studio/model.js";
 import { THEMES } from "./studio/presets.js";
+import { buildFrameworkSamples } from "./studio/samples.js";
 import { Start } from "./studio/Start.js";
 import { saveDoc } from "./studio/storage.js";
 import { Studio } from "./studio/Studio.js";
@@ -15,6 +17,7 @@ import {
   decorScale,
   hasOnboarded,
   loadPrefs,
+  styleFromPrefs,
   stylesFor,
   wantsImages,
   type Prefs,
@@ -27,6 +30,7 @@ type Draft = { structure: Structure; texts: string[]; roles: string[] };
 
 type Screen =
   | { view: "welcome" }
+  | { view: "firstRun" }
   | { view: "start" }
   | { view: "bulk" }
   | { view: "frameworks"; theme: keyof typeof THEMES }
@@ -56,8 +60,29 @@ export function App() {
     return (
       <Welcome
         onDone={(answered) => {
-          if (answered) setPrefs(answered);
+          if (answered) {
+            setPrefs(answered);
+            setScreen({ view: "firstRun" });
+            return;
+          }
+          // They asked to be taken straight in, so do not ask again.
           setScreen({ view: "start" });
+        }}
+      />
+    );
+  }
+
+  if (screen.view === "firstRun") {
+    return (
+      <FirstRun
+        onCreate={() => setScreen({ view: "frameworks", theme: "ink" })}
+        onLater={() => setScreen({ view: "start" })}
+        onExamples={() => {
+          const theme = prefs ? styleFromPrefs(prefs).theme : THEMES.ink!;
+          const docs = buildFrameworkSamples(theme, build);
+          for (const d of docs) saveDoc(d);
+          const first = docs[0];
+          setScreen(first ? { view: "studio", doc: first } : { view: "start" });
         }}
       />
     );
