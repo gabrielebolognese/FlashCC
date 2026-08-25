@@ -115,3 +115,157 @@
 .fcc-rise > * {
   animation: fcc-rise 260ms cubic-bezier(0.2, 0, 0, 1) both;
 }
+
+/* ── Onboarding: a deliberately cinematic surface ─────────────────────────
+   The editor is 0ms on everything that responds to a pointer, because motion
+   there reads as latency. Onboarding is the opposite case: it is seen once, it
+   is not a tool yet, and stillness there reads as cheap. All of it is disabled
+   under prefers-reduced-motion. */
+
+@keyframes fcc-drift-a {
+  0%, 100% { transform: translate3d(-8%, -6%, 0) scale(1); }
+  33%      { transform: translate3d(6%, 4%, 0) scale(1.12); }
+  66%      { transform: translate3d(-4%, 8%, 0) scale(0.95); }
+}
+
+@keyframes fcc-drift-b {
+  0%, 100% { transform: translate3d(10%, 8%, 0) scale(1.05); }
+  50%      { transform: translate3d(-8%, -6%, 0) scale(0.92); }
+}
+
+.fcc-aurora {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  pointer-events: none;
+}
+
+.fcc-aurora::before,
+.fcc-aurora::after {
+  content: "";
+  position: absolute;
+  width: 62vmax;
+  height: 62vmax;
+  border-radius: 50%;
+  filter: blur(90px);
+  opacity: 0.5;
+  will-change: transform;
+}
+
+.fcc-aurora::before {
+  top: -22vmax;
+  left: -14vmax;
+  background: radial-gradient(circle, rgba(217, 165, 33, 0.5), transparent 68%);
+  animation: fcc-drift-a 26s ease-in-out infinite;
+}
+
+.fcc-aurora::after {
+  right: -18vmax;
+  bottom: -24vmax;
+  background: radial-gradient(circle, rgba(76, 134, 214, 0.42), transparent 68%);
+  animation: fcc-drift-b 32s ease-in-out infinite;
+}
+
+/* A soft halo behind the brand mark. */
+@keyframes fcc-pulse {
+  0%, 100% { opacity: 0.55; transform: scale(1); }
+  50%      { opacity: 0.9; transform: scale(1.14); }
+}
+
+.fcc-halo {
+  position: absolute;
+  inset: -40%;
+  border-radius: 50%;
+  background: radial-gradient(circle, rgba(247, 181, 0, 0.55), transparent 66%);
+  filter: blur(22px);
+  animation: fcc-pulse 3.6s ease-in-out infinite;
+  pointer-events: none;
+}
+
+/* Entrance, staggered by index via --i. */
+@keyframes fcc-enter {
+  from { opacity: 0; transform: translateY(14px); }
+  to   { opacity: 1; transform: none; }
+}
+
+.fcc-stagger > * {
+  animation: fcc-enter 520ms cubic-bezier(0.2, 0, 0, 1) both;
+  animation-delay: calc(var(--i, 0) * 70ms);
+}
+
+.fcc-enter {
+  animation: fcc-enter 460ms cubic-bezier(0.2, 0, 0, 1) both;
+}
+
+/* The preview panel breathes, so a still frame does not read as a screenshot. */
+@keyframes fcc-float {
+  0%, 100% { transform: translateY(0); }
+  50%      { transform: translateY(-9px); }
+}
+
+.fcc-float {
+  animation: fcc-float 7s ease-in-out infinite;
+}
+
+/* Choice cards lift and glow. Onboarding only. */
+.fcc-lift {
+  transition:
+    transform 200ms cubic-bezier(0.2, 0, 0, 1),
+    border-color 200ms cubic-bezier(0.2, 0, 0, 1),
+    box-shadow 200ms cubic-bezier(0.2, 0, 0, 1);
+}
+
+.fcc-lift:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 10px 30px -12px rgba(0, 0, 0, 0.6);
+}
+
+.fcc-selected {
+  box-shadow:
+    0 0 0 1px rgba(217, 165, 33, 0.5),
+    0 0 26px -6px rgba(217, 165, 33, 0.45);
+}
+
+/* Sheen across the primary button. */
+@keyframes fcc-sheen {
+  0%   { transform: translateX(-120%); }
+  60%, 100% { transform: translateX(220%); }
+}
+
+.fcc-sheen {
+  position: relative;
+  overflow: hidden;
+}
+
+.fcc-sheen::after {
+  content: "";
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 38%;
+  background: linear-gradient(100deg, transparent, rgba(255, 255, 255, 0.42), transparent);
+  animation: fcc-sheen 4.2s ease-in-out infinite;
+  pointer-events: none;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .fcc-aurora::before,
+  .fcc-aurora::after,
+  .fcc-halo,
+  .fcc-float,
+  .fcc-sheen::after,
+  .fcc-stagger > *,
+  .fcc-enter,
+  .fcc-spin,
+  .fcc-rise > * {
+    animation: none !important;
+  }
+
+  .fcc-lift {
+    transition: none;
+  }
+
+  .fcc-lift:hover {
+    transform: none;
+  }
+}

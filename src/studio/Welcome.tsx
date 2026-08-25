@@ -1,8 +1,8 @@
 import { ArrowLeft, ArrowRight, Check, Sparkles } from "lucide-react";
-import { useMemo, useState, type ReactNode } from "react";
+import { useMemo, useState, type CSSProperties, type ReactNode } from "react";
 
 import { buildSlides } from "./compositions.js";
-import { LayerView } from "./LayerView.js";
+import { SlidePreview } from "./SlidePreview.js";
 import { FONTS } from "./model.js";
 import {
   ACCENTS,
@@ -15,11 +15,10 @@ import {
   type Prefs,
 } from "./onboarding.js";
 
-const W = 1080;
-const H = 1350;
-const PREVIEW_H = 420;
-
 const SAMPLE = "Your videos feel boring. Here's why.";
+
+/** Stagger index, as a CSS var the .fcc-stagger rule reads. */
+const at = (i: number): CSSProperties => ({ ["--i" as string]: i });
 
 type Question = {
   id: keyof Prefs;
@@ -37,8 +36,8 @@ const QUESTIONS: Question[] = [
       <Choices
         value={p.ground}
         options={[
-          { value: "dark" as const, label: "Dark", hint: "White text on near-black" },
-          { value: "light" as const, label: "Light", hint: "Black text on white" },
+          { value: "dark" as const, label: "Dark", hint: "Light text on near-black" },
+          { value: "light" as const, label: "Light", hint: "Dark text on white" },
         ]}
         onChange={(ground) => set({ ground })}
       />
@@ -47,23 +46,23 @@ const QUESTIONS: Question[] = [
   {
     id: "accent",
     title: "Pick an accent",
-    note: "One colour, used for rules, numerals and the closing slide.",
+    note: "One colour, for rules, numerals and the closing slide.",
     render: (p, set) => (
-      <div className="flex flex-wrap gap-2">
-        {ACCENTS.map((hex) => (
+      <div className="flex flex-wrap gap-2.5">
+        {ACCENTS.map((hex, i) => (
           <button
             key={hex}
             type="button"
             onClick={() => set({ accent: hex })}
             aria-label={hex}
+            style={{ background: hex, ...at(i) }}
             className={[
-              "h-11 w-11 rounded-2xl border-2",
-              p.accent === hex ? "border-primary" : "border-hairline hover:border-surface-5",
+              "fcc-lift h-12 w-12 rounded-2xl border-2",
+              p.accent === hex ? "fcc-selected border-white/70" : "border-white/10",
             ].join(" ")}
-            style={{ background: hex }}
           />
         ))}
-        <label className="grid h-11 w-11 cursor-pointer place-items-center rounded-2xl border-2 border-hairline hover:border-surface-5">
+        <label className="fcc-lift grid h-12 w-12 cursor-pointer place-items-center rounded-2xl border-2 border-dashed border-hairline">
           <input
             type="color"
             value={p.accent}
@@ -79,7 +78,7 @@ const QUESTIONS: Question[] = [
     title: "How should headings read?",
     note: "The face on hooks, headings and statements.",
     render: (p, set) => (
-      <div className="flex flex-wrap gap-2">
+      <div className="flex flex-wrap gap-2.5">
         {FONTS.map((f) => (
           <button
             key={f.id}
@@ -87,9 +86,9 @@ const QUESTIONS: Question[] = [
             onClick={() => set({ displayFont: f.id, bodyFont: f.id === "mono" ? "mono" : p.bodyFont })}
             style={{ fontFamily: f.stack }}
             className={[
-              "h-14 min-w-[128px] rounded-2xl border-2 px-4 text-[19px] font-semibold",
+              "fcc-lift h-16 min-w-[124px] flex-1 rounded-2xl border px-4 text-[19px] font-semibold",
               p.displayFont === f.id
-                ? "border-primary text-primary"
+                ? "fcc-selected border-accent-dim bg-accent-wash text-primary"
                 : "border-hairline text-tertiary hover:border-surface-5 hover:text-secondary",
             ].join(" ")}
           >
@@ -102,14 +101,14 @@ const QUESTIONS: Question[] = [
   {
     id: "images",
     title: "Do you use photos?",
-    note: "If you do, every slide reserves a space for one.",
+    note: "If you do, every slide keeps a space for one.",
     render: (p, set) => (
       <Choices
         value={p.images}
         options={[
           { value: "always" as const, label: "Always", hint: "A picture on every slide" },
           { value: "sometimes" as const, label: "Sometimes", hint: "Keep the space, fill what I want" },
-          { value: "never" as const, label: "Never", hint: "Text only, more room for it" },
+          { value: "never" as const, label: "Never", hint: "Text only, and more room for it" },
         ]}
         onChange={(images) => set({ images })}
       />
@@ -118,7 +117,7 @@ const QUESTIONS: Question[] = [
   {
     id: "decor",
     title: "Lines and accents?",
-    note: "The rules under headings, the bar beside a quote, the tick under a numeral.",
+    note: "Rules under headings, the bar beside a quote, the tick under a numeral.",
     render: (p, set) => (
       <Choices
         value={p.decor}
@@ -161,29 +160,42 @@ export function Welcome({ onDone }: { onDone: (prefs: Prefs | null) => void }) {
 
   if (!started) {
     return (
-      <div className="grid h-full place-items-center bg-base">
-        <div className="fcc-rise flex max-w-[520px] flex-col items-center px-6 text-center">
-          <span
-            className="grid h-16 w-16 place-items-center rounded-3xl text-[24px] font-semibold shadow-overlay"
-            style={{ background: "var(--brand-gold)", color: "var(--on-brand-gold)" }}
-          >
-            F
-          </span>
+      <div className="relative grid h-full place-items-center overflow-hidden bg-base">
+        <div className="fcc-aurora" />
 
-          <h1 className="mt-7 text-[34px] font-semibold leading-[42px] tracking-[-0.8px] text-primary">
+        <div className="fcc-stagger relative flex w-full max-w-[560px] flex-col items-center px-6 text-center">
+          <div style={at(0)} className="relative">
+            <span className="fcc-halo" />
+            <span
+              className="relative grid h-[72px] w-[72px] place-items-center rounded-[24px] text-[26px] font-semibold shadow-overlay"
+              style={{ background: "var(--brand-gold)", color: "var(--on-brand-gold)" }}
+            >
+              F
+            </span>
+          </div>
+
+          {/* clamp so a narrow window shrinks the type instead of overflowing */}
+          <h1
+            style={{ ...at(1), fontSize: "clamp(28px, 6vw, 40px)", lineHeight: 1.14 }}
+            className="mt-8 text-balance font-semibold tracking-[-0.8px] text-primary"
+          >
             Welcome to FlashCC
           </h1>
-          <p className="mt-3 text-[17px] leading-[26px] text-tertiary">
-            Do you want to start onboarding? It takes five questions and makes everything after
-            it match your style.
+
+          <p
+            style={{ ...at(2), fontSize: "clamp(15px, 2.2vw, 17px)" }}
+            className="mt-3.5 text-pretty leading-[26px] text-tertiary"
+          >
+            Do you want to start onboarding? Five questions, and everything after them
+            comes out in your style.
           </p>
 
-          <div className="mt-8 flex w-full flex-col gap-2.5">
+          <div style={at(3)} className="mt-9 flex w-full flex-col gap-2.5">
             <button
               type="button"
               onClick={() => setStarted(true)}
               style={{ background: "var(--brand-gold)", color: "var(--on-brand-gold)" }}
-              className="flex h-14 w-full items-center justify-center gap-2.5 rounded-2xl text-[16px] font-semibold shadow-overlay hover:brightness-110"
+              className="fcc-sheen fcc-lift flex h-14 w-full items-center justify-center gap-2.5 rounded-2xl text-[16px] font-semibold shadow-overlay"
             >
               <Sparkles size={18} strokeWidth={2.5} />
               Yes, set it up
@@ -191,14 +203,14 @@ export function Welcome({ onDone }: { onDone: (prefs: Prefs | null) => void }) {
             <button
               type="button"
               onClick={skip}
-              className="flex h-12 w-full items-center justify-center rounded-2xl border border-hairline text-[15px] font-semibold text-secondary hover:border-surface-5 hover:text-primary"
+              className="fcc-lift flex h-12 w-full items-center justify-center rounded-2xl border border-hairline text-[15px] font-semibold text-secondary hover:border-surface-5 hover:text-primary"
             >
               No, take me straight in
             </button>
           </div>
 
-          <p className="mt-4 text-caption text-muted">
-            You can change any of this later, on any slide.
+          <p style={at(4)} className="mt-5 text-caption text-muted">
+            Takes about a minute. You can change any of it later, on any slide.
           </p>
         </div>
       </div>
@@ -209,25 +221,28 @@ export function Welcome({ onDone }: { onDone: (prefs: Prefs | null) => void }) {
   const last = step === QUESTIONS.length - 1;
 
   return (
-    <div className="flex h-full flex-col overflow-hidden bg-base">
-      <header className="flex h-14 shrink-0 items-center gap-3 border-b border-hairline bg-surface-1 px-5">
+    <div className="relative flex h-full flex-col overflow-hidden bg-base">
+      <div className="fcc-aurora opacity-60" />
+
+      <header className="relative flex h-14 shrink-0 items-center gap-3 border-b border-hairline bg-surface-1/80 px-5 backdrop-blur">
         <button
           type="button"
           onClick={() => (step === 0 ? setStarted(false) : setStep(step - 1))}
           aria-label="Back"
-          className="grid h-8 w-8 place-items-center rounded-xl text-tertiary hover:bg-white/[0.06] hover:text-primary"
+          className="grid h-8 w-8 shrink-0 place-items-center rounded-xl text-tertiary hover:bg-white/[0.06] hover:text-primary"
         >
           <ArrowLeft size={16} strokeWidth={2} />
         </button>
-        <div className="text-caption text-muted">
-          Question {step + 1} of {QUESTIONS.length}
+        <div className="shrink-0 text-caption text-muted">
+          {step + 1} of {QUESTIONS.length}
         </div>
-        <div className="ml-2 h-1 w-40 overflow-hidden rounded-full bg-surface-3">
+        <div className="h-1 w-28 shrink-0 overflow-hidden rounded-full bg-surface-3 sm:w-44">
           <div
-            className="h-full rounded-full"
+            className="h-full rounded-full transition-[width] duration-large ease-out"
             style={{
               width: `${((step + 1) / QUESTIONS.length) * 100}%`,
               background: "var(--brand-gold)",
+              boxShadow: "0 0 12px rgba(217,165,33,.6)",
             }}
           />
         </div>
@@ -235,27 +250,36 @@ export function Welcome({ onDone }: { onDone: (prefs: Prefs | null) => void }) {
         <button
           type="button"
           onClick={skip}
-          className="h-8 rounded-xl px-3 text-caption text-muted hover:bg-white/[0.06] hover:text-primary"
+          className="h-8 shrink-0 rounded-xl px-3 text-caption text-muted hover:bg-white/[0.06] hover:text-primary"
         >
           Skip
         </button>
       </header>
 
-      <div className="scroll-quiet min-h-0 flex-1 overflow-y-auto">
-        <div className="mx-auto flex max-w-[900px] flex-col items-center gap-10 px-6 py-10 md:flex-row md:items-start">
-          <div className="w-full min-w-0 flex-1">
-            <h2 className="text-[26px] font-semibold leading-8 tracking-[-0.4px] text-primary">
+      <div className="scroll-quiet relative min-h-0 flex-1 overflow-y-auto">
+        <div className="mx-auto flex max-w-[980px] flex-col items-center gap-10 px-6 py-10 lg:flex-row lg:items-center">
+          {/* key on step so the entrance replays for each question */}
+          <div key={step} className="fcc-stagger w-full min-w-0 flex-1">
+            <h2
+              style={{ ...at(0), fontSize: "clamp(22px, 3.4vw, 30px)", lineHeight: 1.2 }}
+              className="text-balance font-semibold tracking-[-0.5px] text-primary"
+            >
               {q.title}
             </h2>
-            <p className="mb-6 mt-1.5 text-body leading-[20px] text-tertiary">{q.note}</p>
+            <p
+              style={at(1)}
+              className="mb-7 mt-2 text-pretty text-body leading-[20px] text-tertiary"
+            >
+              {q.note}
+            </p>
 
-            {q.render(prefs, set)}
+            <div style={at(2)}>{q.render(prefs, set)}</div>
 
             <button
               type="button"
+              style={{ ...at(3), background: "var(--brand-gold)", color: "var(--on-brand-gold)" }}
               onClick={() => (last ? finish() : setStep(step + 1))}
-              style={{ background: "var(--brand-gold)", color: "var(--on-brand-gold)" }}
-              className="mt-8 flex h-12 items-center justify-center gap-2 rounded-2xl px-6 text-[15px] font-semibold shadow-overlay hover:brightness-110"
+              className="fcc-lift mt-9 flex h-12 items-center justify-center gap-2 rounded-2xl px-7 text-[15px] font-semibold shadow-overlay"
             >
               {last ? (
                 <>
@@ -271,19 +295,18 @@ export function Welcome({ onDone }: { onDone: (prefs: Prefs | null) => void }) {
             </button>
           </div>
 
-          {/* A real slide, rebuilt on every answer. */}
-          <div
-            className="shrink-0 overflow-hidden rounded-2xl border border-hairline shadow-overlay"
-            style={{ width: (W * PREVIEW_H) / H, height: PREVIEW_H, background: preview?.background }}
-          >
+          {/* A real slide, rebuilt on every answer. Scales with the viewport rather
+              than sitting at a fixed size that squeezes the column. */}
+          <div className="fcc-float relative w-full max-w-[300px] shrink-0">
             <div
-              className="pointer-events-none relative origin-top-left"
-              style={{ width: W, height: H, transform: `scale(${PREVIEW_H / H})` }}
-            >
-              {preview?.layers.map((l) => (
-                <LayerView key={l.id} layer={l} />
-              ))}
-            </div>
+              aria-hidden
+              className="absolute -inset-6 rounded-[36px] opacity-70 blur-2xl"
+              style={{ background: `radial-gradient(circle, ${prefs.accent}55, transparent 70%)` }}
+            />
+            <SlidePreview
+              slide={preview}
+              className="relative rounded-2xl border border-white/10 shadow-modal"
+            />
           </div>
         </div>
       </div>
@@ -301,24 +324,26 @@ function Choices<T extends string>({
   onChange: (v: T) => void;
 }) {
   return (
-    <div className="flex flex-col gap-2">
+    <div className="flex flex-col gap-2.5">
       {options.map((o) => (
         <button
           key={o.value}
           type="button"
           onClick={() => onChange(o.value)}
           className={[
-            "flex items-center gap-3 rounded-2xl border-2 px-4 py-3 text-left",
+            "fcc-lift flex items-center gap-3 rounded-2xl border px-4 py-3.5 text-left",
             value === o.value
-              ? "border-primary bg-surface-2"
+              ? "fcc-selected border-accent-dim bg-accent-wash"
               : "border-hairline hover:border-surface-5",
           ].join(" ")}
         >
           <span className="min-w-0 flex-1">
             <span className="block text-[15px] font-semibold text-primary">{o.label}</span>
-            <span className="mt-0.5 block text-caption text-tertiary">{o.hint}</span>
+            <span className="mt-0.5 block text-pretty text-caption text-tertiary">{o.hint}</span>
           </span>
-          {value === o.value ? <Check size={16} className="shrink-0 text-accent" strokeWidth={2.5} /> : null}
+          {value === o.value ? (
+            <Check size={16} className="shrink-0 text-accent" strokeWidth={2.5} />
+          ) : null}
         </button>
       ))}
     </div>
