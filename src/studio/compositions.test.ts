@@ -156,6 +156,11 @@ describe("structures", () => {
         expect(slot.note.length, `${s.name}/${slot.label}`).toBeGreaterThan(10);
         expect(slot.note.length, `${s.name}/${slot.label} too long`).toBeLessThanOrEqual(46);
         expect(slot.note, `${s.name}/${slot.label} has a full stop`).not.toMatch(/[.]$/);
+        // no em dashes anywhere the user reads
+        for (const field of [slot.note, slot.detail]) {
+          expect(field, `${s.name}/${slot.label} em dash`).not.toContain("—");
+        }
+        expect(s.description, `${s.name} description em dash`).not.toContain("—");
         expect(slot.detail.length, `${s.name}/${slot.label} detail`).toBeGreaterThan(20);
         expect(slot.placeholder.length).toBeGreaterThan(0);
         expect(slot.examples.length).toBeGreaterThan(0);

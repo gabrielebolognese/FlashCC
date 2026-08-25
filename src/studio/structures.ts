@@ -39,14 +39,14 @@ export const STRUCTURES: Structure[] = [
     id: "problem",
     name: "Problem → Solution",
     shape: "Problem → Fix",
-    description: "Name a pain, then fix it. The workhorse — it works on a cold audience.",
+    description: "Name a pain, then fix it. The workhorse, and it works on a cold audience.",
     slots: [
       {
         id: "hook",
         label: "Hook",
         note: "Decides whether slide 2 is ever seen",
         detail:
-          "The most important text in the whole carousel. Name the pain the reader already has and promise the reason. Specific beats clever.",
+          "The most important text in the whole carousel. Name the pain the reader already has, and promise the reason. Specific beats clever.",
         placeholder: "Your videos feel boring. Here's why.",
         examples: [
           "Your videos feel boring. Here's why.",
@@ -70,7 +70,7 @@ export const STRUCTURES: Structure[] = [
         label: "Why it happens",
         note: "Name the cause, not the symptom",
         detail:
-          "The mistake underneath. This is where you show you understand the cause — it's what separates you from everyone giving surface tips.",
+          "The mistake underneath. This is where you show you understand the cause. It is what separates you from everyone giving surface tips.",
         placeholder: "The mistake causing it.",
         examples: [
           "You're cutting to the rhythm of the audio, not the attention.",
@@ -80,7 +80,7 @@ export const STRUCTURES: Structure[] = [
       {
         id: "solution",
         label: "Solution outline",
-        note: "The turn — one line, no detail yet",
+        note: "The turn. One line, no detail yet",
         detail: "What to change, in a single sentence. This is the slide people screenshot.",
         placeholder: "What to change.",
         examples: ["Cut on motion, not on beat.", "Stop designing. Start with what you wrote."],
@@ -119,7 +119,7 @@ export const STRUCTURES: Structure[] = [
         id: "cta",
         label: "Call to action",
         note: "One ask. Two gets you neither",
-        detail: "Pick follow, or comment, or the link — and drop the rest.",
+        detail: "Pick follow, or comment, or the link, then drop the rest.",
         placeholder: "Save this for your next edit.",
         examples: [
           "Save this for your next edit.",
@@ -140,7 +140,7 @@ export const STRUCTURES: Structure[] = [
         label: "Hook",
         note: "Lead with the result, not the client",
         detail:
-          "Nobody is looking for your project — they're looking for what you could do to theirs. Open on the transformation.",
+          "Nobody is looking for your project. They are looking for what you could do to theirs, so open on the transformation.",
         placeholder: "Here's how I turned this raw footage into a premium ad.",
         examples: [
           "Here's how I turned this raw footage into a premium ad.",
@@ -184,7 +184,7 @@ export const STRUCTURES: Structure[] = [
       {
         id: "point",
         label: "Key decision",
-        note: "Explain the why — that's the expertise",
+        note: "Explain the why. That's the expertise",
         detail:
           "Don't just show the final product. The decision is what demonstrates expertise; the result alone only demonstrates taste.",
         placeholder: "A decision you made, and why.",
@@ -198,7 +198,7 @@ export const STRUCTURES: Structure[] = [
         id: "point",
         label: "Key decision",
         note: "Pick the surprising choice",
-        detail: "Colour, sound, motion, pacing — the one a client wouldn't have thought of.",
+        detail: "Colour, sound, motion, pacing. Pick the one a client would not have thought of.",
         placeholder: "Another decision, and why.",
         examples: [
           "Cut the music under the VO so the last line lands dry.",
@@ -239,7 +239,7 @@ export const STRUCTURES: Structure[] = [
       {
         id: "hook",
         label: "Hook",
-        note: "Numbers beat vague — “3 tricks” wins",
+        note: "Numbers beat vague. “3 tricks” wins",
         detail: "Promise something specific, and name who it's for.",
         placeholder: "3 editing tricks that instantly make talking-head videos better.",
         examples: [
@@ -407,7 +407,7 @@ export const STRUCTURES: Structure[] = [
         id: "lesson",
         label: "The lesson",
         note: "This is what makes it a case study",
-        detail: "The transferable principle — otherwise it's a brag.",
+        detail: "The transferable principle. Without it, this is only a brag.",
         placeholder: "Why it worked.",
         examples: [
           "The first frame is the hook. Everything else is the second chance.",

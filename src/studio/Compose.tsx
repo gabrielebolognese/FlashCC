@@ -1,5 +1,5 @@
 import { ArrowRight, GripVertical, Plus, Sparkles, Trash2, X } from "lucide-react";
-import { useRef, useState } from "react";
+import { Fragment, useRef, useState } from "react";
 
 import { MAX_SLIDES } from "./compositions.js";
 import { THEMES } from "./presets.js";
@@ -51,6 +51,13 @@ export function Compose({
       const at = last === -1 ? Math.max(0, fs.length - 1) : last + 1;
       return [...fs.slice(0, at), mk(rep), ...fs.slice(at)];
     });
+  }
+
+  /** Insert a slide at an exact position, from the + between two boxes. */
+  function insertAt(at: number) {
+    const rep = repeatableOf(structure);
+    if (!rep) return;
+    setFields((fs) => (fs.length >= MAX_SLIDES ? fs : [...fs.slice(0, at), mk(rep), ...fs.slice(at)]));
   }
 
   const remove = (key: string) =>
@@ -140,33 +147,33 @@ export function Compose({
       </header>
 
       <div className="scroll-quiet min-h-0 flex-1 overflow-y-auto">
-        <div className="mx-auto max-w-[1120px] px-6 py-12">
+        <div className="mx-auto max-w-[1240px] px-6 py-12">
           {fields.map((f, i) => (
-            <div key={f.key} className="mb-11 flex gap-6">
+            <Fragment key={f.key}>
+              {i > 0 ? <InsertRow onClick={() => insertAt(i)} disabled={fields.length >= MAX_SLIDES} /> : null}
+              <div className="flex gap-6">
               {/* The note: one white line on the same row as the field, no border,
                   no background, and a straight arrow pointing at the box. */}
-              <div className="hidden w-[320px] shrink-0 flex-col items-end pt-[46px] lg:flex">
-                <div className="flex items-center gap-2.5" title={f.slot.detail}>
-                  <span className="text-caption text-primary">
-                    <span className="font-semibold">{labelFor(labels, i)}</span>
-                    <span className="text-tertiary"> — </span>
+              <div className="hidden w-[430px] shrink-0 flex-col items-end pt-[36px] lg:flex">
+                <div className="flex items-center gap-3" title={f.slot.detail}>
+                  <span className="text-right text-[22px] font-medium leading-[28px] tracking-[-0.2px] text-primary">
                     {f.slot.note}
                   </span>
-                  <ArrowRight size={14} strokeWidth={2} className="shrink-0 text-muted" />
+                  <LongArrow />
                 </div>
 
                 {f.slot.examples.length > 0 ? (
                   <button
                     type="button"
                     onClick={() => setShowing(showing === f.key ? null : f.key)}
-                    className="mr-6 mt-2 text-[11px] text-muted underline decoration-dotted underline-offset-2 hover:text-accent"
+                    className="mr-[68px] mt-2.5 text-caption text-muted underline decoration-dotted underline-offset-2 hover:text-accent"
                   >
                     {showing === f.key ? "hide examples" : "examples"}
                   </button>
                 ) : null}
 
                 {showing === f.key ? (
-                  <div className="mr-6 mt-2 flex flex-col items-end gap-2">
+                  <div className="mr-[68px] mt-2.5 flex flex-col items-end gap-2">
                     {f.slot.examples.map((ex) => (
                       <button
                         key={ex}
@@ -175,7 +182,7 @@ export function Compose({
                           update(f.key, ex);
                           setShowing(null);
                         }}
-                        className="text-right text-[11px] leading-[16px] text-tertiary hover:text-primary"
+                        className="text-right text-body leading-[18px] text-tertiary hover:text-primary"
                       >
                         “{ex}”
                       </button>
@@ -215,10 +222,10 @@ export function Compose({
                     >
                       {i + 1}
                     </span>
-                    <span className="text-caption text-primary lg:hidden">
+                    <span className="text-caption font-semibold text-secondary">
                       {labelFor(labels, i)}
-                      <span className="text-tertiary"> — {f.slot.note}</span>
                     </span>
+                    <span className="text-caption text-tertiary lg:hidden">{f.slot.note}</span>
                     <div className="flex-1" />
                     <span className="text-caption text-muted">{f.text.trim().length}</span>
                     {fields.length > 1 ? (
@@ -246,10 +253,11 @@ export function Compose({
                   />
                 </div>
               </div>
-            </div>
+              </div>
+            </Fragment>
           ))}
 
-          <div className="flex gap-6">
+          <div className="mt-11 flex gap-6">
             <div className="hidden w-[320px] shrink-0 lg:block" />
             <button
               type="button"
@@ -264,6 +272,51 @@ export function Compose({
             </button>
           </div>
         </div>
+      </div>
+    </div>
+  );
+}
+
+/** Twice the length of a stock arrow, and white — it has to read as a pointer. */
+function LongArrow() {
+  return (
+    <svg
+      width={56}
+      height={12}
+      viewBox="0 0 56 12"
+      fill="none"
+      className="shrink-0 text-primary"
+      aria-hidden
+    >
+      <path
+        d="M1 6h50M45 1l5 5-5 5"
+        stroke="currentColor"
+        strokeWidth={2}
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    </svg>
+  );
+}
+
+/** The + between two boxes. Inserts exactly there, not at the end. */
+function InsertRow({ onClick, disabled }: { onClick: () => void; disabled: boolean }) {
+  return (
+    <div className="group/i flex items-center gap-6 py-4">
+      <div className="hidden w-[430px] shrink-0 lg:block" />
+      <div className="flex min-w-0 flex-1 items-center gap-3">
+        <div className="h-px flex-1 bg-hairline opacity-0 group-hover/i:opacity-100" />
+        <button
+          type="button"
+          disabled={disabled}
+          onClick={onClick}
+          aria-label="Add a slide here"
+          title="Add a slide here"
+          className="grid h-9 w-9 shrink-0 place-items-center rounded-full border border-hairline bg-surface-1 text-tertiary hover:border-accent hover:bg-accent-wash hover:text-accent disabled:opacity-30"
+        >
+          <Plus size={16} strokeWidth={2.5} />
+        </button>
+        <div className="h-px flex-1 bg-hairline opacity-0 group-hover/i:opacity-100" />
       </div>
     </div>
   );
