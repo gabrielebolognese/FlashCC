@@ -79,6 +79,8 @@ export type Doc = {
   palette: string[];
   /** Uploaded images, shared across every slide in the project. */
   media: MediaItem[];
+  /** Optional folder name. Projects with none sit under "Ungrouped". */
+  group?: string | undefined;
   slides: Slide[];
   createdAt: string;
   updatedAt: string;

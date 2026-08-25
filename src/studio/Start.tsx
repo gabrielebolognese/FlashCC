@@ -1,22 +1,53 @@
-import { PenLine, Plus, Trash2 } from "lucide-react";
-import { useState } from "react";
+import { Copy, Folder, Layers, PenLine, Plus, Trash2 } from "lucide-react";
+import { useMemo, useState } from "react";
 
 import { LayerView } from "./LayerView.js";
 import type { Doc } from "./model.js";
 import { buildDoc, PRESETS, THEMES } from "./presets.js";
-import { deleteDoc, listDocs, loadDoc, saveDoc, type DocSummary } from "./storage.js";
+import {
+  deleteDoc,
+  duplicateDoc,
+  listDocs,
+  loadDoc,
+  saveDoc,
+  setDocGroup,
+  UNGROUPED,
+  type DocSummary,
+} from "./storage.js";
 
 const CARD_H = 186;
 
 export function Start({
   onOpen,
   onCompose,
+  onBulk,
 }: {
   onOpen: (doc: Doc) => void;
   onCompose: (theme: keyof typeof THEMES) => void;
+  onBulk: () => void;
 }) {
   const [docs, setDocs] = useState<DocSummary[]>(() => listDocs());
   const [theme, setTheme] = useState<keyof typeof THEMES>("ink");
+  const [moving, setMoving] = useState<string | null>(null);
+
+  const refresh = () => setDocs(listDocs());
+
+  /** Projects by folder, in the order the folders were last touched. */
+  const grouped = useMemo(() => {
+    const map = new Map<string, DocSummary[]>();
+    for (const d of docs) {
+      const key = d.group ?? UNGROUPED;
+      map.set(key, [...(map.get(key) ?? []), d]);
+    }
+    return [...map.entries()].sort(([a], [b]) =>
+      a === UNGROUPED ? 1 : b === UNGROUPED ? -1 : 0,
+    );
+  }, [docs]);
+
+  const groupNames = useMemo(
+    () => [...new Set(docs.map((d) => d.group).filter((g): g is string => Boolean(g)))],
+    [docs],
+  );
 
   function create(presetId: string) {
     const preset = PRESETS.find((p) => p.id === presetId) ?? PRESETS[0]!;
@@ -74,6 +105,24 @@ export function Start({
           </span>
         </button>
 
+        <button
+          type="button"
+          onClick={onBulk}
+          className="fcc-lift group mt-3 flex w-full items-center gap-4 rounded-3xl border border-hairline bg-surface-1 p-5 text-left hover:border-accent-dim"
+        >
+          <span className="grid h-12 w-12 shrink-0 place-items-center rounded-2xl border border-hairline text-tertiary group-hover:border-accent-dim group-hover:text-accent">
+            <Layers size={20} strokeWidth={2.2} />
+          </span>
+          <span className="min-w-0 flex-1">
+            <span className="block text-[15px] font-semibold leading-5 text-primary">
+              Bulk create
+            </span>
+            <span className="mt-0.5 block text-body text-tertiary">
+              Paste a batch of posts and get one carousel each, in the same style.
+            </span>
+          </span>
+        </button>
+
         {/* theme + presets */}
         <div className="mt-9 flex items-center gap-3">
           <span className="text-overline uppercase text-tertiary">Start from a layout</span>
@@ -124,11 +173,20 @@ export function Start({
           })}
         </div>
 
-        {docs.length > 0 ? (
-          <section className="mt-12">
-            <div className="mb-3 text-overline uppercase text-tertiary">Your projects</div>
+        {grouped.map(([name, items]) => (
+          <section key={name} className="mt-12">
+            <div className="mb-3 flex items-center gap-2">
+              {name === UNGROUPED ? null : (
+                <Folder size={13} strokeWidth={2} className="text-tertiary" />
+              )}
+              <span className="text-overline uppercase text-tertiary">
+                {name === UNGROUPED && grouped.length === 1 ? "Your projects" : name}
+              </span>
+              <span className="text-caption text-muted">{items.length}</span>
+            </div>
+
             <div className="grid grid-cols-[repeat(auto-fill,minmax(200px,1fr))] gap-4">
-              {docs.map((d) => (
+              {items.map((d) => (
                 <div key={d.id} className="group relative">
                   <button
                     type="button"
@@ -146,22 +204,49 @@ export function Start({
                       </div>
                     </div>
                   </button>
-                  <button
-                    type="button"
-                    aria-label="Delete project"
-                    onClick={() => {
-                      deleteDoc(d.id);
-                      setDocs(listDocs());
-                    }}
-                    className="absolute right-2 top-2 hidden h-7 w-7 place-items-center rounded-xl bg-black/50 text-white/70 backdrop-blur hover:text-danger group-hover:grid"
-                  >
-                    <Trash2 size={13} strokeWidth={2} />
-                  </button>
+
+                  <div className="absolute right-2 top-2 hidden gap-1 group-hover:flex">
+                    <CardButton
+                      icon={Folder}
+                      label="Move to a group"
+                      onClick={() => setMoving(moving === d.id ? null : d.id)}
+                    />
+                    <CardButton
+                      icon={Copy}
+                      label="Duplicate"
+                      onClick={() => {
+                        duplicateDoc(d.id);
+                        refresh();
+                      }}
+                    />
+                    <CardButton
+                      icon={Trash2}
+                      label="Delete"
+                      danger
+                      onClick={() => {
+                        deleteDoc(d.id);
+                        refresh();
+                      }}
+                    />
+                  </div>
+
+                  {moving === d.id ? (
+                    <GroupMenu
+                      current={d.group}
+                      groups={groupNames}
+                      onPick={(g) => {
+                        setDocGroup(d.id, g);
+                        setMoving(null);
+                        refresh();
+                      }}
+                      onClose={() => setMoving(null)}
+                    />
+                  ) : null}
                 </div>
               ))}
             </div>
           </section>
-        ) : null}
+        ))}
 
         <button
           type="button"
@@ -173,5 +258,96 @@ export function Start({
         </button>
       </main>
     </div>
+  );
+}
+
+function CardButton({
+  icon: Icon,
+  label,
+  onClick,
+  danger = false,
+}: {
+  icon: typeof Copy;
+  label: string;
+  onClick: () => void;
+  danger?: boolean;
+}) {
+  return (
+    <button
+      type="button"
+      aria-label={label}
+      title={label}
+      onClick={onClick}
+      className={[
+        "grid h-7 w-7 place-items-center rounded-xl bg-black/55 text-white/75 backdrop-blur",
+        danger ? "hover:text-danger" : "hover:text-white",
+      ].join(" ")}
+    >
+      <Icon size={13} strokeWidth={2} />
+    </button>
+  );
+}
+
+function GroupMenu({
+  current,
+  groups,
+  onPick,
+  onClose,
+}: {
+  current: string | undefined;
+  groups: string[];
+  onPick: (group: string | undefined) => void;
+  onClose: () => void;
+}) {
+  const [name, setName] = useState("");
+
+  return (
+    <>
+      <div className="fixed inset-0 z-overlay" onClick={onClose} />
+      <div
+        className="absolute right-2 top-11 z-modal w-52 rounded-2xl border border-hairline p-1.5 shadow-overlay"
+        style={{ background: "rgba(20,35,56,.95)", backdropFilter: "blur(20px)" }}
+      >
+        <button
+          type="button"
+          onClick={() => onPick(undefined)}
+          className={[
+            "flex h-8 w-full items-center rounded-lg px-2 text-caption",
+            current ? "text-secondary hover:bg-white/[0.06]" : "bg-accent-wash text-accent",
+          ].join(" ")}
+        >
+          {UNGROUPED}
+        </button>
+
+        {groups.map((g) => (
+          <button
+            key={g}
+            type="button"
+            onClick={() => onPick(g)}
+            className={[
+              "flex h-8 w-full items-center rounded-lg px-2 text-caption",
+              g === current ? "bg-accent-wash text-accent" : "text-secondary hover:bg-white/[0.06]",
+            ].join(" ")}
+          >
+            {g}
+          </button>
+        ))}
+
+        <form
+          className="mt-1 border-t border-hairline pt-1.5"
+          onSubmit={(e) => {
+            e.preventDefault();
+            if (name.trim()) onPick(name.trim());
+          }}
+        >
+          <input
+            value={name}
+            onChange={(e) => setName(e.target.value)}
+            placeholder="New group…"
+            className="h-8 w-full rounded-lg bg-transparent px-2 text-caption text-primary outline-none placeholder:text-muted"
+          />
+        </form>
+      </div>
+    </>
   );
 }

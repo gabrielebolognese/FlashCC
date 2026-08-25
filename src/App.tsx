@@ -1,6 +1,7 @@
 import { useMemo, useState } from "react";
 
 import { AiChat } from "./studio/AiChat.js";
+import { BulkCreate } from "./studio/BulkCreate.js";
 import { buildSlides } from "./studio/compositions.js";
 import { Compose } from "./studio/Compose.js";
 import { Frameworks } from "./studio/Frameworks.js";
@@ -27,6 +28,7 @@ type Draft = { structure: Structure; texts: string[]; roles: string[] };
 type Screen =
   | { view: "welcome" }
   | { view: "start" }
+  | { view: "bulk" }
   | { view: "frameworks"; theme: keyof typeof THEMES }
   | { view: "ai"; structure: Structure; theme: keyof typeof THEMES }
   | { view: "compose"; structure: Structure; theme: keyof typeof THEMES; texts?: string[] }
@@ -56,6 +58,22 @@ export function App() {
         onDone={(answered) => {
           if (answered) setPrefs(answered);
           setScreen({ view: "start" });
+        }}
+      />
+    );
+  }
+
+  if (screen.view === "bulk") {
+    return (
+      <BulkCreate
+        styles={styles}
+        build={build}
+        onCancel={() => setScreen({ view: "start" })}
+        onDone={(docs) => {
+          for (const d of docs) saveDoc(d);
+          // Straight into the first one; the rest are waiting on the project list.
+          const first = docs[0];
+          setScreen(first ? { view: "studio", doc: first } : { view: "start" });
         }}
       />
     );
@@ -145,6 +163,7 @@ export function App() {
     <Start
       onOpen={(doc) => setScreen({ view: "studio", doc })}
       onCompose={(theme) => setScreen({ view: "frameworks", theme })}
+      onBulk={() => setScreen({ view: "bulk" })}
     />
   );
 }
