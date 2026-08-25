@@ -1,13 +1,12 @@
 /**
  * Icon glyphs as pure path data, on a 24×24 grid.
  *
- * Shipped here rather than imported from lucide-react so `computeLayout` can emit an
- * icon node without a React dependency, and so phase 2 resolves one without a DOM.
- * 24 glyphs is a set; a searchable library is a second product (docs/template-system.md §5.7).
+ * Shipped as path data rather than as lucide components so a layer can carry a glyph
+ * id and be painted anywhere, including the print path. A fixed set, not a library.
  */
-import type { IconId } from "../doc/template.js";
 
-export const ICON_PATHS: Record<IconId, string> = {
+
+export const ICON_PATHS: Record<string, string> = {
   "arrow-right": "M5 12h14M13 6l6 6-6 6",
   "arrow-down": "M12 5v14M6 13l6 6 6-6",
   "arrow-up-right": "M7 17L17 7M8 7h9v9",

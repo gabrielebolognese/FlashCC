@@ -1,6 +1,6 @@
 import type { LucideIcon } from "lucide-react";
 
-import { ICON } from "./tokens.js";
+
 
 type Props = {
   children: string;
@@ -30,7 +30,7 @@ export function Button({ children, onClick, icon: Icon, hero = false, disabled =
         disabled ? "pointer-events-none opacity-60" : "",
       ].join(" ")}
     >
-      {Icon ? <Icon size={ICON} strokeWidth={hero ? 2.5 : 2} /> : null}
+      {Icon ? <Icon size={14} strokeWidth={hero ? 2.5 : 2} /> : null}
       {children}
     </button>
   );

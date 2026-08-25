@@ -37,26 +37,30 @@ React + Vite + Tailwind + lucide-react. Node >= 20, ESM, strict tsconfig, vitest
 Single test file: `npx vitest run src/doc/split.test.ts`
 Single test by name: `npx vitest run -t "is deterministic"`
 
-## Architecture invariants
+## The model
 
-These are the rules that keep the product coherent. Breaking one is a design change, not a
-refactor.
+A document is **artboards of layers** — the Photoshop/Figma model. There is no document
+model, no template engine, no roles, no blocks, and nothing derived at render time.
 
-1. **One renderer, fixed logical coordinate space.** `src/render/SlideRenderer.tsx` always draws
-   at the format's logical size (1080×1350) in absolute logical px. Scale is applied *outside* it
-   by a `transform: scale()` wrapper — preview ≈0.3, thumbnail ≈0.05, export 1. No viewport units,
-   no media queries, no `em`/`rem` inside the renderer: that is what makes preview and export
-   pixel-identical structurally rather than by testing.
-2. **Layout is a pure function; React only paints it.** `computeLayout(slide, brand, format, n)`
-   returns `LayoutNode[]` — data with positions, sizes, and resolved type. Phase 2 converts that
-   array into a FlashFX scene document. Never put layout maths in JSX.
-3. **`src/doc/**` is pure.** Zero React, zero DOM. It runs in Node for tests and for the phase-2
-   converter.
-4. **The document is authoritative.** Slides are an explicit list in the left pane, not
-   blank-line-separated prose — pasting still splits on blank lines, but after that the list is
-   the editing surface. `serialize`/`rebuild` remain for the paste path only.
-5. **Two colour systems, never mixed.** FlashFX tokens paint the app chrome; the user's brand kit
-   paints the slides. A slide may be cream-on-hot-pink inside the navy app — that is correct.
+```
+Doc { width, height, palette, slides }
+Slide { background, layers[] }        // array order IS z-order, 0 = back
+Layer { kind, x, y, w, h, rotation, opacity, visible, locked, fill, stroke, ...type }
+```
+
+Coordinates are **artboard pixels**, not fractions. A layer at x=540 is at x=540.
+Changing the canvas size is a canvas resize: layers keep their positions.
+
+Invariants worth keeping:
+
+1. **Nothing is derived.** What is stored is what renders. A layer a preset created and
+   a layer the user drew are the same kind of object with the same handles.
+2. **Presets run once.** `presets.ts` returns plain layers and then is gone — there is no
+   live template to fight with. Same for the text importer.
+3. **`LayerView` is the only painter.** Canvas, preset thumbnails and the print/export
+   path all render through it, so there is no second rendering path to drift.
+4. **`geometry.ts` is pure and tested.** Resize, hit testing, marquee and snapping have no
+   DOM dependency, because that is where a drag editor actually breaks.
 
 ## Conventions
 

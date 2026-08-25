@@ -1,40 +1,13 @@
 import { useState } from "react";
 
-import type { Template } from "./doc/template.js";
-import type { FlashCCDocument } from "./doc/types.js";
-import { Editor } from "./app/Editor.js";
-import { Home } from "./app/Home.js";
-import { TemplateEditor } from "./app/TemplateEditor.js";
-
-type Screen =
-  | { view: "home" }
-  | { view: "editor"; doc: FlashCCDocument }
-  | { view: "template"; template: Template | null };
+import type { Doc } from "./studio/model.js";
+import { Start } from "./studio/Start.js";
+import { Studio } from "./studio/Studio.js";
 
 export function App() {
-  const [screen, setScreen] = useState<Screen>({ view: "home" });
+  const [doc, setDoc] = useState<Doc | null>(null);
 
-  if (screen.view === "editor") {
-    // key: a fresh document gets fresh state and a fresh history stack.
-    return (
-      <Editor
-        key={screen.doc.id}
-        initial={screen.doc}
-        onHome={() => setScreen({ view: "home" })}
-      />
-    );
-  }
-
-  if (screen.view === "template") {
-    return (
-      <TemplateEditor initial={screen.template} onDone={() => setScreen({ view: "home" })} />
-    );
-  }
-
-  return (
-    <Home
-      onOpen={(doc) => setScreen({ view: "editor", doc })}
-      onEditTemplate={(template) => setScreen({ view: "template", template })}
-    />
-  );
+  if (!doc) return <Start onOpen={setDoc} />;
+  // key: a different project gets fresh state and a fresh history stack.
+  return <Studio key={doc.id} initial={doc} onHome={() => setDoc(null)} />;
 }

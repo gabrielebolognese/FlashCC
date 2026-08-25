@@ -1,6 +1,6 @@
 import type { LucideIcon } from "lucide-react";
 
-import { ICON } from "./tokens.js";
+
 
 type Props = {
   icon: LucideIcon;
@@ -28,7 +28,7 @@ export function IconButton({ icon: Icon, label, onClick, active = false, danger 
         danger ? "hover:text-danger" : "",
       ].join(" ")}
     >
-      <Icon size={ICON} strokeWidth={2} />
+      <Icon size={14} strokeWidth={2} />
     </button>
   );
 }
