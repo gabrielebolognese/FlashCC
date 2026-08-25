@@ -196,28 +196,41 @@ export function Compose({
                 ) : null}
               </div>
 
-              <div className="min-w-0 flex-1">
+              {/* Handle and delete are full-height rails either side of the field, so
+                  neither is a 12px target hidden until hover. Only the handle is
+                  draggable — making the whole card draggable fights text selection. */}
+              <div
+                className="flex min-w-0 flex-1 items-stretch gap-2"
+                onDragOver={(e) => e.preventDefault()}
+                onDrop={() => {
+                  const from = dragFrom.current;
+                  if (from === null || from === i) return;
+                  setFields((fs) => {
+                    const next = [...fs];
+                    const [m] = next.splice(from, 1);
+                    if (m) next.splice(i, 0, m);
+                    return next;
+                  });
+                  dragFrom.current = null;
+                }}
+              >
                 <div
                   draggable
                   onDragStart={() => {
                     dragFrom.current = i;
                   }}
-                  onDragOver={(e) => e.preventDefault()}
-                  onDrop={() => {
-                    const from = dragFrom.current;
-                    if (from === null || from === i) return;
-                    setFields((fs) => {
-                      const next = [...fs];
-                      const [m] = next.splice(from, 1);
-                      if (m) next.splice(i, 0, m);
-                      return next;
-                    });
+                  onDragEnd={() => {
                     dragFrom.current = null;
                   }}
-                  className="group rounded-2xl border border-hairline bg-surface-1 p-3 transition-[border-color] duration-instant ease-out focus-within:border-accent-dim hover:border-surface-5"
+                  aria-label={`Reorder ${labelFor(labels, i)}`}
+                  title="Drag to reorder"
+                  className="grid w-8 shrink-0 cursor-grab place-items-center rounded-xl border border-hairline bg-surface-1 text-muted hover:border-surface-5 hover:text-primary active:cursor-grabbing"
                 >
+                  <GripVertical size={15} strokeWidth={2} />
+                </div>
+
+                <div className="min-w-0 flex-1 rounded-2xl border border-hairline bg-surface-1 p-3 transition-[border-color] duration-instant ease-out focus-within:border-accent-dim hover:border-surface-5">
                   <div className="mb-2 flex items-center gap-2">
-                    <GripVertical size={13} className="cursor-grab text-muted" />
                     <span
                       className="grid h-6 min-w-6 place-items-center rounded-lg px-1.5 text-[10px] font-semibold"
                       style={{
@@ -233,16 +246,6 @@ export function Compose({
                     <span className="text-caption text-tertiary lg:hidden">{f.slot.note}</span>
                     <div className="flex-1" />
                     <span className="text-caption text-muted">{f.text.trim().length}</span>
-                    {fields.length > 1 ? (
-                      <button
-                        type="button"
-                        onClick={() => remove(f.key)}
-                        aria-label="Remove slide"
-                        className="grid h-6 w-6 place-items-center rounded-lg text-muted opacity-0 hover:bg-white/[0.06] hover:text-danger group-hover:opacity-100"
-                      >
-                        <Trash2 size={12} strokeWidth={2} />
-                      </button>
-                    ) : null}
                   </div>
 
                   <textarea
@@ -257,6 +260,17 @@ export function Compose({
                     className="w-full resize-none bg-transparent text-[14px] leading-[22px] text-primary outline-none placeholder:text-muted"
                   />
                 </div>
+
+                <button
+                  type="button"
+                  disabled={fields.length <= 1}
+                  onClick={() => remove(f.key)}
+                  aria-label={`Delete ${labelFor(labels, i)}`}
+                  title="Delete this slide"
+                  className="grid w-8 shrink-0 place-items-center rounded-xl border border-danger-dim bg-danger-wash text-danger hover:border-danger hover:bg-danger hover:text-white disabled:pointer-events-none disabled:opacity-25"
+                >
+                  <Trash2 size={15} strokeWidth={2} />
+                </button>
               </div>
               </div>
             </Fragment>

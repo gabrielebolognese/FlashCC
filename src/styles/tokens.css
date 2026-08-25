@@ -30,7 +30,9 @@
 
   /* Semantic */
   --success: #3dbe7a;
-  --danger:  #e5545a;
+  --danger:      #e5545a;
+  --danger-wash: rgba(229,84,90,0.12);  /* danger background tint */
+  --danger-dim:  rgba(229,84,90,0.45);  /* danger border */
   --info:    #4c86d6;
   --live:    #ff3b5c;  /* "recording"/scrub red — distinct from selection gold */
 

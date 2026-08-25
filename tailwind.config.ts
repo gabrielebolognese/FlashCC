@@ -36,7 +36,11 @@ export default {
         tertiary: "var(--text-tertiary)",
         muted: "var(--text-muted)",
         success: "var(--success)",
-        danger: "var(--danger)",
+        danger: {
+          DEFAULT: "var(--danger)",
+          wash: "var(--danger-wash)",
+          dim: "var(--danger-dim)",
+        },
         info: "var(--info)",
         live: "var(--live)",
       },
