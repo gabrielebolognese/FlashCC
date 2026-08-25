@@ -37,7 +37,9 @@ export function listDocs(): DocSummary[] {
 
 export function loadDoc(id: string): Doc | null {
   const d = read<Doc>(KEY(id));
-  return d && d.version === 3 && Array.isArray(d.slides) ? d : null;
+  if (!d || d.version !== 3 || !Array.isArray(d.slides)) return null;
+  // Projects saved before the media pool existed have no array.
+  return { ...d, media: Array.isArray(d.media) ? d.media : [] };
 }
 
 export function saveDoc(doc: Doc): boolean {

@@ -15,6 +15,7 @@ import {
   type Rect,
 } from "./geometry.js";
 import { LayerView } from "./LayerView.js";
+import { MEDIA_DRAG_TYPE } from "./MediaPool.js";
 import { makeLayer, type Layer, type Tool } from "./model.js";
 import type { Studio } from "./useStudio.js";
 
@@ -38,6 +39,7 @@ export function Canvas({ studio }: { studio: Studio }) {
   const [drag, setDrag] = useState<Drag>(null);
   const [guides, setGuides] = useState<Guide[]>([]);
   const [spaceDown, setSpaceDown] = useState(false);
+  const [dropTarget, setDropTarget] = useState<string | null>(null);
 
   const layers = slide?.layers ?? [];
   const selectedLayers = layers.filter((l) => selection.includes(l.id));
@@ -362,6 +364,35 @@ export function Canvas({ studio }: { studio: Studio }) {
     setGuides([]);
   };
 
+  /** Topmost image layer under the pointer — a drop lands there, sized to its box. */
+  const imageUnder = (clientX: number, clientY: number): Layer | undefined => {
+    const p = toBoard(clientX, clientY);
+    return [...layers]
+      .reverse()
+      .find((l) => l.visible && !l.locked && l.kind === "image" && contains(rectOf(l), p.x, p.y));
+  };
+
+  const onDragOver = (e: React.DragEvent<HTMLDivElement>) => {
+    if (!e.dataTransfer.types.includes(MEDIA_DRAG_TYPE)) return;
+    e.preventDefault();
+    e.dataTransfer.dropEffect = "copy";
+    setDropTarget(imageUnder(e.clientX, e.clientY)?.id ?? null);
+  };
+
+  const onDrop = (e: React.DragEvent<HTMLDivElement>) => {
+    const id = e.dataTransfer.getData(MEDIA_DRAG_TYPE);
+    if (!id) return;
+    e.preventDefault();
+    setDropTarget(null);
+    const item = doc.media.find((m) => m.id === id);
+    if (!item) return;
+
+    const target = imageUnder(e.clientX, e.clientY);
+    // Onto a slot: keep the slot's box. Onto bare canvas: a new layer at the pointer.
+    if (target) studio.fillWithMedia(target.id, item);
+    else studio.placeMedia(item, toBoard(e.clientX, e.clientY));
+  };
+
   const cursor = spaceDown ? "grab" : tool === "select" ? "default" : "crosshair";
 
   return (
@@ -372,6 +403,9 @@ export function Canvas({ studio }: { studio: Studio }) {
       onPointerMove={onMove}
       onPointerUp={onUp}
       onPointerLeave={onUp}
+      onDragOver={onDragOver}
+      onDragLeave={() => setDropTarget(null)}
+      onDrop={onDrop}
     >
       <div
         className="absolute left-1/2 top-1/2"
@@ -412,6 +446,19 @@ export function Canvas({ studio }: { studio: Studio }) {
               ),
             )}
           </div>
+
+          {/* the slot a drop would land on */}
+          {dropTarget
+            ? layers
+                .filter((l) => l.id === dropTarget)
+                .map((l) => (
+                  <div
+                    key={`drop-${l.id}`}
+                    className="pointer-events-none absolute rounded-lg border-2 border-accent bg-accent-wash"
+                    style={{ left: l.x * zoom, top: l.y * zoom, width: l.w * zoom, height: l.h * zoom }}
+                  />
+                ))
+            : null}
 
           {/* selection chrome, in screen space */}
           {selectedLayers.map((l) => (

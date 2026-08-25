@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { buildSlides, compositionFor, MAX_SLIDES } from "./compositions.js";
+import { bandsFor, buildSlides, compositionFor, MAX_SLIDES } from "./compositions.js";
 import { THEMES } from "./presets.js";
 import { insertionIndex, labelFor, repeatableOf, STRUCTURES } from "./structures.js";
 
@@ -191,6 +191,68 @@ describe("structures", () => {
       const at = insertionIndex(s.slots);
       expect(at, s.name).toBeLessThan(s.slots.length);
       expect(s.slots[at]?.repeatable ?? false, s.name).toBe(false);
+    }
+  });
+});
+
+describe("image bands", () => {
+  it("reserves a picture slot on every generated slide", () => {
+    const slides = buildSlides(texts(8), theme);
+    for (const s of slides) {
+      const images = s.layers.filter((l) => l.kind === "image");
+      expect(images).toHaveLength(1);
+      expect(images[0]?.src, "a fresh slot must be empty").toBeUndefined();
+    }
+  });
+
+  it("puts the placeholder behind the text, so neither hides the other", () => {
+    for (const s of buildSlides(texts(6), theme)) {
+      expect(s.layers[0]?.kind).toBe("image");
+    }
+  });
+
+  it("uses both placements across a deck, not one for everything", () => {
+    const placements = new Set(
+      texts(8).map((_, i) => compositionFor(i, 8).image),
+    );
+    expect(placements).toEqual(new Set(["above", "below"]));
+  });
+
+  it("never overlaps the picture band with the text region", () => {
+    for (const placement of ["above", "below"] as const) {
+      const { image, textRegion } = bandsFor(placement);
+      const gap =
+        placement === "above"
+          ? textRegion.y - (image.y + image.h)
+          : image.y - (textRegion.y + textRegion.h);
+      expect(gap, placement).toBeGreaterThan(0);
+    }
+  });
+
+  it("keeps the band and the text inside the artboard", () => {
+    for (const placement of ["above", "below"] as const) {
+      const { image, textRegion } = bandsFor(placement);
+      for (const r of [image, textRegion]) {
+        expect(r.y).toBeGreaterThanOrEqual(0);
+        expect(r.y + r.h).toBeLessThanOrEqual(H);
+        expect(r.h).toBeGreaterThan(200);
+      }
+    }
+  });
+
+  it("still fits every framework end to end with the band taking half the slide", () => {
+    for (const s of STRUCTURES) {
+      const slides = buildSlides(
+        s.slots.map((x) => x.placeholder),
+        theme,
+        s.slots.map((x) => x.id),
+      );
+      for (const sl of slides) {
+        for (const l of sl.layers) {
+          expect(l.y + l.h, `${s.name}/${l.name}`).toBeLessThanOrEqual(H + 1);
+          expect(l.h).toBeGreaterThan(0);
+        }
+      }
     }
   });
 });

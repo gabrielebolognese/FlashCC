@@ -15,7 +15,7 @@ export function LayersPanel({ studio }: { studio: Studio }) {
   const reversed = [...layers].reverse();
 
   return (
-    <div className="flex w-[212px] shrink-0 flex-col border-r border-hairline bg-surface-1">
+    <div className="flex max-h-[46%] min-h-[120px] shrink-0 flex-col">
       {/* layers */}
       <div className="flex h-9 shrink-0 items-center justify-between border-b border-hairline px-3">
         <span className="text-overline uppercase text-tertiary">Layers</span>

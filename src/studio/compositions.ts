@@ -5,6 +5,10 @@
  * The point is that consecutive slides do not look the same — a deck where every
  * slide is the same box of centred text reads as generated, which is the one thing
  * it must not do. Slide 1 is always the title.
+ *
+ * Every slide reserves an image band, above or below the text. It renders as an empty
+ * placeholder until something is dropped on it, and it is an ordinary image layer the
+ * whole time — movable, resizable, deletable like anything else.
  */
 import { makeLayer, makeSlide, type Layer, type Slide } from "./model.js";
 import type { Theme } from "./presets.js";
@@ -13,6 +17,13 @@ const W = 1080;
 const H = 1350;
 const M = 96;
 const COL = W - M * 2;
+
+/** How much height the image band takes, and the air between it and the text. */
+const BAND = 430;
+const BAND_GAP = 56;
+
+export type Region = { x: number; y: number; w: number; h: number };
+export type ImagePlacement = "above" | "below";
 
 type Ctx = { text: string; index: number; total: number; theme: Theme };
 
@@ -25,11 +36,11 @@ function autoSize(text: string, max: number, min: number, ideal: number): number
   return Math.round(Math.max(min, Math.min(max, max * Math.sqrt(ideal / n))));
 }
 
-function text(t: string, at: { x: number; y: number; w: number; h: number }, fill: string, extra: Partial<Layer> = {}): Layer {
+function text(t: string, at: Region, fill: string, extra: Partial<Layer> = {}): Layer {
   return { ...makeLayer("text", at, fill), text: t, ...extra };
 }
 
-const rect = (at: { x: number; y: number; w: number; h: number }, fill: string, extra: Partial<Layer> = {}): Layer => ({
+const rect = (at: Region, fill: string, extra: Partial<Layer> = {}): Layer => ({
   ...makeLayer("rect", at, fill),
   ...extra,
 });
@@ -43,18 +54,28 @@ function lead(t: string): [string, string] {
   return [t.trim(), ""];
 }
 
-type Composition = { id: string; label: string; build: (c: Ctx) => Layer[] };
+/** Vertically centre a block of height `h` inside a region. */
+const centred = (region: Region, h: number): number => region.y + Math.max(0, (region.h - h) / 2);
+
+type Composition = {
+  id: string;
+  label: string;
+  /** Where this composition wants its picture. */
+  image: ImagePlacement;
+  build: (c: Ctx, region: Region) => Layer[];
+};
 
 const TITLE: Composition = {
   id: "title",
   label: "Title",
-  build: ({ text: t, theme }) => {
-    const size = autoSize(t, 108, 52, 46);
-    const h = Math.max(200, Math.ceil(t.length / 18) * size * 1.06);
-    const y = H - M - 120 - h;
+  image: "above",
+  build: ({ text: t, theme }, r) => {
+    const size = autoSize(t, 104, 46, 46);
+    const h = Math.min(r.h - 60, Math.max(150, Math.ceil(t.length / 18) * size * 1.06));
+    const y = r.y + r.h - h;
     return [
-      rect({ x: M, y: y - 56, w: 132, h: 10 }, theme.accent, { name: "Rule", radius: 5 }),
-      text(t, { x: M, y, w: COL, h }, theme.fg, {
+      rect({ x: r.x, y: y - 46, w: 132, h: 10 }, theme.accent, { name: "Rule", radius: 5 }),
+      text(t, { x: r.x, y, w: r.w, h }, theme.fg, {
         fontSize: size,
         fontWeight: 700,
         lineHeight: 1.06,
@@ -65,26 +86,46 @@ const TITLE: Composition = {
   },
 };
 
+const UNDERLINE: Composition = {
+  id: "underline",
+  label: "Underlined",
+  image: "below",
+  build: ({ text: t, theme }, r) => {
+    const size = autoSize(t, 70, 34, 80);
+    const h = Math.min(r.h - 40, Math.max(size * 1.15, Math.ceil(t.length / 22) * size * 1.15));
+    return [
+      text(t, { x: r.x, y: r.y, w: r.w, h }, theme.fg, {
+        fontSize: size,
+        fontWeight: 700,
+        lineHeight: 1.15,
+        name: "Text",
+      }),
+      rect({ x: r.x, y: r.y + h + 28, w: r.w, h: 4 }, theme.accent, { name: "Underline", radius: 2 }),
+    ];
+  },
+};
+
 const HEADING_BODY: Composition = {
   id: "heading-body",
   label: "Heading + body",
-  build: ({ text: t, theme }) => {
-    const [head, rest] = lead(t);
-    if (!rest) return UNDERLINE.build({ text: t, index: 1, total: 2, theme });
-    const hs = autoSize(head, 64, 40, 40);
-    const bs = autoSize(rest, 42, 28, 220);
+  image: "above",
+  build: (ctx, r) => {
+    const [head, rest] = lead(ctx.text);
+    if (!rest) return UNDERLINE.build(ctx, r);
+    const { theme } = ctx;
+    const hs = autoSize(head, 58, 34, 40);
+    const bs = autoSize(rest, 40, 26, 220);
     const hh = Math.max(hs * 1.2, Math.ceil(head.length / 26) * hs * 1.2);
     const bh = Math.max(bs * 1.5, Math.ceil(rest.length / 44) * bs * 1.45);
-    const total = hh + 40 + bh;
-    const y = (H - total) / 2;
+    const y = centred(r, hh + 32 + bh);
     return [
-      text(head, { x: M, y, w: COL, h: hh }, theme.fg, {
+      text(head, { x: r.x, y, w: r.w, h: hh }, theme.fg, {
         fontSize: hs,
         fontWeight: 700,
         lineHeight: 1.15,
         name: "Heading",
       }),
-      text(rest, { x: M, y: y + hh + 40, w: COL, h: bh }, theme.muted, {
+      text(rest, { x: r.x, y: y + hh + 32, w: r.w, h: bh }, theme.muted, {
         fontSize: bs,
         fontWeight: 400,
         lineHeight: 1.45,
@@ -97,11 +138,12 @@ const HEADING_BODY: Composition = {
 const STATEMENT: Composition = {
   id: "statement",
   label: "Statement",
-  build: ({ text: t, theme }) => {
-    const size = autoSize(t, 84, 40, 70);
-    const h = Math.max(size * 1.2, Math.ceil(t.length / 22) * size * 1.18);
+  image: "below",
+  build: ({ text: t, theme }, r) => {
+    const size = autoSize(t, 76, 34, 70);
+    const h = Math.min(r.h, Math.max(size * 1.2, Math.ceil(t.length / 22) * size * 1.18));
     return [
-      text(t, { x: M, y: (H - h) / 2, w: COL, h }, theme.fg, {
+      text(t, { x: r.x, y: centred(r, h), w: r.w, h }, theme.fg, {
         fontSize: size,
         fontWeight: 700,
         lineHeight: 1.18,
@@ -115,19 +157,22 @@ const STATEMENT: Composition = {
 const NUMBERED: Composition = {
   id: "numbered",
   label: "Numbered",
-  build: ({ text: t, index, theme }) => {
-    const size = autoSize(t, 52, 30, 150);
-    const h = Math.max(size * 1.4, Math.ceil(t.length / 34) * size * 1.4);
+  image: "below",
+  build: ({ text: t, index, theme }, r) => {
+    const size = autoSize(t, 46, 26, 150);
+    const th = Math.max(size * 1.4, Math.ceil(t.length / 34) * size * 1.4);
+    const numH = 110;
+    const y = centred(r, numH + 24 + 6 + 36 + th);
     return [
-      text(String(index + 1).padStart(2, "0"), { x: M, y: M + 40, w: 260, h: 170 }, theme.accent, {
-        fontSize: 150,
+      text(String(index + 1).padStart(2, "0"), { x: r.x, y, w: 240, h: numH }, theme.accent, {
+        fontSize: 100,
         fontWeight: 700,
         lineHeight: 1,
         letterSpacing: -0.04,
         name: "Number",
       }),
-      rect({ x: M, y: M + 240, w: 72, h: 6 }, theme.accent, { name: "Tick", radius: 3 }),
-      text(t, { x: M, y: M + 320, w: COL, h }, theme.fg, {
+      rect({ x: r.x, y: y + numH + 24, w: 72, h: 6 }, theme.accent, { name: "Tick", radius: 3 }),
+      text(t, { x: r.x, y: y + numH + 24 + 6 + 36, w: r.w, h: th }, theme.fg, {
         fontSize: size,
         fontWeight: 500,
         lineHeight: 1.4,
@@ -140,13 +185,14 @@ const NUMBERED: Composition = {
 const QUOTE: Composition = {
   id: "quote",
   label: "Quote",
-  build: ({ text: t, theme }) => {
-    const size = autoSize(t, 68, 34, 90);
-    const h = Math.max(size * 1.25, Math.ceil(t.length / 24) * size * 1.25);
-    const y = (H - h) / 2;
+  image: "above",
+  build: ({ text: t, theme }, r) => {
+    const size = autoSize(t, 62, 28, 90);
+    const h = Math.min(r.h, Math.max(size * 1.25, Math.ceil(t.length / 24) * size * 1.25));
+    const y = centred(r, h);
     return [
-      rect({ x: M, y, w: 8, h }, theme.accent, { name: "Bar", radius: 4 }),
-      text(t, { x: M + 48, y, w: COL - 48, h }, theme.fg, {
+      rect({ x: r.x, y, w: 8, h }, theme.accent, { name: "Bar", radius: 4 }),
+      text(t, { x: r.x + 44, y, w: r.w - 44, h }, theme.fg, {
         fontSize: size,
         fontWeight: 500,
         lineHeight: 1.25,
@@ -157,37 +203,19 @@ const QUOTE: Composition = {
   },
 };
 
-const UNDERLINE: Composition = {
-  id: "underline",
-  label: "Underlined",
-  build: ({ text: t, theme }) => {
-    const size = autoSize(t, 76, 36, 80);
-    const h = Math.max(size * 1.15, Math.ceil(t.length / 22) * size * 1.15);
-    const y = M + 180;
-    return [
-      text(t, { x: M, y, w: COL, h }, theme.fg, {
-        fontSize: size,
-        fontWeight: 700,
-        lineHeight: 1.15,
-        name: "Text",
-      }),
-      rect({ x: M, y: y + h + 36, w: COL, h: 4 }, theme.accent, { name: "Underline", radius: 2 }),
-    ];
-  },
-};
-
 const BLOCK: Composition = {
   id: "block",
   label: "Colour block",
-  build: ({ text: t, theme }) => {
-    const size = autoSize(t, 74, 34, 80);
+  image: "above",
+  build: ({ text: t, theme }, r) => {
+    const size = autoSize(t, 68, 30, 80);
     const h = Math.max(size * 1.2, Math.ceil(t.length / 22) * size * 1.2);
-    const padY = 96;
-    const blockH = h + padY * 2;
-    const y = (H - blockH) / 2;
+    const padY = Math.min(64, Math.max(28, (r.h - h) / 2));
+    const blockH = Math.min(r.h, h + padY * 2);
+    const y = centred(r, blockH);
     return [
       rect({ x: 0, y, w: W, h: blockH }, theme.accent, { name: "Block" }),
-      text(t, { x: M, y: y + padY, w: COL, h }, theme.bg, {
+      text(t, { x: r.x, y: y + (blockH - h) / 2, w: r.w, h }, theme.bg, {
         fontSize: size,
         fontWeight: 700,
         lineHeight: 1.2,
@@ -201,11 +229,12 @@ const BLOCK: Composition = {
 const CAPS: Composition = {
   id: "caps",
   label: "Caps",
-  build: ({ text: t, theme }) => {
-    const size = autoSize(t, 62, 28, 90);
-    const h = Math.max(size * 1.3, Math.ceil(t.length / 20) * size * 1.3);
+  image: "below",
+  build: ({ text: t, theme }, r) => {
+    const size = autoSize(t, 56, 24, 90);
+    const h = Math.min(r.h, Math.max(size * 1.3, Math.ceil(t.length / 20) * size * 1.3));
     return [
-      text(t, { x: M, y: (H - h) / 2, w: COL, h }, theme.fg, {
+      text(t, { x: r.x, y: centred(r, h), w: r.w, h }, theme.fg, {
         fontSize: size,
         fontWeight: 700,
         lineHeight: 1.3,
@@ -253,6 +282,26 @@ export function compositionFor(index: number, total: number, role?: string): Com
 export const compositionLabel = (index: number, total: number, role?: string): string =>
   compositionFor(index, total, role).label;
 
+/** The picture band and the text region it leaves behind. */
+export function bandsFor(placement: ImagePlacement): { image: Region; textRegion: Region } {
+  const innerH = H - M * 2;
+  if (placement === "above") {
+    return {
+      image: { x: M, y: M, w: COL, h: BAND },
+      textRegion: { x: M, y: M + BAND + BAND_GAP, w: COL, h: innerH - BAND - BAND_GAP },
+    };
+  }
+  return {
+    image: { x: M, y: H - M - BAND, w: COL, h: BAND },
+    textRegion: { x: M, y: M, w: COL, h: innerH - BAND - BAND_GAP },
+  };
+}
+
+/** An empty picture slot. Dotted outline and an upload mark until something lands on it. */
+export function imagePlaceholder(at: Region, theme: Theme, name = "Image"): Layer {
+  return { ...makeLayer("image", at, theme.muted), name, radius: 12, fit: "cover" };
+}
+
 export function buildSlides(texts: string[], theme: Theme, roles?: string[]): Slide[] {
   const kept: { text: string; role: string | undefined }[] = [];
   texts.forEach((t, i) => {
@@ -262,9 +311,15 @@ export function buildSlides(texts: string[], theme: Theme, roles?: string[]): Sl
 
   return kept.map((k, i) => {
     const comp = compositionFor(i, kept.length, k.role);
+    const { image, textRegion } = bandsFor(comp.image);
+    // Picture first so it sits behind the text, which is what you want if either
+    // ends up dragged over the other later.
     return {
       ...makeSlide(theme.bg, comp.id === "title" ? "Hook" : `Slide ${i + 1}`),
-      layers: comp.build({ text: k.text, index: i, total: kept.length, theme }),
+      layers: [
+        imagePlaceholder(image, theme),
+        ...comp.build({ text: k.text, index: i, total: kept.length, theme }, textRegion),
+      ],
     };
   });
 }

@@ -1,6 +1,15 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
-import { cloneLayer, makeSlide, type Doc, type Layer, type Slide, type Tool } from "./model.js";
+import {
+  cloneLayer,
+  makeLayer,
+  makeSlide,
+  type Doc,
+  type Layer,
+  type MediaItem,
+  type Slide,
+  type Tool,
+} from "./model.js";
 import { saveDoc } from "./storage.js";
 
 const LIMIT = 120;
@@ -223,6 +232,57 @@ export function useStudio(initial: Doc) {
 
   const setName = useCallback((name: string) => commit({ ...doc, name }, "name"), [commit, doc]);
 
+  /* ── media pool ─────────────────────────────────────────────────────── */
+
+  const addMedia = useCallback(
+    (items: MediaItem[]) => {
+      if (items.length === 0) return;
+      commit({ ...doc, media: [...items, ...doc.media] });
+    },
+    [commit, doc],
+  );
+
+  const removeMedia = useCallback(
+    (id: string) => commit({ ...doc, media: doc.media.filter((m) => m.id !== id) }),
+    [commit, doc],
+  );
+
+  /**
+   * Drop a picture onto a layer. The slot keeps its own box and the image is
+   * cover-fitted into it, so the composition stays intact.
+   */
+  const fillWithMedia = useCallback(
+    (layerId: string, media: MediaItem) => {
+      patchSlide(index, (s) => ({
+        ...s,
+        layers: s.layers.map((l) =>
+          l.id === layerId ? { ...l, kind: "image", src: media.src, name: media.name, fit: l.fit ?? "cover" } : l,
+        ),
+      }));
+      setSelection([layerId]);
+    },
+    [index, patchSlide],
+  );
+
+  /** Dropped on empty canvas: a new image layer, sized to fit inside the artboard. */
+  const placeMedia = useCallback(
+    (media: MediaItem, at: { x: number; y: number }) => {
+      const max = Math.min(doc.width * 0.6, doc.height * 0.6);
+      const scale = Math.min(1, max / Math.max(media.w, media.h));
+      const w = Math.round(media.w * scale);
+      const h = Math.round(media.h * scale);
+      const layer: Layer = {
+        ...makeLayer("image", { x: Math.round(at.x - w / 2), y: Math.round(at.y - h / 2), w, h }, "#000000"),
+        src: media.src,
+        name: media.name,
+        radius: 12,
+      };
+      patchSlide(index, (s) => ({ ...s, layers: [...s.layers, layer] }));
+      setSelection([layer.id]);
+    },
+    [doc.width, doc.height, index, patchSlide],
+  );
+
   const replaceDoc = useCallback((next: Doc) => commit(next), [commit]);
 
   const selected = useMemo(
@@ -261,6 +321,10 @@ export function useStudio(initial: Doc) {
     setFormat,
     setName,
     replaceDoc,
+    addMedia,
+    removeMedia,
+    fillWithMedia,
+    placeMedia,
   };
 }
 

@@ -99,19 +99,29 @@ export function LayerView({
 
   if (layer.kind === "image") {
     if (!layer.src) {
+      // Empty slot: dotted outline and an upload mark, until something lands on it.
       return (
         <div
           style={{
             ...box,
-            border: `2px dashed ${layer.fill}`,
             borderRadius: layer.radius,
+            border: `3px dotted ${layer.fill}`,
             display: "grid",
             placeItems: "center",
-            opacity: (layer.opacity ?? 1) * 0.6,
+            opacity: (layer.opacity ?? 1) * 0.75,
           }}
         >
-          <svg width="18%" viewBox="0 0 24 24" fill="none" stroke={layer.fill} strokeWidth={2}>
-            <path d="M3 5h18v14H3zM3 16l5-5 4 4 3-3 6 6" />
+          <svg
+            width={Math.max(48, Math.min(layer.w, layer.h) * 0.22)}
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke={layer.fill}
+            strokeWidth={1.6}
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          >
+            <path d="M12 16V4M7 9l5-5 5 5" />
+            <path d="M3 15v3a3 3 0 0 0 3 3h12a3 3 0 0 0 3-3v-3" />
           </svg>
         </div>
       );

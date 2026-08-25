@@ -52,6 +52,16 @@ export type Layer = {
   fit?: "cover" | "contain" | undefined;
 };
 
+/** One item in the media pool. Data URL so a project stays self-contained. */
+export type MediaItem = {
+  id: string;
+  name: string;
+  src: string;
+  w: number;
+  h: number;
+  bytes: number;
+};
+
 export type Slide = {
   id: string;
   name: string;
@@ -67,6 +77,8 @@ export type Doc = {
   height: number;
   /** Saved swatches. Not a brand lock — just colours you reach for. */
   palette: string[];
+  /** Uploaded images, shared across every slide in the project. */
+  media: MediaItem[];
   slides: Slide[];
   createdAt: string;
   updatedAt: string;
@@ -161,6 +173,7 @@ export function makeDoc(name = "Untitled", w = 1080, h = 1350): Doc {
     width: w,
     height: h,
     palette: [...DEFAULT_PALETTE],
+    media: [],
     slides: [makeSlide()],
     createdAt: now,
     updatedAt: now,

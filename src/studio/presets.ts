@@ -158,6 +158,7 @@ export function buildDoc(preset: Preset, themeId: keyof typeof THEMES, name: str
     width: W,
     height: H,
     palette: [theme.bg, theme.fg, theme.accent, theme.muted, "#ffffff", "#000000", "#e5545a", "#3dbe7a", "#4c86d6", "#db2777"],
+    media: [],
     slides: preset.build(theme),
     createdAt: now,
     updatedAt: now,

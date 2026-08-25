@@ -7,6 +7,7 @@ import { IconButton } from "../ui/IconButton.js";
 import { Canvas } from "./Canvas.js";
 import { Filmstrip } from "./Filmstrip.js";
 import { LayersPanel } from "./LayersPanel.js";
+import { MediaPool } from "./MediaPool.js";
 import { LayerView } from "./LayerView.js";
 import type { Doc } from "./model.js";
 import { Properties } from "./Properties.js";
@@ -75,7 +76,10 @@ export function Studio({ initial, onHome }: { initial: Doc; onHome: () => void }
 
       <div className="flex min-h-0 flex-1">
         <Toolbar studio={studio} />
-        <LayersPanel studio={studio} />
+        <div className="flex w-[212px] shrink-0 flex-col border-r border-hairline bg-surface-1">
+          <LayersPanel studio={studio} />
+          <MediaPool studio={studio} />
+        </div>
         <Canvas studio={studio} />
         <Properties studio={studio} />
       </div>
