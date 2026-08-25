@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import { buildSlides, compositionFor, MAX_SLIDES } from "./compositions.js";
 import { THEMES } from "./presets.js";
+import { insertionIndex, labelFor, repeatableOf, STRUCTURES } from "./structures.js";
 
 const theme = THEMES.ink!;
 const W = 1080;
@@ -108,5 +109,79 @@ describe("buildSlides", () => {
     const sig = (i: number) =>
       slides[i]!.layers.map((l) => `${Math.round(l.x)},${Math.round(l.y)},${l.fontSize ?? 0}`).join("|");
     for (let i = 0; i < slides.length - 1; i += 1) expect(sig(i)).not.toBe(sig(i + 1));
+  });
+});
+
+describe("role-driven compositions", () => {
+  it("makes the hook the title and the CTA the colour block", () => {
+    expect(compositionFor(0, 8, "hook").id).toBe("title");
+    expect(compositionFor(7, 8, "cta").id).toBe("block");
+  });
+
+  it("still never repeats a composition on consecutive slides", () => {
+    for (const s of STRUCTURES) {
+      const roles = s.slots.map((x) => x.id);
+      for (let i = 0; i < roles.length - 1; i += 1) {
+        expect(
+          compositionFor(i, roles.length, roles[i]).id,
+          `${s.name}: ${roles[i]}→${roles[i + 1]}`,
+        ).not.toBe(compositionFor(i + 1, roles.length, roles[i + 1]).id);
+      }
+    }
+  });
+
+  it("builds every framework end to end without a degenerate layer", () => {
+    for (const s of STRUCTURES) {
+      const texts = s.slots.map((x) => x.placeholder);
+      const slides = buildSlides(texts, theme, s.slots.map((x) => x.id));
+      expect(slides, s.name).toHaveLength(s.slots.length);
+      for (const sl of slides) {
+        expect(sl.layers.length).toBeGreaterThan(0);
+        for (const l of sl.layers) {
+          expect(l.w).toBeGreaterThan(0);
+          expect(l.h).toBeGreaterThan(0);
+          expect(l.x + l.w).toBeLessThanOrEqual(1081);
+          expect(l.y + l.h).toBeLessThanOrEqual(1351);
+        }
+      }
+    }
+  });
+});
+
+describe("structures", () => {
+  it("gives every slot a note, a placeholder and examples", () => {
+    for (const s of STRUCTURES) {
+      for (const slot of s.slots) {
+        expect(slot.note.length, `${s.name}/${slot.label}`).toBeGreaterThan(20);
+        expect(slot.placeholder.length).toBeGreaterThan(0);
+        expect(slot.examples.length).toBeGreaterThan(0);
+      }
+    }
+  });
+
+  it("starts every framework with a hook and ends it with a CTA", () => {
+    for (const s of STRUCTURES) {
+      expect(s.slots[0]?.id, s.name).toBe("hook");
+      expect(s.slots.at(-1)?.id, s.name).toBe("cta");
+    }
+  });
+
+  it("gives every framework something to repeat", () => {
+    for (const s of STRUCTURES) expect(repeatableOf(s), s.name).toBeDefined();
+  });
+
+  it("numbers repeated slots and leaves single ones unnumbered", () => {
+    const problem = STRUCTURES.find((s) => s.id === "problem")!;
+    expect(labelFor(problem.slots, 0)).toBe("Hook");
+    const fixes = problem.slots.map((_, i) => labelFor(problem.slots, i)).filter((l) => l.startsWith("Fix"));
+    expect(fixes).toEqual(["Fix 1", "Fix 2", "Fix 3"]);
+  });
+
+  it("inserts a new repeatable slot before the closing slots", () => {
+    for (const s of STRUCTURES) {
+      const at = insertionIndex(s.slots);
+      expect(at, s.name).toBeLessThan(s.slots.length);
+      expect(s.slots[at]?.repeatable ?? false, s.name).toBe(false);
+    }
   });
 });

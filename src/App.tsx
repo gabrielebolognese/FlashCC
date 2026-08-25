@@ -21,12 +21,12 @@ export function App() {
       <Compose
         initialTheme={screen.theme}
         onCancel={() => setScreen({ view: "start" })}
-        onGenerate={({ texts, themeId }) => {
+        onGenerate={({ texts, roles, themeId }) => {
           const theme = THEMES[themeId]!;
           const doc: Doc = {
             ...makeDoc(texts[0]?.slice(0, 40).trim() || "Untitled"),
             palette: [theme.bg, theme.fg, theme.accent, theme.muted, "#ffffff", "#000000", "#e5545a", "#3dbe7a", "#4c86d6", "#db2777"],
-            slides: buildSlides(texts, theme),
+            slides: buildSlides(texts, theme, roles),
           };
           saveDoc(doc);
           setScreen({ view: "studio", doc });

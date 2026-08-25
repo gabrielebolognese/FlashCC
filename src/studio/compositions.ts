@@ -221,26 +221,50 @@ const CAPS: Composition = {
 /** The rotation. Consecutive slides never share a composition. */
 const CYCLE: Composition[] = [HEADING_BODY, STATEMENT, NUMBERED, QUOTE, UNDERLINE, CAPS];
 
-export function compositionFor(index: number, total: number): Composition {
+/**
+ * Roles that always get the same treatment, whatever their position. The hook is the
+ * title because it is the hook; the CTA is the one loud slide because it is the ask.
+ */
+const BY_ROLE: Record<string, Composition> = {
+  hook: TITLE,
+  cta: BLOCK,
+  takeaway: STATEMENT,
+  lesson: STATEMENT,
+  turn: QUOTE,
+  result: NUMBERED,
+};
+
+export function compositionFor(index: number, total: number, role?: string): Composition {
+  if (role) {
+    const pinned = BY_ROLE[role];
+    if (pinned) {
+      // ...unless it would repeat its neighbour, which is the one thing to avoid.
+      const prev = index > 0 ? compositionFor(index - 1, total) : null;
+      if (!prev || prev.id !== pinned.id) return pinned;
+    }
+    return CYCLE[(index - 1 + CYCLE.length) % CYCLE.length]!;
+  }
   if (index === 0) return TITLE;
   // A short last slide closes on the colour block — the one loud slide in the deck.
   if (index === total - 1 && total > 2) return BLOCK;
   return CYCLE[(index - 1) % CYCLE.length]!;
 }
 
-export const compositionLabel = (index: number, total: number): string =>
-  compositionFor(index, total).label;
+export const compositionLabel = (index: number, total: number, role?: string): string =>
+  compositionFor(index, total, role).label;
 
-export function buildSlides(texts: string[], theme: Theme): Slide[] {
-  const clean = texts.map((t) => t.trim()).filter(Boolean);
-  if (clean.length === 0) return [makeSlide(theme.bg, "Slide 1")];
+export function buildSlides(texts: string[], theme: Theme, roles?: string[]): Slide[] {
+  const kept: { text: string; role: string | undefined }[] = [];
+  texts.forEach((t, i) => {
+    if (t.trim()) kept.push({ text: t.trim(), role: roles?.[i] });
+  });
+  if (kept.length === 0) return [makeSlide(theme.bg, "Slide 1")];
 
-  return clean.map((t, i) => {
-    const comp = compositionFor(i, clean.length);
-    const bg = comp.id === "block" ? theme.bg : theme.bg;
+  return kept.map((k, i) => {
+    const comp = compositionFor(i, kept.length, k.role);
     return {
-      ...makeSlide(bg, i === 0 ? "Title" : `Slide ${i + 1}`),
-      layers: comp.build({ text: t, index: i, total: clean.length, theme }),
+      ...makeSlide(theme.bg, comp.id === "title" ? "Hook" : `Slide ${i + 1}`),
+      layers: comp.build({ text: k.text, index: i, total: kept.length, theme }),
     };
   });
 }
