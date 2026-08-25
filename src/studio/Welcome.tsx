@@ -1,5 +1,5 @@
-import { ArrowLeft, ArrowRight, Check, Sparkles } from "lucide-react";
-import { useMemo, useState, type CSSProperties, type ReactNode } from "react";
+import { ArrowLeft, ArrowRight, Check, SkipForward, Sparkles } from "lucide-react";
+import { useEffect, useMemo, useState, type CSSProperties, type ReactNode } from "react";
 
 import { buildSlides } from "./compositions.js";
 import { SlidePreview } from "./SlidePreview.js";
@@ -186,8 +186,17 @@ export function Welcome({ onDone }: { onDone: (prefs: Prefs | null) => void }) {
   const [started, setStarted] = useState(false);
   const [step, setStep] = useState(0);
   const [prefs, setPrefs] = useState<Prefs>(DEFAULT_PREFS);
+  const [confirming, setConfirming] = useState(false);
+  /** Set to hand over; the beat runs, then onDone fires with this payload. */
+  const [leaving, setLeaving] = useState<{ prefs: Prefs | null; kept: boolean } | null>(null);
 
   const set = (patch: Partial<Prefs>) => setPrefs((p) => ({ ...p, ...patch }));
+
+  useEffect(() => {
+    if (!leaving) return;
+    const t = window.setTimeout(() => onDone(leaving.prefs), 1000);
+    return () => window.clearTimeout(t);
+  }, [leaving, onDone]);
 
   const preview = useMemo(() => {
     const style = styleFromPrefs(prefs);
@@ -200,13 +209,16 @@ export function Welcome({ onDone }: { onDone: (prefs: Prefs | null) => void }) {
   function finish() {
     savePrefs(prefs);
     markOnboarded();
-    onDone(prefs);
+    setLeaving({ prefs, kept: true });
   }
 
   function skip() {
     markOnboarded();
-    onDone(null);
+    setConfirming(false);
+    setLeaving({ prefs: null, kept: false });
   }
+
+  if (leaving) return <Leaving kept={leaving.kept} accent={prefs.accent} />;
 
   if (!started) {
     return (
@@ -252,7 +264,7 @@ export function Welcome({ onDone }: { onDone: (prefs: Prefs | null) => void }) {
             </button>
             <button
               type="button"
-              onClick={skip}
+              onClick={() => setConfirming(true)}
               className="fcc-lift flex h-12 w-full items-center justify-center rounded-2xl border border-hairline text-[15px] font-semibold text-secondary hover:border-surface-5 hover:text-primary"
             >
               No, take me straight in
@@ -263,6 +275,8 @@ export function Welcome({ onDone }: { onDone: (prefs: Prefs | null) => void }) {
             Takes about a minute. You can change any of it later, on any slide.
           </p>
         </div>
+
+        {confirming ? <ConfirmSkip onCancel={() => setConfirming(false)} onSkip={skip} /> : null}
       </div>
     );
   }
@@ -299,10 +313,11 @@ export function Welcome({ onDone }: { onDone: (prefs: Prefs | null) => void }) {
         <div className="flex-1" />
         <button
           type="button"
-          onClick={skip}
-          className="h-8 shrink-0 rounded-xl px-3 text-caption text-muted hover:bg-white/[0.06] hover:text-primary"
+          onClick={() => setConfirming(true)}
+          className="fcc-lift flex h-9 shrink-0 items-center gap-1.5 rounded-xl border border-hairline px-3.5 text-caption font-semibold text-secondary hover:border-surface-5 hover:text-primary"
         >
-          Skip
+          <SkipForward size={13} strokeWidth={2.2} />
+          Skip setup
         </button>
       </header>
 
@@ -358,6 +373,88 @@ export function Welcome({ onDone }: { onDone: (prefs: Prefs | null) => void }) {
               className="relative rounded-2xl border border-white/10 shadow-modal"
             />
           </div>
+        </div>
+      </div>
+
+      {/* Outside the scroller, so it is always the last thing on screen. */}
+      <div className="relative shrink-0 px-6 pb-6 pt-3 text-center">
+        <p className="text-[15px] font-medium leading-6 text-primary">
+          You can always change all of these settings later.
+        </p>
+      </div>
+
+      {confirming ? <ConfirmSkip onCancel={() => setConfirming(false)} onSkip={skip} /> : null}
+    </div>
+  );
+}
+
+/** The beat between answering and arriving, so the handover is not a hard cut. */
+function Leaving({ kept, accent }: { kept: boolean; accent: string }) {
+  return (
+    <div className="relative grid h-full place-items-center overflow-hidden bg-base">
+      <div className="fcc-aurora" />
+      <div className="fcc-enter relative flex flex-col items-center gap-5 px-6 text-center">
+        <span className="relative grid h-14 w-14 place-items-center">
+          <span
+            className="fcc-halo"
+            style={{ background: `radial-gradient(circle, ${accent}88, transparent 66%)` }}
+          />
+          <span className="fcc-spin relative block h-11 w-11 rounded-full border-2 border-hairline border-t-accent" />
+        </span>
+        <div>
+          <div className="text-[19px] font-semibold leading-7 tracking-[-0.2px] text-primary">
+            {kept ? "Saving your style" : "Getting things ready"}
+          </div>
+          <div className="mt-1 text-body text-tertiary">
+            {kept ? "It will be waiting when you generate." : "Using the defaults for now."}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function ConfirmSkip({ onCancel, onSkip }: { onCancel: () => void; onSkip: () => void }) {
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") onCancel();
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [onCancel]);
+
+  return (
+    <div
+      className="absolute inset-0 z-modal grid place-items-center px-6"
+      style={{ background: "rgba(0,0,0,.62)", backdropFilter: "blur(6px)" }}
+      onClick={onCancel}
+    >
+      <div
+        className="fcc-enter w-full max-w-[420px] rounded-3xl border border-hairline bg-surface-2 p-6 shadow-modal"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="text-[19px] font-semibold leading-7 tracking-[-0.2px] text-primary">
+          Skip the setup?
+        </div>
+        <p className="mt-2 text-pretty text-body leading-[21px] text-tertiary">
+          You will start on the default style. Nothing is lost — every one of these
+          settings is available later, on any slide.
+        </p>
+        <div className="mt-6 flex gap-2.5">
+          <button
+            type="button"
+            onClick={onCancel}
+            className="fcc-lift h-11 flex-1 rounded-2xl border border-hairline text-[15px] font-semibold text-secondary hover:border-surface-5 hover:text-primary"
+          >
+            Keep setting up
+          </button>
+          <button
+            type="button"
+            onClick={onSkip}
+            className="fcc-lift h-11 flex-1 rounded-2xl border border-danger-dim bg-danger-wash text-[15px] font-semibold text-danger hover:border-danger hover:bg-danger hover:text-white"
+          >
+            Skip anyway
+          </button>
         </div>
       </div>
     </div>
