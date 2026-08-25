@@ -33,7 +33,15 @@ export const DEFAULT_PREFS: Prefs = {
 const SEEN = "flashcc:v3:onboarded";
 const PREFS = "flashcc:v3:prefs";
 
+/**
+ * Dev only: replay onboarding on every load so changes to it are visible without
+ * clearing localStorage each time. Flip to false to test the real returning-user
+ * path; production ignores this entirely.
+ */
+const REPLAY_IN_DEV = true;
+
 export function hasOnboarded(): boolean {
+  if (import.meta.env.DEV && REPLAY_IN_DEV) return false;
   try {
     return localStorage.getItem(SEEN) === "1";
   } catch {
