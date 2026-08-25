@@ -1,6 +1,7 @@
 import { useState } from "react";
 
 import { buildSlides } from "./studio/compositions.js";
+import { AiChat } from "./studio/AiChat.js";
 import { Compose } from "./studio/Compose.js";
 import { Frameworks } from "./studio/Frameworks.js";
 import { makeDoc, type Doc } from "./studio/model.js";
@@ -13,6 +14,7 @@ import type { Structure } from "./studio/structures.js";
 type Screen =
   | { view: "start" }
   | { view: "frameworks"; theme: keyof typeof THEMES }
+  | { view: "ai"; structure: Structure; theme: keyof typeof THEMES }
   | { view: "compose"; structure: Structure; theme: keyof typeof THEMES }
   | { view: "studio"; doc: Doc };
 
@@ -23,7 +25,19 @@ export function App() {
     return (
       <Frameworks
         onCancel={() => setScreen({ view: "start" })}
-        onPick={(structure) => setScreen({ view: "compose", structure, theme: screen.theme })}
+        onPick={(structure) => setScreen({ view: "ai", structure, theme: screen.theme })}
+      />
+    );
+  }
+
+  if (screen.view === "ai") {
+    return (
+      <AiChat
+        structure={screen.structure}
+        onCancel={() => setScreen({ view: "frameworks", theme: screen.theme })}
+        onWriteMyself={() =>
+          setScreen({ view: "compose", structure: screen.structure, theme: screen.theme })
+        }
       />
     );
   }
@@ -33,7 +47,7 @@ export function App() {
       <Compose
         structure={screen.structure}
         initialTheme={screen.theme}
-        onBack={() => setScreen({ view: "frameworks", theme: screen.theme })}
+        onBack={() => setScreen({ view: "ai", structure: screen.structure, theme: screen.theme })}
         onGenerate={({ texts, roles, themeId }) => {
           const theme = THEMES[themeId]!;
           const doc: Doc = {

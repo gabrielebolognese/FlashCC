@@ -166,9 +166,9 @@ export function Compose({
                   <button
                     type="button"
                     onClick={() => setShowing(showing === f.key ? null : f.key)}
-                    className="mr-[68px] mt-2.5 text-caption text-muted underline decoration-dotted underline-offset-2 hover:text-accent"
+                    className="mr-[68px] mt-3 flex h-8 items-center rounded-xl border border-accent-dim px-3 text-[14px] font-semibold text-accent hover:bg-accent-wash"
                   >
-                    {showing === f.key ? "hide examples" : "examples"}
+                    {showing === f.key ? "Hide examples" : "Examples"}
                   </button>
                 ) : null}
 
