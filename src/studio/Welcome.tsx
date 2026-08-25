@@ -15,7 +15,7 @@ import {
   type Prefs,
 } from "./onboarding.js";
 
-const SAMPLE = "Your videos feel boring. Here's why.";
+const SAMPLE = "Your carousel title";
 
 /** Stagger index, as a CSS var the .fcc-stagger rule reads. */
 const at = (i: number): CSSProperties => ({ ["--i" as string]: i });
