@@ -5,6 +5,10 @@ import {
   ACCENTS,
   DEFAULT_PREFS,
   decorScale,
+  GROUNDS,
+  groundById,
+  MAIN_GROUNDS,
+  MORE_GROUNDS,
   styleFromPrefs,
   stylesFor,
   wantsImages,
@@ -105,5 +109,72 @@ describe("answers change what is generated", () => {
         }
       }
     }
+  });
+});
+
+describe("grounds", () => {
+  const lum = (hex: string): number => {
+    const n = Number.parseInt(hex.replace("#", ""), 16);
+    const c = (v: number) => {
+      const x = v / 255;
+      return x <= 0.04045 ? x / 12.92 : ((x + 0.055) / 1.055) ** 2.4;
+    };
+    return 0.2126 * c((n >> 16) & 255) + 0.7152 * c((n >> 8) & 255) + 0.0722 * c(n & 255);
+  };
+  const cr = (a: string, b: string) => {
+    const [hi, lo] = [lum(a), lum(b)].sort((x, y) => y - x) as [number, number];
+    return (hi + 0.05) / (lo + 0.05);
+  };
+
+  it("offers two mains and eight tints", () => {
+    expect(MAIN_GROUNDS.map((g) => g.id)).toEqual(["dark", "light"]);
+    expect(MORE_GROUNDS).toHaveLength(8);
+    expect(GROUNDS).toHaveLength(10);
+  });
+
+  it("has unique ids and names", () => {
+    expect(new Set(GROUNDS.map((g) => g.id)).size).toBe(GROUNDS.length);
+    expect(new Set(GROUNDS.map((g) => g.name)).size).toBe(GROUNDS.length);
+  });
+
+  it("keeps body text readable on every ground", () => {
+    for (const g of GROUNDS) expect(cr(g.fg, g.bg), g.name).toBeGreaterThanOrEqual(4.5);
+  });
+
+  it("keeps muted legible on every ground", () => {
+    for (const g of GROUNDS) expect(cr(g.muted, g.bg), g.name).toBeGreaterThanOrEqual(3);
+  });
+
+  it("falls back to dark for an unknown id", () => {
+    expect(groundById("nope").id).toBe("dark");
+    expect(groundById("plum").id).toBe("plum");
+  });
+
+  it("builds a working style from every ground", () => {
+    for (const g of GROUNDS) {
+      const p = prefs({ ground: g.id });
+      expect(styleFromPrefs(p).theme.bg).toBe(g.bg);
+      for (const slide of slidesFor(p)) {
+        expect(slide.background).toBe(g.bg);
+        for (const l of slide.layers) expect(l.y + l.h, `${g.name}/${l.name}`).toBeLessThanOrEqual(H + 0.5);
+      }
+    }
+  });
+});
+
+describe("cover title placement", () => {
+  it("lifts a short hook off the bottom of its region", () => {
+    const slide = slidesFor(prefs(), ["Short hook"])[0]!;
+    const title = slide.layers.find((l) => l.name === "Title")!;
+    // Well clear of the safe-area floor rather than sitting on it.
+    expect(title.y + title.h).toBeLessThan(H - 200);
+  });
+
+  it("still keeps a long hook inside the slide", () => {
+    const long = "A hook long enough that it wraps several times and would previously have run off";
+    const slide = slidesFor(prefs(), [long])[0]!;
+    const title = slide.layers.find((l) => l.name === "Title")!;
+    expect(title.y).toBeGreaterThanOrEqual(0);
+    expect(title.y + title.h).toBeLessThanOrEqual(H);
   });
 });

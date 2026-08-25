@@ -93,9 +93,12 @@ const TITLE: Composition = {
     const LH = 1.06;
     const RULE = decor > 0 ? 56 : 0; // rule + the air under it
     const f = fit(t, { w: r.w, h: r.h - RULE }, [104, 40], LH, { letterSpacing: -0.02 });
-    // Bottom-anchored, so a taller block grows upward — and is clamped so the rule
-    // above it never leaves the region either.
-    const y = clampY(r.y + r.h - f.height, f.height, r.y + RULE, r.h - RULE);
+    // Sits in the upper third of its free space rather than on the floor of the
+    // region: pinned to the bottom, a short hook stranded itself at the very edge
+    // with a wall of dead space above it. A long one still grows upward from here.
+    const LIFT = 0.34;
+    const free = Math.max(0, r.h - RULE - f.height);
+    const y = clampY(r.y + RULE + free * LIFT, f.height, r.y + RULE, r.h - RULE);
     return [
       ...accent(decor, { x: r.x, y: y - 46, w: 132, h: 10 }, theme.accent, { name: "Rule", radius: 5 }),
       text(t, { x: r.x, y, w: r.w, h: f.height }, theme.fg, {

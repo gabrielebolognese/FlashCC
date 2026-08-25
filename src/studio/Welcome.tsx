@@ -7,6 +7,8 @@ import { FONTS } from "./model.js";
 import {
   ACCENTS,
   DEFAULT_PREFS,
+  MAIN_GROUNDS,
+  MORE_GROUNDS,
   decorScale,
   markOnboarded,
   savePrefs,
@@ -31,16 +33,64 @@ const QUESTIONS: Question[] = [
   {
     id: "ground",
     title: "Light or dark?",
-    note: "The ground everything else sits on.",
+    note: "The ground everything else sits on. There are tinted ones underneath.",
     render: (p, set) => (
-      <Choices
-        value={p.ground}
-        options={[
-          { value: "dark" as const, label: "Dark", hint: "Light text on near-black" },
-          { value: "light" as const, label: "Light", hint: "Dark text on white" },
-        ]}
-        onChange={(ground) => set({ ground })}
-      />
+      <div>
+        <div className="grid grid-cols-2 gap-2.5">
+          {MAIN_GROUNDS.map((g) => (
+            <button
+              key={g.id}
+              type="button"
+              onClick={() => set({ ground: g.id })}
+              className={[
+                "fcc-lift flex items-center gap-3 rounded-2xl border p-3 text-left",
+                p.ground === g.id
+                  ? "fcc-selected border-accent-dim bg-accent-wash"
+                  : "border-hairline hover:border-surface-5",
+              ].join(" ")}
+            >
+              <span
+                className="grid h-11 w-11 shrink-0 place-items-center rounded-xl border border-white/10 text-[15px] font-semibold"
+                style={{ background: g.bg, color: g.fg }}
+              >
+                Aa
+              </span>
+              <span className="min-w-0">
+                <span className="block text-[15px] font-semibold text-primary">{g.name}</span>
+                <span className="block text-caption text-tertiary">
+                  {g.id === "dark" ? "Light text on near-black" : "Dark text on white"}
+                </span>
+              </span>
+            </button>
+          ))}
+        </div>
+
+        <div className="mb-2 mt-5 text-overline uppercase text-tertiary">Or a tint</div>
+        <div className="grid grid-cols-3 gap-2">
+          {MORE_GROUNDS.map((g) => (
+            <button
+              key={g.id}
+              type="button"
+              onClick={() => set({ ground: g.id })}
+              title={g.name}
+              className={[
+                "fcc-lift flex items-center gap-2 rounded-xl border px-2.5 py-2 text-left",
+                p.ground === g.id
+                  ? "fcc-selected border-accent-dim bg-accent-wash"
+                  : "border-hairline hover:border-surface-5",
+              ].join(" ")}
+            >
+              <span
+                className="grid h-7 w-7 shrink-0 place-items-center rounded-lg border border-white/10 text-[10px] font-semibold"
+                style={{ background: g.bg, color: g.fg }}
+              >
+                Aa
+              </span>
+              <span className="min-w-0 truncate text-caption text-secondary">{g.name}</span>
+            </button>
+          ))}
+        </div>
+      </div>
     ),
   },
   {

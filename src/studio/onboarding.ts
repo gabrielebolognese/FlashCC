@@ -12,8 +12,8 @@ export type DecorLevel = "none" | "normal" | "bold";
 export type ImageUse = "always" | "sometimes" | "never";
 
 export type Prefs = {
-  /** Which of the two plain grounds the palette is built on. */
-  ground: "dark" | "light";
+  /** Key into GROUNDS. Dark and light are the plain two; the rest are tinted. */
+  ground: string;
   accent: string;
   displayFont: string;
   bodyFont: string;
@@ -76,14 +76,34 @@ export function savePrefs(prefs: Prefs): void {
   }
 }
 
-const GROUND: Record<Prefs["ground"], { bg: string; fg: string; muted: string }> = {
-  dark: { bg: "#101215", fg: "#f2f4f7", muted: "#8b93a1" },
-  light: { bg: "#ffffff", fg: "#141619", muted: "#61666e" },
-};
+export type Ground = { id: string; name: string; bg: string; fg: string; muted: string };
+
+/** The two plain grounds. Most decks are one of these. */
+export const MAIN_GROUNDS: Ground[] = [
+  { id: "dark", name: "Dark", bg: "#101215", fg: "#f2f4f7", muted: "#8b93a1" },
+  { id: "light", name: "Light", bg: "#ffffff", fg: "#141619", muted: "#61666e" },
+];
+
+/** Everything else, offered smaller because it is a preference, not a default. */
+export const MORE_GROUNDS: Ground[] = [
+  { id: "midnight", name: "Midnight", bg: "#0b1020", fg: "#e8ecf5", muted: "#8891a8" },
+  { id: "slate", name: "Slate", bg: "#1c2128", fg: "#e6eaf0", muted: "#8b95a3" },
+  { id: "forest", name: "Forest", bg: "#0f2419", fg: "#eef7f0", muted: "#8aa896" },
+  { id: "cobalt", name: "Cobalt", bg: "#12285a", fg: "#ffffff", muted: "#9fb2d9" },
+  { id: "plum", name: "Plum", bg: "#1b1024", fg: "#f3e9fb", muted: "#9d8bb0" },
+  { id: "paper", name: "Paper", bg: "#f7f4ed", fg: "#1a1a18", muted: "#645f55" },
+  { id: "sand", name: "Sand", bg: "#efe7da", fg: "#2a2118", muted: "#6b6053" },
+  { id: "rose", name: "Rose", bg: "#fdf2f8", fg: "#2b1220", muted: "#77536a" },
+];
+
+export const GROUNDS: Ground[] = [...MAIN_GROUNDS, ...MORE_GROUNDS];
+
+export const groundById = (id: string): Ground =>
+  GROUNDS.find((g) => g.id === id) ?? MAIN_GROUNDS[0]!;
 
 /** The answers, as a style that sits first in the gallery. */
 export function styleFromPrefs(prefs: Prefs): Style {
-  const g = GROUND[prefs.ground];
+  const g = groundById(prefs.ground);
   const theme: Theme = {
     bg: g.bg,
     fg: g.fg,
