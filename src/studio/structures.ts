@@ -16,8 +16,10 @@ export type Slot = {
   /** Stable id. Slots sharing an id are the repeatable ones. */
   id: string;
   label: string;
-  /** Shown beside the box — guidance, not chrome. */
+  /** One line, shown beside the box. A punchline, never a paragraph. */
   note: string;
+  /** The long version, on hover. Costs no space. */
+  detail: string;
   placeholder: string;
   examples: string[];
   /** The slot "add slide" clones. */
@@ -32,20 +34,19 @@ export type Structure = {
   slots: Slot[];
 };
 
-const HOOK_NOTE =
-  "The most important text in the whole carousel — it alone decides whether slide 2 is ever seen.";
-
 export const STRUCTURES: Structure[] = [
   {
     id: "problem",
     name: "Problem → Solution",
     shape: "Problem → Fix",
-    description: "Name a pain, then fix it",
+    description: "Name a pain, then fix it. The workhorse — it works on a cold audience.",
     slots: [
       {
         id: "hook",
         label: "Hook",
-        note: `${HOOK_NOTE} Name the pain the reader already has, and promise the reason. Specific beats clever.`,
+        note: "Decides whether slide 2 is ever seen",
+        detail:
+          "The most important text in the whole carousel. Name the pain the reader already has and promise the reason. Specific beats clever.",
         placeholder: "Your videos feel boring. Here's why.",
         examples: [
           "Your videos feel boring. Here's why.",
@@ -56,37 +57,39 @@ export const STRUCTURES: Structure[] = [
       {
         id: "problem",
         label: "The problem",
-        note: "Make it sting before you fix it. Describe the situation in their words, not yours. One idea only.",
+        note: "Make it sting before you fix it",
+        detail: "Describe the situation in their words, not yours. One idea only.",
         placeholder: "The problem, in their words.",
         examples: [
           "Every cut lands on the beat and it still feels flat.",
-          "You post it, it does fine, and nobody remembers it by Friday.",
+          "You post it, it does fine, nobody remembers it by Friday.",
         ],
       },
       {
         id: "why",
         label: "Why it happens",
-        note: "The mistake causing it. This is where you show you understand the cause, not just the symptom — it's what separates you from everyone giving surface tips.",
-        placeholder: "The mistake underneath it.",
+        note: "Name the cause, not the symptom",
+        detail:
+          "The mistake underneath. This is where you show you understand the cause — it's what separates you from everyone giving surface tips.",
+        placeholder: "The mistake causing it.",
         examples: [
           "You're cutting to the rhythm of the audio, not the attention.",
-          "The problem was never the footage. It was the pacing decision before it.",
+          "The problem was never the footage. It was the pacing.",
         ],
       },
       {
         id: "solution",
         label: "Solution outline",
-        note: "The turn. What to change, in one line — the detail comes next. This is the slide people screenshot.",
+        note: "The turn — one line, no detail yet",
+        detail: "What to change, in a single sentence. This is the slide people screenshot.",
         placeholder: "What to change.",
-        examples: [
-          "Cut on motion, not on beat.",
-          "Stop designing. Start with what you already wrote.",
-        ],
+        examples: ["Cut on motion, not on beat.", "Stop designing. Start with what you wrote."],
       },
       {
         id: "point",
         label: "Fix",
-        note: "One fix, one slide. Lead with the instruction, then the reason. If it needs an “and also”, it's two slides.",
+        note: "One fix per slide. Verb first",
+        detail: "Lead with the instruction, then the reason. If it needs an “and also”, it's two slides.",
         placeholder: "Fix #1",
         examples: [
           "Cut on movement — a hand raise, a head turn, a step.",
@@ -97,7 +100,8 @@ export const STRUCTURES: Structure[] = [
       {
         id: "point",
         label: "Fix",
-        note: "Keep the same shape as the fix before it. A deck reads as considered when its middle slides rhyme.",
+        note: "Same shape as the one before",
+        detail: "A deck reads as considered when its middle slides rhyme.",
         placeholder: "Fix #2",
         examples: ["Hold the first frame 200ms longer than feels right."],
         repeatable: true,
@@ -105,7 +109,8 @@ export const STRUCTURES: Structure[] = [
       {
         id: "point",
         label: "Fix",
-        note: "Three is the sweet spot. A fourth is usually the first one restated — check before you add it.",
+        note: "Three is the sweet spot",
+        detail: "A fourth is usually the first one restated. Check before you add it.",
         placeholder: "Fix #3",
         examples: ["Match your cut rate to the speaker's energy, not the music's."],
         repeatable: true,
@@ -113,12 +118,13 @@ export const STRUCTURES: Structure[] = [
       {
         id: "cta",
         label: "Call to action",
-        note: "Ask for exactly one thing. Two asks get you neither.",
+        note: "One ask. Two gets you neither",
+        detail: "Pick follow, or comment, or the link — and drop the rest.",
         placeholder: "Save this for your next edit.",
         examples: [
           "Save this for your next edit.",
           "Follow for one of these every week.",
-          "Comment “cuts” and I'll send the full breakdown.",
+          "Comment “cuts” and I'll send the breakdown.",
         ],
       },
     ],
@@ -127,12 +133,14 @@ export const STRUCTURES: Structure[] = [
     id: "showcase",
     name: "Showcase / Portfolio",
     shape: "Work → Process → Result",
-    description: "Show the work and the thinking",
+    description: "Show the work and the thinking behind it. This is the one that books clients.",
     slots: [
       {
         id: "hook",
         label: "Hook",
-        note: `${HOOK_NOTE} Lead with the transformation, not the client name. Nobody is looking for your project — they're looking for what you can do to theirs.`,
+        note: "Lead with the result, not the client",
+        detail:
+          "Nobody is looking for your project — they're looking for what you could do to theirs. Open on the transformation.",
         placeholder: "Here's how I turned this raw footage into a premium ad.",
         examples: [
           "Here's how I turned this raw footage into a premium ad.",
@@ -143,17 +151,19 @@ export const STRUCTURES: Structure[] = [
       {
         id: "context",
         label: "Context",
-        note: "What the project was, plainly. A stranger should understand it in one sentence — no category words, no “deliverable”.",
+        note: "One sentence a stranger would get",
+        detail: "What the project was. No category words, no “deliverable”.",
         placeholder: "What the project was.",
         examples: [
-          "A 30-second spot for a DTC coffee brand, shot in one afternoon.",
-          "Six hours of raw interview footage, one 60-second cut.",
+          "A 30-second spot for a coffee brand, shot in one afternoon.",
+          "Six hours of raw interview, one 60-second cut.",
         ],
       },
       {
         id: "goal",
         label: "The goal",
-        note: "What the client actually wanted — in their language. Stating the brief proves you were solving a problem, not just editing.",
+        note: "Their brief, in their words",
+        detail: "Stating the brief proves you were solving a problem, not just editing.",
         placeholder: "What the client wanted.",
         examples: [
           "They wanted it to feel expensive without looking like an ad.",
@@ -163,49 +173,55 @@ export const STRUCTURES: Structure[] = [
       {
         id: "process",
         label: "The process",
-        note: "The before, and how you got in. Raw footage, first assembly, the state it was in when you started.",
-        placeholder: "Where it started — the raw footage.",
+        note: "Show where it started",
+        detail: "The raw footage, the first assembly, the state it was in when you got it.",
+        placeholder: "The raw footage.",
         examples: [
-          "The raw footage was flat, handheld and badly lit in the back half.",
+          "Flat, handheld, badly lit in the back half.",
           "First assembly ran 2:10. The brief was 30 seconds.",
         ],
       },
       {
         id: "point",
         label: "Key decision",
-        note: "This is the slide that wins you clients. Don't just show the final product — explain the decision and why you made it. That's what demonstrates expertise; the result alone only demonstrates taste.",
+        note: "Explain the why — that's the expertise",
+        detail:
+          "Don't just show the final product. The decision is what demonstrates expertise; the result alone only demonstrates taste.",
         placeholder: "A decision you made, and why.",
         examples: [
-          "Dropped the intro entirely — the product shot was the stronger open.",
-          "Warmed the grade 200K to make the kitchen read as morning, not night.",
+          "Dropped the intro — the product shot was the stronger open.",
+          "Warmed the grade 200K so the kitchen reads as morning.",
         ],
         repeatable: true,
       },
       {
         id: "point",
         label: "Key decision",
-        note: "Colour, sound, motion, pacing — pick the choice a client wouldn't have thought of. The surprising decision beats the one you spent longest on.",
+        note: "Pick the surprising choice",
+        detail: "Colour, sound, motion, pacing — the one a client wouldn't have thought of.",
         placeholder: "Another decision, and why.",
         examples: [
           "Cut the music under the VO so the last line lands dry.",
-          "Held the final frame 800ms. It's the only still moment in the spot.",
+          "Held the final frame 800ms. The only still moment in the spot.",
         ],
         repeatable: true,
       },
       {
         id: "result",
         label: "Final result",
-        note: "The payoff. A number, a before/after, or the client's own words — one concrete thing beats three adjectives.",
+        note: "A number beats three adjectives",
+        detail: "A figure, a before/after, or the client's own words.",
         placeholder: "How it landed.",
         examples: [
-          "Ran for six weeks and beat their previous best by 3x on watch time.",
-          "Client's words: “this is the first one that felt like us.”",
+          "Ran six weeks and beat their best by 3x on watch time.",
+          "Client's words: “the first one that felt like us.”",
         ],
       },
       {
         id: "cta",
         label: "Call to action",
-        note: "One ask, and make it easy to say. A keyword beats a link.",
+        note: "A keyword beats a link",
+        detail: "One ask, and make it easy to say.",
         placeholder: "DM me 'EDIT' if you want this style.",
         examples: [
           "DM me “EDIT” if you want this style.",
@@ -218,12 +234,13 @@ export const STRUCTURES: Structure[] = [
     id: "educational",
     name: "Educational / Value",
     shape: "Concept → Explanation → Application",
-    description: "Teach one thing properly",
+    description: "Teach one thing properly. Builds the authority the others cash in.",
     slots: [
       {
         id: "hook",
         label: "Hook",
-        note: `${HOOK_NOTE} Numbered promises beat vague ones — “3 tricks” outperforms “some tips”. Name who it's for.`,
+        note: "Numbers beat vague — “3 tricks” wins",
+        detail: "Promise something specific, and name who it's for.",
         placeholder: "3 editing tricks that instantly make talking-head videos better.",
         examples: [
           "3 editing tricks that instantly make talking-head videos better.",
@@ -234,27 +251,30 @@ export const STRUCTURES: Structure[] = [
       {
         id: "promise",
         label: "The promise",
-        note: "What they'll be able to do by the end. Earn the next six slides in one line.",
+        note: "What they'll know by the end",
+        detail: "Earn the next six slides in one line.",
         placeholder: "What they'll learn.",
         examples: [
-          "By the end you'll never cut a talking head the same way again.",
-          "Three techniques, all of them free, all of them 10 seconds each.",
+          "By the end you'll never cut a talking head the same way.",
+          "Three techniques, all free, all 10 seconds each.",
         ],
       },
       {
         id: "concept",
         label: "The concept",
-        note: "The underlying principle — the why beneath all the techniques. Answer one specific question. Don't turn this into a Wikipedia page.",
-        placeholder: "The principle underneath.",
+        note: "The principle underneath",
+        detail: "Answer one specific question. Don't turn this into a Wikipedia page.",
+        placeholder: "The underlying principle.",
         examples: [
-          "Attention resets every time the frame changes. Every cut spends some.",
+          "Attention resets every time the frame changes.",
           "The eye follows motion before it reads a face.",
         ],
       },
       {
         id: "breakdown",
         label: "Breakdown",
-        note: "Explain the principle in practice. Start with the verb — if they can act on it after reading only this slide, it's a good breakdown.",
+        note: "Start with the verb",
+        detail: "If they can act on it after reading only this slide, it's a good breakdown.",
         placeholder: "Technique #1",
         examples: [
           "Punch in 15% on the second sentence of every answer.",
@@ -264,10 +284,11 @@ export const STRUCTURES: Structure[] = [
       {
         id: "point",
         label: "Example",
-        note: "Application. Show it working on something real — an example is what turns a rule into a skill.",
+        note: "Show it working on something real",
+        detail: "An example is what turns a rule into a skill.",
         placeholder: "Technique #2",
         examples: [
-          "Watch any A24 trailer: every cut lands on a movement, never a beat.",
+          "Watch any A24 trailer: every cut lands on a movement.",
           "Same interview, two cuts — one keeps the breath, one doesn't.",
         ],
         repeatable: true,
@@ -275,7 +296,8 @@ export const STRUCTURES: Structure[] = [
       {
         id: "point",
         label: "Example",
-        note: "One more. Three total is the sweet spot; a fourth is usually the first one restated.",
+        note: "Three total. A fourth repeats",
+        detail: "Past three, you're restating the first one.",
         placeholder: "Technique #3",
         examples: ["Mute the music on your last export and see if it still works."],
         repeatable: true,
@@ -283,17 +305,16 @@ export const STRUCTURES: Structure[] = [
       {
         id: "takeaway",
         label: "Key takeaway",
-        note: "The rule to remember, compressed into something they could repeat to someone else. This is the line that gets quoted.",
+        note: "The line that gets quoted",
+        detail: "Compress it into something they could repeat to someone else.",
         placeholder: "The rule to remember.",
-        examples: [
-          "Cut on motion, not on beat.",
-          "Every cut spends attention. Spend it on purpose.",
-        ],
+        examples: ["Cut on motion, not on beat.", "Every cut spends attention. Spend it on purpose."],
       },
       {
         id: "cta",
         label: "Call to action",
-        note: "Ask for exactly one thing. For educational posts, “save” usually beats “follow”.",
+        note: "“Save” beats “follow” here",
+        detail: "Educational posts get saved. Ask for the save.",
         placeholder: "Save this for your next edit.",
         examples: ["Save this for your next edit.", "Follow for one of these every week."],
       },
@@ -303,12 +324,14 @@ export const STRUCTURES: Structure[] = [
     id: "story",
     name: "Story / Case Study",
     shape: "Situation → Conflict → Transformation",
-    description: "Take them through what happened",
+    description: "Take them through what happened. The most shared of the four.",
     slots: [
       {
         id: "hook",
         label: "Hook",
-        note: `${HOOK_NOTE} Open mid-scene, at the strangest or worst moment. No setup, no “so I was thinking” — start where it got interesting, and hint at the change.`,
+        note: "Open mid-scene. No setup",
+        detail:
+          "Start at the strangest or worst moment, and hint at the change. No “so I was thinking”.",
         placeholder: "This client was getting 2K views per video. Then we changed one thing.",
         examples: [
           "This client was getting 2K views per video. Then we changed one thing.",
@@ -319,17 +342,19 @@ export const STRUCTURES: Structure[] = [
       {
         id: "situation",
         label: "The situation",
-        note: "Where things stood at the start. Give just enough for the turn to land — resist the full backstory.",
+        note: "Just enough for the turn to land",
+        detail: "Where things stood at the start. Resist the full backstory.",
         placeholder: "The starting situation.",
         examples: [
-          "Posting four times a week, decent footage, flat numbers for months.",
-          "They'd hired two editors before me. Both did exactly what was asked.",
+          "Posting four times a week, decent footage, flat numbers.",
+          "They'd hired two editors before me. Both did what was asked.",
         ],
       },
       {
         id: "problem",
         label: "The problem",
-        note: "What wasn't working. Be specific about the symptom — vague problems make the fix look lucky.",
+        note: "Be specific about the symptom",
+        detail: "Vague problems make the fix look lucky.",
         placeholder: "What wasn't working.",
         examples: [
           "Watch time collapsed at 4 seconds. Every single video.",
@@ -339,18 +364,20 @@ export const STRUCTURES: Structure[] = [
       {
         id: "point",
         label: "What they'd tried",
-        note: "The attempt, and the conflict. Showing the failed attempts is what makes the solution credible — skip this and it reads as a lucky guess.",
+        note: "Failed attempts make the fix credible",
+        detail: "Skip this and the solution reads as a lucky guess.",
         placeholder: "What they had already tried.",
         examples: [
-          "Faster cuts. Louder music. Trending audio. None of it moved the 4-second drop.",
-          "We tried three different hooks. The problem was never the hook.",
+          "Faster cuts. Louder music. Trending audio. Nothing moved it.",
+          "We tried three hooks. The problem was never the hook.",
         ],
         repeatable: true,
       },
       {
         id: "turn",
         label: "The turning point",
-        note: "The realisation. This is the slide the whole post exists for — make it the sharpest sentence you have.",
+        note: "The sharpest sentence you have",
+        detail: "The realisation. This is the slide the whole post exists for.",
         placeholder: "The realisation.",
         examples: [
           "The first frame was a wide shot. Nobody knew what they were looking at.",
@@ -360,37 +387,38 @@ export const STRUCTURES: Structure[] = [
       {
         id: "solution",
         label: "What you changed",
-        note: "The actual change, concretely. One thing, stated so precisely that someone could copy it.",
+        note: "One change, precisely stated",
+        detail: "So precise that someone could copy it.",
         placeholder: "What you changed.",
         examples: [
-          "Opened on a close-up of the product, mid-motion, no establishing shot.",
+          "Opened on a close-up, mid-motion, no establishing shot.",
           "Moved the payoff from 0:22 to 0:03.",
         ],
       },
       {
         id: "result",
         label: "The result",
-        note: "The numbers. Specific beats triumphant — let the figures do the persuading.",
+        note: "Let the numbers persuade",
+        detail: "Specific beats triumphant.",
         placeholder: "What happened after.",
-        examples: [
-          "2K to 61K on the next video. Same client, same footage style.",
-          "Watch time went from 4 seconds to 19.",
-        ],
+        examples: ["2K to 61K on the next video.", "Watch time went from 4 seconds to 19."],
       },
       {
         id: "lesson",
         label: "The lesson",
-        note: "Why it worked — the transferable principle. This is what makes it a case study instead of a brag.",
+        note: "This is what makes it a case study",
+        detail: "The transferable principle — otherwise it's a brag.",
         placeholder: "Why it worked.",
         examples: [
           "The first frame is the hook. Everything else is the second chance.",
-          "You can't pace your way out of a bad opening decision.",
+          "You can't pace your way out of a bad opening.",
         ],
       },
       {
         id: "cta",
         label: "Call to action",
-        note: "One ask. After a case study, “follow for more breakdowns” converts better than a pitch.",
+        note: "“More breakdowns” beats a pitch",
+        detail: "After a case study, the soft ask converts better.",
         placeholder: "Follow for more breakdowns.",
         examples: ["Follow for more breakdowns.", "DM me “AUDIT” and I'll look at your first frame."],
       },

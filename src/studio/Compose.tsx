@@ -1,17 +1,9 @@
-import { ArrowRight, CornerDownRight, GripVertical, Plus, Sparkles, Trash2, X } from "lucide-react";
+import { ArrowRight, GripVertical, Plus, Sparkles, Trash2, X } from "lucide-react";
 import { useRef, useState } from "react";
 
 import { MAX_SLIDES } from "./compositions.js";
 import { THEMES } from "./presets.js";
-import {
-  DEFAULT_STRUCTURE,
-  insertionIndex,
-  labelFor,
-  repeatableOf,
-  STRUCTURES,
-  type Slot,
-  type Structure,
-} from "./structures.js";
+import { labelFor, repeatableOf, type Slot, type Structure } from "./structures.js";
 
 export type ComposeResult = {
   texts: string[];
@@ -27,41 +19,25 @@ const mk = (slot: Slot, text = ""): Field => {
   return { key: `f${n}`, slot, text };
 };
 
-const fieldsFor = (s: Structure): Field[] => s.slots.map((slot) => mk(slot));
-
 export function Compose({
+  structure,
   initialTheme = "ink",
   onGenerate,
-  onCancel,
+  onBack,
 }: {
+  structure: Structure;
   initialTheme?: keyof typeof THEMES;
   onGenerate: (result: ComposeResult) => void;
-  onCancel: () => void;
+  onBack: () => void;
 }) {
-  const [structure, setStructure] = useState<Structure>(DEFAULT_STRUCTURE);
-  const [fields, setFields] = useState<Field[]>(() => fieldsFor(DEFAULT_STRUCTURE));
+  const [fields, setFields] = useState<Field[]>(() => structure.slots.map((slot) => mk(slot)));
   const [themeId, setThemeId] = useState<keyof typeof THEMES>(initialTheme);
   const [showing, setShowing] = useState<string | null>(null);
   const dragFrom = useRef<number | null>(null);
 
   const filled = fields.filter((f) => f.text.trim().length > 0);
-  const canAdd = fields.length < MAX_SLIDES && repeatableOf(structure) !== undefined;
   const theme = THEMES[themeId]!;
-
-  /** Switching framework keeps what you have written, matched up by position. */
-  function switchTo(next: Structure) {
-    setStructure(next);
-    setFields((prev) => {
-      const written = prev.filter((f) => f.text.trim().length > 0).map((f) => f.text);
-      const base = next.slots.map((slot, i) => mk(slot, written[i] ?? ""));
-      const spare = written.slice(next.slots.length);
-      const rep = repeatableOf(next);
-      if (!rep || spare.length === 0) return base;
-      const at = insertionIndex(next.slots);
-      return [...base.slice(0, at), ...spare.map((t) => mk(rep, t)), ...base.slice(at)];
-    });
-    setShowing(null);
-  }
+  const labels = fields.map((f) => f.slot);
 
   const update = (key: string, text: string) =>
     setFields((fs) => fs.map((f) => (f.key === key ? { ...f, text } : f)));
@@ -106,21 +82,19 @@ export function Compose({
     return true;
   }
 
-  const labels = fields.map((f) => f.slot);
-
   return (
     <div className="flex h-full flex-col overflow-hidden bg-base">
       <header className="flex h-14 shrink-0 items-center gap-3 border-b border-hairline bg-surface-1 px-5">
         <button
           type="button"
-          onClick={onCancel}
+          onClick={onBack}
           aria-label="Back"
           className="grid h-8 w-8 place-items-center rounded-xl text-tertiary hover:bg-white/[0.06] hover:text-primary"
         >
           <X size={16} strokeWidth={2} />
         </button>
         <div>
-          <div className="text-title text-primary">Write your carousel</div>
+          <div className="text-title text-primary">{structure.name}</div>
           <div className="text-caption text-muted">
             {structure.shape} · {filled.length}/{MAX_SLIDES} slides
           </div>
@@ -166,51 +140,33 @@ export function Compose({
       </header>
 
       <div className="scroll-quiet min-h-0 flex-1 overflow-y-auto">
-        <div className="mx-auto max-w-[1060px] px-6 py-8">
-          {/* framework picker */}
-          <div className="mb-2 text-overline uppercase text-tertiary">Framework</div>
-          <div className="mb-8 grid grid-cols-2 gap-2.5 lg:grid-cols-4">
-            {STRUCTURES.map((s) => {
-              const active = s.id === structure.id;
-              return (
-                <button
-                  key={s.id}
-                  type="button"
-                  onClick={() => switchTo(s)}
-                  className={[
-                    "rounded-2xl border p-3 text-left transition-[border-color,transform] duration-micro ease-out hover:-translate-y-px",
-                    active
-                      ? "border-accent bg-accent-wash"
-                      : "border-hairline bg-surface-1 hover:border-surface-5",
-                  ].join(" ")}
-                >
-                  <div className={["text-body-strong", active ? "text-accent" : "text-primary"].join(" ")}>
-                    {s.name}
-                  </div>
-                  <div className="mt-0.5 text-caption text-tertiary">{s.description}</div>
-                  <div className="mt-1.5 font-mono text-[10px] leading-[14px] text-muted">{s.shape}</div>
-                </button>
-              );
-            })}
-          </div>
-
+        <div className="mx-auto max-w-[1120px] px-6 py-12">
           {fields.map((f, i) => (
-            <div key={f.key} className="flex gap-5">
-              {/* the note: no border, no background — it sits in the margin */}
-              <div className="hidden w-[268px] shrink-0 pt-9 text-right lg:block">
-                <div className="text-caption font-semibold text-secondary">{labelFor(labels, i)}</div>
-                <p className="mt-1 text-[11px] leading-[17px] text-muted">{f.slot.note}</p>
+            <div key={f.key} className="mb-11 flex gap-6">
+              {/* The note: one white line on the same row as the field, no border,
+                  no background, and a straight arrow pointing at the box. */}
+              <div className="hidden w-[320px] shrink-0 flex-col items-end pt-[46px] lg:flex">
+                <div className="flex items-center gap-2.5" title={f.slot.detail}>
+                  <span className="text-caption text-primary">
+                    <span className="font-semibold">{labelFor(labels, i)}</span>
+                    <span className="text-tertiary"> — </span>
+                    {f.slot.note}
+                  </span>
+                  <ArrowRight size={14} strokeWidth={2} className="shrink-0 text-muted" />
+                </div>
+
                 {f.slot.examples.length > 0 ? (
                   <button
                     type="button"
                     onClick={() => setShowing(showing === f.key ? null : f.key)}
-                    className="mt-1.5 text-[11px] text-tertiary underline decoration-dotted underline-offset-2 hover:text-accent"
+                    className="mr-6 mt-2 text-[11px] text-muted underline decoration-dotted underline-offset-2 hover:text-accent"
                   >
-                    {showing === f.key ? "Hide examples" : "See examples"}
+                    {showing === f.key ? "hide examples" : "examples"}
                   </button>
                 ) : null}
+
                 {showing === f.key ? (
-                  <div className="mt-2 flex flex-col items-end gap-1.5">
+                  <div className="mr-6 mt-2 flex flex-col items-end gap-2">
                     {f.slot.examples.map((ex) => (
                       <button
                         key={ex}
@@ -224,14 +180,8 @@ export function Compose({
                         “{ex}”
                       </button>
                     ))}
-                    <span className="text-[10px] text-muted">click one to use it</span>
                   </div>
                 ) : null}
-              </div>
-
-              {/* the arrow, pointing from the note at the box */}
-              <div className="hidden shrink-0 pt-9 lg:block">
-                <CornerDownRight size={13} className="-scale-y-100 text-muted" strokeWidth={2} />
               </div>
 
               <div className="min-w-0 flex-1">
@@ -252,7 +202,7 @@ export function Compose({
                     });
                     dragFrom.current = null;
                   }}
-                  className="group mb-3 rounded-2xl border border-hairline bg-surface-1 p-3 transition-[border-color] duration-instant ease-out focus-within:border-accent-dim hover:border-surface-5"
+                  className="group rounded-2xl border border-hairline bg-surface-1 p-3 transition-[border-color] duration-instant ease-out focus-within:border-accent-dim hover:border-surface-5"
                 >
                   <div className="mb-2 flex items-center gap-2">
                     <GripVertical size={13} className="cursor-grab text-muted" />
@@ -265,7 +215,10 @@ export function Compose({
                     >
                       {i + 1}
                     </span>
-                    <span className="text-caption text-tertiary lg:hidden">{labelFor(labels, i)}</span>
+                    <span className="text-caption text-primary lg:hidden">
+                      {labelFor(labels, i)}
+                      <span className="text-tertiary"> — {f.slot.note}</span>
+                    </span>
                     <div className="flex-1" />
                     <span className="text-caption text-muted">{f.text.trim().length}</span>
                     {fields.length > 1 ? (
@@ -296,14 +249,13 @@ export function Compose({
             </div>
           ))}
 
-          <div className="flex gap-5">
-            <div className="hidden w-[268px] shrink-0 lg:block" />
-            <div className="hidden w-[13px] shrink-0 lg:block" />
+          <div className="flex gap-6">
+            <div className="hidden w-[320px] shrink-0 lg:block" />
             <button
               type="button"
-              disabled={!canAdd}
+              disabled={fields.length >= MAX_SLIDES}
               onClick={addSlide}
-              className="flex h-10 min-w-0 flex-1 items-center justify-center gap-2 rounded-2xl border border-dashed border-hairline text-body text-tertiary hover:border-edge hover:text-primary disabled:opacity-40"
+              className="flex h-11 min-w-0 flex-1 items-center justify-center gap-2 rounded-2xl border border-dashed border-hairline text-body text-tertiary hover:border-edge hover:text-primary disabled:opacity-40"
             >
               <Plus size={15} strokeWidth={2} />
               {fields.length >= MAX_SLIDES

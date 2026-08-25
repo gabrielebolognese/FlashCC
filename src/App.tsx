@@ -2,30 +2,46 @@ import { useState } from "react";
 
 import { buildSlides } from "./studio/compositions.js";
 import { Compose } from "./studio/Compose.js";
+import { Frameworks } from "./studio/Frameworks.js";
 import { makeDoc, type Doc } from "./studio/model.js";
 import { THEMES } from "./studio/presets.js";
 import { Start } from "./studio/Start.js";
 import { saveDoc } from "./studio/storage.js";
 import { Studio } from "./studio/Studio.js";
+import type { Structure } from "./studio/structures.js";
 
 type Screen =
   | { view: "start" }
-  | { view: "compose"; theme: keyof typeof THEMES }
+  | { view: "frameworks"; theme: keyof typeof THEMES }
+  | { view: "compose"; structure: Structure; theme: keyof typeof THEMES }
   | { view: "studio"; doc: Doc };
 
 export function App() {
   const [screen, setScreen] = useState<Screen>({ view: "start" });
 
+  if (screen.view === "frameworks") {
+    return (
+      <Frameworks
+        onCancel={() => setScreen({ view: "start" })}
+        onPick={(structure) => setScreen({ view: "compose", structure, theme: screen.theme })}
+      />
+    );
+  }
+
   if (screen.view === "compose") {
     return (
       <Compose
+        structure={screen.structure}
         initialTheme={screen.theme}
-        onCancel={() => setScreen({ view: "start" })}
+        onBack={() => setScreen({ view: "frameworks", theme: screen.theme })}
         onGenerate={({ texts, roles, themeId }) => {
           const theme = THEMES[themeId]!;
           const doc: Doc = {
             ...makeDoc(texts[0]?.slice(0, 40).trim() || "Untitled"),
-            palette: [theme.bg, theme.fg, theme.accent, theme.muted, "#ffffff", "#000000", "#e5545a", "#3dbe7a", "#4c86d6", "#db2777"],
+            palette: [
+              theme.bg, theme.fg, theme.accent, theme.muted,
+              "#ffffff", "#000000", "#e5545a", "#3dbe7a", "#4c86d6", "#db2777",
+            ],
             slides: buildSlides(texts, theme, roles),
           };
           saveDoc(doc);
@@ -43,7 +59,7 @@ export function App() {
   return (
     <Start
       onOpen={(doc) => setScreen({ view: "studio", doc })}
-      onCompose={(theme) => setScreen({ view: "compose", theme })}
+      onCompose={(theme) => setScreen({ view: "frameworks", theme })}
     />
   );
 }
