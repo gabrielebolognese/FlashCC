@@ -478,5 +478,40 @@ function plateRole(members: ("title" | "body" | "list")[], sink: RoleSpec["sink"
   });
 }
 
-export const STARTERS: Template[] = [ANCHORED, STAGE, RULED, FRAMED, INDEX, PLATE];
+/* ── 0 · Blank — an empty canvas ────────────────────────────────────────
+   No slots in any region. Nothing is placed for you; the toolbar is the app. */
+export const BLANK: Template = {
+  schema: 1,
+  id: "tpl_blank",
+  name: "Blank",
+  teaches: "anchor",
+  origin: { kind: "starter" },
+  page: {
+    grid: { margin: "default", railHeight: { top: 0, bottom: 0 }, railGap: 0 },
+    background: { fill: "bg", treatment: { kind: "flat" } },
+    type: { steps: [96, 84, 72, 64, 56, 48, 44, 40, 36, 32, 30, 28, 26, 24], floor: 13 },
+    slotStyles: slotStyles(),
+    invariants: INVARIANTS,
+  },
+  roles: {
+    cover: blankRole(),
+    body: blankRole(),
+    list: blankRole(),
+    quote: blankRole(),
+    cta: blankRole(),
+  },
+};
+
+function blankRole(): RoleSpec {
+  return role({
+    regions: {
+      topRail: region(),
+      body: region({ members: ["body"], anchor: "start", align: "left" }),
+      bottomRail: region(),
+    },
+    sink: "body",
+  });
+}
+
+export const STARTERS: Template[] = [BLANK, ANCHORED, STAGE, RULED, FRAMED, INDEX, PLATE];
 export const DEFAULT_TEMPLATE = ANCHORED;

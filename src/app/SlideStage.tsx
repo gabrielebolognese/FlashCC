@@ -3,11 +3,11 @@ import { useEffect, useLayoutEffect, useRef, useState, type PointerEvent as RPoi
 
 import { newId } from "../doc/ids.js";
 import type { IconId, Template } from "../doc/template.js";
-import { effectiveRole, ROLES, type BrandKit, type Overlay, type Slide, type SlideRole } from "../doc/types.js";
+import { effectiveRole, ROLES, type BrandKit, type Element, type Slide, type SlideRole } from "../doc/types.js";
 import { ICON_PATHS } from "../render/icons.js";
-import { computeLayout } from "../render/layout/computeLayout.js";
+import { elementsToNodes } from "../render/materialize.js";
 import type { Format, LayoutNode } from "../render/layout/node.js";
-import { nodeKey, SlideRenderer } from "../render/SlideRenderer.js";
+import { SlideRenderer } from "../render/SlideRenderer.js";
 import { IconButton } from "../ui/IconButton.js";
 
 type Props = {
@@ -20,8 +20,8 @@ type Props = {
   onSelect: (id: string | null) => void;
   onRoleChange: (role: SlideRole | undefined) => void;
   onEdit: (node: LayoutNode, text: string) => void;
-  onAddOverlay: (overlay: Overlay) => void;
-  onUpdateOverlay: (id: string, patch: Partial<Overlay>, coalesce?: string) => void;
+  onAddElement: (element: Element) => void;
+  onUpdateElement: (id: string, patch: Partial<Element>, coalesce?: string) => void;
   onSplit: () => void;
 };
 
@@ -46,8 +46,8 @@ export function SlideStage({
   onSelect,
   onRoleChange,
   onEdit,
-  onAddOverlay,
-  onUpdateOverlay,
+  onAddElement,
+  onUpdateElement,
   onSplit,
 }: Props) {
   const hostRef = useRef<HTMLDivElement>(null);
@@ -98,16 +98,17 @@ export function SlideStage({
     );
   }
 
-  const nodes = computeLayout(template, slide, brand, format, slideNumber);
-  const overflowing = nodes.some((n) => n.overflow);
+  const elements = slide.elements ?? [];
+  const nodes = elementsToNodes(elements, format, slide.background ?? brand.palette.background);
   const role = effectiveRole(slide);
-  const overlays = slide.overlays ?? [];
-  const selected = overlays.find((o) => o.id === selectedId) ?? null;
+  const selected = elements.find((o) => o.id === selectedId) ?? null;
+  const topZ = elements.reduce((m, e) => Math.max(m, e.z), 0);
 
-  function addOverlay(kind: Overlay["kind"], extra: Partial<Overlay> = {}) {
-    const overlay: Overlay = {
-      id: newId("ov"),
+  function addElement(kind: Element["kind"], extra: Partial<Element> = {}) {
+    const element: Element = {
+      id: newId("el"),
       kind,
+      z: topZ + 1,
       x: 0.3,
       y: 0.42,
       w: kind === "text" ? 0.4 : 0.16,
@@ -120,13 +121,13 @@ export function SlideStage({
       ...(kind === "icon" ? { glyph: "star", strokeWidth: 2 } : {}),
       ...extra,
     };
-    onAddOverlay(overlay);
-    onSelect(overlay.id);
+    onAddElement(element);
+    onSelect(element.id);
     setAddMenu(null);
   }
 
   const startDrag = (e: RPointerEvent<HTMLDivElement>, id: string, mode: DragState["mode"]) => {
-    const o = overlays.find((v) => v.id === id);
+    const o = elements.find((v) => v.id === id);
     if (!o) return;
     e.stopPropagation();
     e.preventDefault();
@@ -142,13 +143,13 @@ export function SlideStage({
     const dx = (e.clientX - d.startX) / (format.w * scale);
     const dy = (e.clientY - d.startY) / (format.h * scale);
     if (d.mode === "move") {
-      onUpdateOverlay(
+      onUpdateElement(
         d.id,
         { x: clamp(d.origin.x + dx, -0.2, 1.2), y: clamp(d.origin.y + dy, -0.2, 1.2) },
         `move:${d.id}`,
       );
     } else {
-      onUpdateOverlay(
+      onUpdateElement(
         d.id,
         { w: Math.max(0.02, d.origin.w + dx), h: Math.max(0.01, d.origin.h + dy) },
         `resize:${d.id}`,
@@ -169,7 +170,7 @@ export function SlideStage({
         className="absolute left-1/2 top-3 z-overlay flex -translate-x-1/2 items-center gap-1 rounded-lg border border-hairline p-1 shadow-overlay"
         style={glass}
       >
-        <ToolButton icon={Type} label="Add text" onClick={() => addOverlay("text")} />
+        <ToolButton icon={Type} label="Add text" onClick={() => addElement("text")} />
         <ToolButton
           icon={Shapes}
           label="Add shape"
@@ -183,7 +184,7 @@ export function SlideStage({
           onClick={() => setAddMenu(addMenu === "icon" ? null : "icon")}
         />
         <div className="mx-0.5 h-4 w-px bg-hairline" />
-        <span className="px-1.5 text-caption text-muted">click any text to edit it</span>
+        <span className="px-1.5 text-caption text-muted">click to select · drag to move · double-click text to edit</span>
       </div>
 
       {addMenu === "shape" ? (
@@ -191,10 +192,10 @@ export function SlideStage({
           className="absolute left-1/2 top-14 z-overlay flex -translate-x-1/2 gap-1 rounded-lg border border-hairline p-1 shadow-overlay"
           style={glass}
         >
-          <ToolButton icon={Square} label="Rectangle" onClick={() => addOverlay("shape", { shape: "rect" })} />
-          <ToolButton icon={Circle} label="Ellipse" onClick={() => addOverlay("shape", { shape: "ellipse" })} />
-          <ToolButton icon={Triangle} label="Triangle" onClick={() => addOverlay("shape", { shape: "triangle" })} />
-          <ToolButton icon={Minus} label="Line" onClick={() => addOverlay("shape", { shape: "line", h: 0.005 })} />
+          <ToolButton icon={Square} label="Rectangle" onClick={() => addElement("shape", { shape: "rect" })} />
+          <ToolButton icon={Circle} label="Ellipse" onClick={() => addElement("shape", { shape: "ellipse" })} />
+          <ToolButton icon={Triangle} label="Triangle" onClick={() => addElement("shape", { shape: "triangle" })} />
+          <ToolButton icon={Minus} label="Line" onClick={() => addElement("shape", { shape: "line", h: 0.005 })} />
         </div>
       ) : null}
 
@@ -208,7 +209,7 @@ export function SlideStage({
               key={glyph}
               type="button"
               title={glyph}
-              onClick={() => addOverlay("icon", { glyph })}
+              onClick={() => addElement("icon", { glyph })}
               className="grid h-7 w-7 place-items-center rounded-md text-tertiary hover:bg-white/[0.06] hover:text-primary"
             >
               <svg
@@ -245,16 +246,38 @@ export function SlideStage({
               format={format}
               editingId={editingId}
               onEditStart={(node) => {
-                onSelect(node.overlayId ?? node.blockId ?? null);
-                setEditingId(nodeKey(node));
+                onSelect(node.overlayId ?? null);
               }}
               onEditCommit={(node, text) => {
                 setEditingId(null);
-                if (node.overlayId) onUpdateOverlay(node.overlayId, { text });
-                else onEdit(node, text);
+                // A block-linked element syncs through the block, so the slide list
+                // and the canvas stay one truth and it stays one undo step.
+                if (node.blockId) onEdit(node, text);
+                else if (node.overlayId) onUpdateElement(node.overlayId, { text });
               }}
             />
           </div>
+
+          {/* Hit layer: one target per element, so EVERYTHING is selectable and
+              draggable — template-seeded or hand-placed, text or shape or icon. */}
+          {elements.map((el) => (
+            <div
+              key={el.id}
+              className={selectedId === el.id ? "" : "hover:outline hover:outline-1 hover:outline-accent-dim"}
+              style={{
+                position: "absolute",
+                left: el.x * format.w * scale,
+                top: el.y * format.h * scale,
+                width: Math.max(8, el.w * format.w * scale),
+                height: Math.max(8, el.h * format.h * scale),
+                cursor: "move",
+              }}
+              onPointerDown={(e) => startDrag(e, el.id, "move")}
+              onDoubleClick={() => {
+                if (el.kind === "text") setEditingId(el.blockId ? `${el.blockId}` : el.id);
+              }}
+            />
+          ))}
 
           {/* Selection frame, in screen space over the scaled slide. */}
           {selected ? (
@@ -263,17 +286,29 @@ export function SlideStage({
               style={{
                 left: selected.x * format.w * scale,
                 top: selected.y * format.h * scale,
-                width: selected.w * format.w * scale,
-                height: selected.h * format.h * scale,
+                width: Math.max(8, selected.w * format.w * scale),
+                height: Math.max(8, selected.h * format.h * scale),
                 cursor: "move",
               }}
               onPointerDown={(e) => startDrag(e, selected.id, "move")}
+              onDoubleClick={() => {
+                if (selected.kind === "text") setEditingId(selected.id);
+              }}
             >
-              <div
-                className="absolute -bottom-1.5 -right-1.5 h-3 w-3 rounded-sm border border-accent bg-base"
-                style={{ cursor: "nwse-resize" }}
-                onPointerDown={(e) => startDrag(e, selected.id, "resize")}
-              />
+              {(["nw", "ne", "sw", "se"] as const).map((corner) => (
+                <div
+                  key={corner}
+                  className="absolute h-2.5 w-2.5 rounded-sm border border-accent bg-base"
+                  style={{
+                    left: corner.includes("w") ? -5 : undefined,
+                    right: corner.includes("e") ? -5 : undefined,
+                    top: corner.startsWith("n") ? -5 : undefined,
+                    bottom: corner.startsWith("s") ? -5 : undefined,
+                    cursor: corner === "nw" || corner === "se" ? "nwse-resize" : "nesw-resize",
+                  }}
+                  onPointerDown={(e) => startDrag(e, selected.id, "resize")}
+                />
+              ))}
             </div>
           ) : null}
 
@@ -316,14 +351,6 @@ export function SlideStage({
             ) : null}
           </div>
 
-          {overflowing ? (
-            <div className="absolute -bottom-8 left-0 flex items-center gap-2 text-caption">
-              <span className="text-danger">Text does not fit</span>
-              <button type="button" onClick={onSplit} className="text-secondary underline hover:text-primary">
-                split this slide
-              </button>
-            </div>
-          ) : null}
         </div>
       </div>
 

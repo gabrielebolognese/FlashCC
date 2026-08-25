@@ -3,6 +3,8 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { newId } from "../doc/ids.js";
 import { rebuild, serialize } from "../doc/serialize.js";
 import { assignRoles, splitToSlides } from "../doc/split.js";
+import { materialize, syncTextToElements } from "../render/materialize.js";
+import { FORMATS } from "../render/layout/node.js";
 import type { FlashCCDocument, Slide } from "../doc/types.js";
 import { saveDocument } from "./persist.js";
 
@@ -12,8 +14,24 @@ import { saveDocument } from "./persist.js";
  */
 const LIMIT = 100;
 
+/**
+ * Give every slide its elements. The template runs ONCE here, not on every render,
+ * which is exactly what makes its output editable afterwards.
+ */
+export function seedElements(doc: FlashCCDocument): FlashCCDocument {
+  const format = FORMATS[doc.format] ?? { w: 1080, h: 1350 };
+  return {
+    ...doc,
+    slides: doc.slides.map((slide, i) => {
+      if (slide.elements && slide.elements.length > 0) return slide;
+      const { elements, background } = materialize(slide, doc.template, doc.brandKit, format, i + 1);
+      return { ...slide, elements, background };
+    }),
+  };
+}
+
 export function useDocument(initial: FlashCCDocument) {
-  const [doc, setDoc] = useState(initial);
+  const [doc, setDoc] = useState(() => seedElements(initial));
   const past = useRef<FlashCCDocument[]>([]);
   const future = useRef<FlashCCDocument[]>([]);
   const saveTimer = useRef<number | undefined>(undefined);
@@ -86,10 +104,15 @@ export function useDocument(initial: FlashCCDocument) {
 
   const setSlides = useCallback(
     (slides: Slide[], coalesce?: string) => {
-      const roled = assignRoles(slides).map((s, i) => ({
-        ...s,
-        roleOverride: slides[i]?.roleOverride,
-      }));
+      const format = FORMATS[doc.format] ?? { w: 1080, h: 1350 };
+      const roled = assignRoles(slides).map((s, i) => {
+        const withRole = { ...s, roleOverride: slides[i]?.roleOverride };
+        if (!withRole.elements || withRole.elements.length === 0) {
+          const seeded = materialize(withRole, doc.template, doc.brandKit, format, i + 1);
+          return { ...withRole, elements: seeded.elements, background: seeded.background };
+        }
+        return { ...withRole, elements: syncTextToElements(withRole) };
+      });
       commit({ ...doc, slides: roled, source: serialize(roled) }, coalesce);
     },
     [commit, doc],
@@ -109,8 +132,16 @@ export function useDocument(initial: FlashCCDocument) {
     [commit, doc],
   );
 
+  /** Re-runs the template over every slide, discarding manual positions. One undo step. */
   const setTemplate = useCallback(
-    (template: FlashCCDocument["template"]) => commit({ ...doc, template }),
+    (template: FlashCCDocument["template"]) => {
+      const format = FORMATS[doc.format] ?? { w: 1080, h: 1350 };
+      const slides = doc.slides.map((slide, i) => {
+        const seeded = materialize(slide, template, doc.brandKit, format, i + 1);
+        return { ...slide, elements: seeded.elements, background: seeded.background };
+      });
+      commit({ ...doc, template, slides });
+    },
     [commit, doc],
   );
 

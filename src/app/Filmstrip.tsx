@@ -3,7 +3,8 @@ import { useState } from "react";
 
 import type { Template } from "../doc/template.js";
 import type { BrandKit, Slide } from "../doc/types.js";
-import { computeLayout, type Format } from "../render/layout/computeLayout.js";
+import type { Format } from "../render/layout/node.js";
+import { elementsToNodes } from "../render/materialize.js";
 import { SlideRenderer } from "../render/SlideRenderer.js";
 import { IconButton } from "../ui/IconButton.js";
 
@@ -84,7 +85,7 @@ export function Filmstrip({
                 style={{ width: format.w, height: format.h, transform: `scale(${scale})` }}
               >
                 <SlideRenderer
-                  nodes={computeLayout(template, slide, brand, format, i + 1)}
+                  nodes={elementsToNodes(slide.elements ?? [], format, slide.background ?? brand.palette.background)}
                   format={format}
                 />
               </div>

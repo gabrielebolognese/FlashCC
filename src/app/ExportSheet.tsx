@@ -3,7 +3,8 @@ import { useEffect } from "react";
 import { createPortal } from "react-dom";
 
 import type { FlashCCDocument } from "../doc/types.js";
-import { computeLayout, type Format } from "../render/layout/computeLayout.js";
+import type { Format } from "../render/layout/node.js";
+import { elementsToNodes } from "../render/materialize.js";
 import { SlideRenderer } from "../render/SlideRenderer.js";
 import { IconButton } from "../ui/IconButton.js";
 
@@ -77,7 +78,7 @@ export function ExportSheet({ doc, format, onClose }: Props) {
               {doc.slides.map((slide, i) => (
                 <div key={slide.id} style={{ breakAfter: "page", width: format.w, height: format.h }}>
                   <SlideRenderer
-                    nodes={computeLayout(doc.template, slide, doc.brandKit, format, i + 1)}
+                    nodes={elementsToNodes(slide.elements ?? [], format, slide.background ?? doc.brandKit.palette.background)}
                     format={format}
                   />
                 </div>

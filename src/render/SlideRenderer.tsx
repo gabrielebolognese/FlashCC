@@ -36,7 +36,7 @@ export function SlideRenderer({ nodes, format, editingId = null, onEditStart, on
             <TextNode
               key={node.id}
               node={node}
-              editing={editingId === nodeKey(node)}
+              editing={editingId === (node.overlayId ?? node.id)}
               {...(onEditStart ? { onEditStart } : {})}
               {...(onEditCommit ? { onEditCommit } : {})}
             />

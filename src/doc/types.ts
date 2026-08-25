@@ -30,26 +30,37 @@ export type BlockBody =
 
 export type Block = { id: string; style?: BlockStyle | undefined } & BlockBody;
 
-export type ShapeKind = "rect" | "ellipse" | "line" | "triangle";
+export type ShapeKind = "rect" | "ellipse" | "triangle" | "line";
+export type ElementKind = "text" | "icon" | "shape" | "image";
 
 /**
- * A free-positioned element the user placed on the canvas: text, an icon, or a shape.
- * Position and size are FRACTIONS of the slide, not pixels, so an overlay survives a
- * format change the same way template-driven content does.
+ * Every visual thing on a slide. There is no locked, template-only layer any more:
+ * the template's job is to compute good STARTING positions, after which every
+ * element is a free object the user can drag, resize and restyle.
+ *
+ * Position and size are FRACTIONS of the slide, never pixels, so an element survives
+ * a format change.
  */
-export type Overlay = {
+export type Element = {
   id: string;
-  kind: "text" | "icon" | "shape";
+  kind: ElementKind;
   x: number;
   y: number;
   w: number;
   h: number;
+  z: number;
   colour: string;
+  /** Links back to the text block in the slide list, so the two stay in sync. */
+  blockId?: string | undefined;
+  itemIndex?: number | undefined;
+  /** Set when the template produced this element and the user has not moved it. */
+  fromTemplate?: boolean | undefined;
+  locked?: boolean | undefined;
   opacity?: number | undefined;
-  rotation?: number | undefined;
   /** text */
   text?: string | undefined;
   fontSize?: number | undefined;
+  lineHeight?: number | undefined;
   family?: FontRole | undefined;
   weight?: number | undefined;
   align?: "left" | "center" | "right" | undefined;
@@ -64,15 +75,21 @@ export type Overlay = {
   filled?: boolean | undefined;
 };
 
+/** Kept as an alias so older call sites keep compiling. */
+export type Overlay = Element;
+
 export type Slide = {
   id: string;
   /** What inference decided. */
   role: SlideRole;
   /** What the user chose from the on-slide control. Wins when set. */
   roleOverride?: SlideRole | undefined;
+  /** The words. Edited in the slide list; mirrored onto elements by blockId. */
   blocks: Block[];
-  /** Elements placed by hand on top of the template layout. */
-  overlays?: Overlay[] | undefined;
+  /** Everything drawn, template-seeded or hand-placed. All of it is free. */
+  elements?: Element[] | undefined;
+  /** Slide background colour. Falls back to the template's when unset. */
+  background?: string | undefined;
 };
 
 export type FontRole = "sans" | "serif" | "mono";

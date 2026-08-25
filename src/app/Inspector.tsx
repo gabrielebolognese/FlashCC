@@ -1,16 +1,18 @@
 import { AlignCenter, AlignLeft, AlignRight, Trash2 } from "lucide-react";
 import type { ReactNode } from "react";
 
-import type { Block, BlockStyle, BrandKit, FontRole, Overlay } from "../doc/types.js";
+import type { Block, BlockStyle, BrandKit, Element, FontRole } from "../doc/types.js";
 import { IconButton } from "../ui/IconButton.js";
 
 type Props = {
   brand: BrandKit;
-  overlay: Overlay | null;
+  element: Element | null;
   block: Block | null;
-  onOverlay: (patch: Partial<Overlay>, coalesce?: string) => void;
+  onElement: (patch: Partial<Element>, coalesce?: string) => void;
   onBlockStyle: (patch: BlockStyle, coalesce?: string) => void;
-  onDeleteOverlay: () => void;
+  onDeleteElement: () => void;
+  background: string;
+  onBackground: (hex: string) => void;
 };
 
 const FAMILIES: { value: FontRole; label: string }[] = [
@@ -25,17 +27,16 @@ const WEIGHTS = [400, 500, 600, 700] as const;
  * Whatever is selected. A template-driven block gets overrides on top of the
  * template's decision; a hand-placed overlay gets full control. Empty until a click.
  */
-export function Inspector({ brand, overlay, block, onOverlay, onBlockStyle, onDeleteOverlay }: Props) {
-  if (!overlay && !block) {
-    return (
-      <aside className="w-[236px] shrink-0 overflow-y-auto border-l border-hairline bg-surface-1 p-3">
-        <p className="text-caption leading-[16px] text-muted">
-          Click text on the slide, or an element you added, to change how it looks.
-        </p>
-      </aside>
-    );
-  }
-
+export function Inspector({
+  brand,
+  element,
+  block,
+  onElement,
+  onBlockStyle,
+  onDeleteElement,
+  background,
+  onBackground,
+}: Props) {
   const swatches = [
     brand.palette.text,
     brand.palette.muted,
@@ -43,64 +44,79 @@ export function Inspector({ brand, overlay, block, onOverlay, onBlockStyle, onDe
     brand.palette.background,
   ];
 
-  if (overlay) {
-    const isText = overlay.kind === "text";
-    const isShape = overlay.kind === "shape";
+  // Nothing selected: the slide itself is the subject.
+  if (!element && !block) {
+    return (
+      <aside className="w-[236px] shrink-0 overflow-y-auto border-l border-hairline bg-surface-1 p-3">
+        <div className="mb-3 text-title text-primary">Slide</div>
+        <Row label="Background">
+          <Swatches swatches={swatches} value={background} onChange={onBackground} />
+        </Row>
+        <p className="mt-4 border-t border-hairline pt-3 text-caption leading-[16px] text-muted">
+          Click anything on the slide to select it. Drag to move, drag a corner to resize.
+        </p>
+      </aside>
+    );
+  }
+
+  if (element) {
+    const isText = element.kind === "text";
+    const isShape = element.kind === "shape";
     return (
       <aside className="w-[236px] shrink-0 overflow-y-auto border-l border-hairline bg-surface-1 p-3">
         <div className="mb-3 flex items-center gap-2">
-          <span className="text-title capitalize text-primary">{overlay.kind}</span>
+          <span className="text-title capitalize text-primary">{element.kind}</span>
           <div className="flex-1" />
-          <IconButton icon={Trash2} label="Delete element" danger onClick={onDeleteOverlay} />
+          <IconButton icon={Trash2} label="Delete element" danger onClick={onDeleteElement} />
         </div>
 
         {isText ? (
           <>
             <Row label="Font">
               <Segmented
-                value={overlay.family ?? "sans"}
+                value={element.family ?? "sans"}
                 options={FAMILIES}
-                onChange={(family) => onOverlay({ family })}
+                onChange={(family) => onElement({ family })}
               />
             </Row>
             <Row label="Size">
               <Stepper
-                value={overlay.fontSize ?? 48}
+                value={element.fontSize ?? 48}
                 min={12}
                 max={220}
                 step={4}
                 suffix="px"
-                onChange={(fontSize) => onOverlay({ fontSize }, `size:${overlay.id}`)}
+                onChange={(fontSize) => onElement({ fontSize }, `size:${element.id}`)}
               />
             </Row>
             <Row label="Weight">
               <Segmented
-                value={String(overlay.weight ?? 600)}
+                value={String(element.weight ?? 600)}
                 options={WEIGHTS.map((w) => ({ value: String(w), label: String(w) }))}
-                onChange={(w) => onOverlay({ weight: Number(w) })}
+                onChange={(w) => onElement({ weight: Number(w) })}
               />
             </Row>
             <Row label="Align">
-              <AlignPicker value={overlay.align ?? "left"} onChange={(align) => onOverlay({ align })} />
+              <AlignPicker value={element.align ?? "left"} onChange={(align) => onElement({ align })} />
             </Row>
             <Row label="Letter spacing">
               <Stepper
-                value={Math.round((overlay.tracking ?? 0) * 100)}
+                value={Math.round((element.tracking ?? 0) * 100)}
                 min={-8}
                 max={30}
                 step={1}
                 suffix=""
-                onChange={(v) => onOverlay({ tracking: v / 100 }, `track:${overlay.id}`)}
+                onChange={(v) => onElement({ tracking: v / 100 }, `track:${element.id}`)}
               />
             </Row>
             <Row label="Caps">
               <Segmented
-                value={overlay.uppercase ? "upper" : "none"}
+                value={element.uppercase ? "upper" : "none"}
                 options={[
                   { value: "none", label: "Normal" },
                   { value: "upper", label: "UPPER" },
                 ]}
-                onChange={(v) => onOverlay({ uppercase: v === "upper" })}
+                onChange={(v) => onElement({ uppercase: v === "upper" })}
               />
             </Row>
           </>
@@ -110,36 +126,36 @@ export function Inspector({ brand, overlay, block, onOverlay, onBlockStyle, onDe
           <>
             <Row label="Fill">
               <Segmented
-                value={overlay.filled === false ? "outline" : "solid"}
+                value={element.filled === false ? "outline" : "solid"}
                 options={[
                   { value: "solid", label: "Solid" },
                   { value: "outline", label: "Outline" },
                 ]}
-                onChange={(v) => onOverlay({ filled: v === "solid" })}
+                onChange={(v) => onElement({ filled: v === "solid" })}
               />
             </Row>
             <Row label="Corner">
               <Stepper
-                value={overlay.radius ?? 0}
+                value={element.radius ?? 0}
                 min={0}
                 max={200}
                 step={4}
                 suffix="px"
-                onChange={(radius) => onOverlay({ radius }, `radius:${overlay.id}`)}
+                onChange={(radius) => onElement({ radius }, `radius:${element.id}`)}
               />
             </Row>
           </>
         ) : null}
 
-        {overlay.kind === "icon" || overlay.filled === false ? (
+        {element.kind === "icon" || element.filled === false ? (
           <Row label="Thickness">
             <Stepper
-              value={overlay.strokeWidth ?? 2}
+              value={element.strokeWidth ?? 2}
               min={1}
               max={12}
               step={1}
               suffix=""
-              onChange={(strokeWidth) => onOverlay({ strokeWidth }, `stroke:${overlay.id}`)}
+              onChange={(strokeWidth) => onElement({ strokeWidth }, `stroke:${element.id}`)}
             />
           </Row>
         ) : null}
@@ -147,19 +163,19 @@ export function Inspector({ brand, overlay, block, onOverlay, onBlockStyle, onDe
         <Row label="Colour">
           <Swatches
             swatches={swatches}
-            value={overlay.colour}
-            onChange={(colour) => onOverlay({ colour })}
+            value={element.colour}
+            onChange={(colour) => onElement({ colour })}
           />
         </Row>
 
         <Row label="Opacity">
           <Stepper
-            value={Math.round((overlay.opacity ?? 1) * 100)}
+            value={Math.round((element.opacity ?? 1) * 100)}
             min={10}
             max={100}
             step={5}
             suffix="%"
-            onChange={(v) => onOverlay({ opacity: v / 100 }, `op:${overlay.id}`)}
+            onChange={(v) => onElement({ opacity: v / 100 }, `op:${element.id}`)}
           />
         </Row>
 

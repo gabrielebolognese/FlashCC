@@ -29,11 +29,11 @@ export function FirstRunBar() {
 
   return (
     <div className="flex h-8 shrink-0 items-center gap-2 border-b border-hairline bg-surface-2 px-3 text-caption text-tertiary">
-      <Step n="1" text="Edit your words in the list on the left" />
+      <Step n="1" text="Everything on the slide is draggable — click it and move it" />
       <Sep />
-      <Step n="2" text="Click any text on the slide to change it there" />
+      <Step n="2" text="Double-click text to retype it, or edit it in the list" />
       <Sep />
-      <Step n="3" text="Add text, shapes and icons from the toolbar above the slide" />
+      <Step n="3" text="Add text, shapes and icons from the toolbar above" />
       <div className="flex-1" />
       <button
         type="button"

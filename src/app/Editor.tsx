@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type PointerEvent } from "react";
 
 import { newId } from "../doc/ids.js";
-import type { Block, BlockStyle, FlashCCDocument, Overlay, Slide, SlideRole } from "../doc/types.js";
+import type { Block, BlockStyle, Element, FlashCCDocument, Slide, SlideRole } from "../doc/types.js";
 import { FORMATS, type LayoutNode } from "../render/layout/node.js";
 import { saveTemplate } from "../state/persist.js";
 import { useDocument } from "../state/useDocument.js";
@@ -33,13 +33,13 @@ export function Editor({ initial, onHome }: Props) {
   const current = Math.min(index, Math.max(0, doc.slides.length - 1));
   const slide = doc.slides[current];
 
-  const selectedOverlay = useMemo(
-    () => slide?.overlays?.find((o) => o.id === selectedId) ?? null,
+  const selectedElement = useMemo(
+    () => slide?.elements?.find((o) => o.id === selectedId) ?? null,
     [slide, selectedId],
   );
   const selectedBlock = useMemo(
-    () => (selectedOverlay ? null : (slide?.blocks.find((b) => b.id === selectedId) ?? null)),
-    [slide, selectedId, selectedOverlay],
+    () => (selectedElement ? null : (slide?.blocks.find((b) => b.id === selectedId) ?? null)),
+    [slide, selectedId, selectedElement],
   );
 
   /* ── slide + block mutations ───────────────────────────────────────────── */
@@ -123,32 +123,35 @@ export function Editor({ initial, onHome }: Props) {
     [patchSlide],
   );
 
-  /* ── overlays ──────────────────────────────────────────────────────────── */
+  /* ── elements ──────────────────────────────────────────────────────────── */
 
-  const addOverlay = useCallback(
-    (overlay: Overlay) =>
-      patchSlide(current, (s) => ({ ...s, overlays: [...(s.overlays ?? []), overlay] })),
+  const addElement = useCallback(
+    (element: Element) =>
+      patchSlide(current, (s) => ({ ...s, elements: [...(s.elements ?? []), element] })),
     [current, patchSlide],
   );
 
-  const updateOverlay = useCallback(
-    (id: string, patch: Partial<Overlay>, coalesce?: string) =>
+  const updateElement = useCallback(
+    (id: string, patch: Partial<Element>, coalesce?: string) =>
       patchSlide(
         current,
         (s) => ({
           ...s,
-          overlays: (s.overlays ?? []).map((o) => (o.id === id ? { ...o, ...patch } : o)),
+          // Touching a template-seeded element makes it the users own. It never snaps back.
+          elements: (s.elements ?? []).map((o) =>
+            o.id === id ? { ...o, ...patch, fromTemplate: false } : o,
+          ),
         }),
         coalesce,
       ),
     [current, patchSlide],
   );
 
-  const deleteOverlay = useCallback(() => {
+  const deleteElement = useCallback(() => {
     if (!selectedId) return;
     patchSlide(current, (s) => ({
       ...s,
-      overlays: (s.overlays ?? []).filter((o) => o.id !== selectedId),
+      elements: (s.elements ?? []).filter((o) => o.id !== selectedId),
     }));
     setSelectedId(null);
   }, [current, patchSlide, selectedId]);
@@ -194,13 +197,13 @@ export function Editor({ initial, onHome }: Props) {
         setSelectedId(null);
       } else if (e.key === "Delete" || e.key === "Backspace") {
         e.preventDefault();
-        if (selectedOverlay) deleteOverlay();
+        if (selectedElement) deleteElement();
         else api.deleteSlide(current);
       }
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [api, current, deleteOverlay, doc.slides.length, selectedOverlay]);
+  }, [api, current, deleteElement, doc.slides.length, selectedElement]);
 
   const onEdit = useCallback(
     (node: LayoutNode, text: string) => {
@@ -289,20 +292,22 @@ export function Editor({ initial, onHome }: Props) {
           onSelect={setSelectedId}
           onRoleChange={(role: SlideRole | undefined) => api.setRoleOverride(current, role)}
           onEdit={onEdit}
-          onAddOverlay={addOverlay}
-          onUpdateOverlay={updateOverlay}
+          onAddElement={addElement}
+          onUpdateElement={updateElement}
           onSplit={onSplit}
         />
 
         <Inspector
           brand={doc.brandKit}
-          overlay={selectedOverlay}
+          element={selectedElement}
           block={selectedBlock}
-          onOverlay={(patch, coalesce) => {
-            if (selectedId) updateOverlay(selectedId, patch, coalesce);
+          onElement={(patch, coalesce) => {
+            if (selectedId) updateElement(selectedId, patch, coalesce);
           }}
           onBlockStyle={setBlockStyle}
-          onDeleteOverlay={deleteOverlay}
+          onDeleteElement={deleteElement}
+          background={slide?.background ?? doc.brandKit.palette.background}
+          onBackground={(hex) => patchSlide(current, (sl) => ({ ...sl, background: hex }))}
         />
 
         {sheet === "brand" ? (
