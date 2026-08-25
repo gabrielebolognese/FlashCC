@@ -74,8 +74,9 @@ export function Studio({ initial, onHome }: { initial: Doc; onHome: () => void }
         </Button>
       </header>
 
+      <Toolbar studio={studio} />
+
       <div className="flex min-h-0 flex-1">
-        <Toolbar studio={studio} />
         <div className="flex w-[212px] shrink-0 flex-col border-r border-hairline bg-surface-1">
           <LayersPanel studio={studio} />
           <MediaPool studio={studio} />
