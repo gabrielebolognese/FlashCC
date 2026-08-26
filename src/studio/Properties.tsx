@@ -14,6 +14,8 @@ import {
 import type { ReactNode } from "react";
 
 import { IconButton } from "../ui/IconButton.js";
+import { GradientEditor } from "./GradientEditor.js";
+import { averageColour, makeGradient, type Gradient } from "./gradient.js";
 import { allFonts, type Layer } from "./model.js";
 import type { Studio } from "./useStudio.js";
 
@@ -29,7 +31,13 @@ export function Properties({ studio }: { studio: Studio }) {
       <aside className="w-[232px] shrink-0 overflow-y-auto border-l border-hairline bg-surface-1 p-3">
         <div className="mb-3 text-title text-primary">Slide</div>
         <Field label="Background">
-          <Colour palette={doc.palette} value={slide?.background ?? "#000"} onChange={studio.setBackground} />
+          <PaintPicker
+            palette={doc.palette}
+            colour={slide?.background ?? "#000000"}
+            gradient={slide?.gradient}
+            onColour={studio.setBackground}
+            onGradient={studio.setBackgroundGradient}
+          />
         </Field>
         <Field label="Canvas">
           <div className="flex gap-1">
@@ -157,7 +165,22 @@ export function Properties({ studio }: { studio: Studio }) {
       ) : null}
 
       <Field label={isText || isIcon ? "Colour" : "Fill"}>
-        <Colour palette={doc.palette} value={one?.fill ?? "#ffffff"} onChange={(fill) => set(isIcon ? { fill, stroke: fill } : { fill })} />
+        {isIcon ? (
+          // An icon is a stroked path; a ramp has nothing to fill.
+          <Colour
+            palette={doc.palette}
+            value={one?.fill ?? "#ffffff"}
+            onChange={(fill) => set({ fill, stroke: fill })}
+          />
+        ) : (
+          <PaintPicker
+            palette={doc.palette}
+            colour={one?.fill ?? "#ffffff"}
+            gradient={one?.gradient}
+            onColour={(fill) => set({ fill, gradient: undefined })}
+            onGradient={(gradient) => set({ gradient })}
+          />
+        )}
       </Field>
 
       {!isText ? (
@@ -301,4 +324,66 @@ function Colour({
       </label>
     </div>
   );
+}
+
+/**
+ * Solid or gradient, on one control. Switching to a gradient seeds it from the solid
+ * colour already in use, so the first thing you see is a ramp of the thing you had
+ * rather than an unrelated default.
+ */
+function PaintPicker({
+  palette,
+  colour,
+  gradient,
+  onColour,
+  onGradient,
+}: {
+  palette: string[];
+  colour: string;
+  gradient: Gradient | undefined;
+  onColour: (hex: string) => void;
+  onGradient: (g: Gradient | undefined) => void;
+}) {
+  return (
+    <div>
+      <div className="mb-2 flex h-7 items-center gap-0.5 rounded-md border border-hairline p-0.5">
+        <button
+          type="button"
+          onClick={() => onGradient(undefined)}
+          className={[
+            "h-6 flex-1 rounded-sm text-caption",
+            gradient ? "text-tertiary hover:bg-white/[0.04]" : "bg-surface-4 text-primary",
+          ].join(" ")}
+        >
+          Solid
+        </button>
+        <button
+          type="button"
+          onClick={() => onGradient(gradient ?? makeGradient([colour, shift(colour)]))}
+          className={[
+            "h-6 flex-1 rounded-sm text-caption",
+            gradient ? "bg-surface-4 text-primary" : "text-tertiary hover:bg-white/[0.04]",
+          ].join(" ")}
+        >
+          Gradient
+        </button>
+      </div>
+
+      {gradient ? (
+        <GradientEditor value={gradient} onChange={onGradient} />
+      ) : (
+        <Colour palette={palette} value={colour} onChange={onColour} />
+      )}
+    </div>
+  );
+}
+
+/** A second stop that is visibly different from the first, whichever end it is at. */
+function shift(hex: string): string {
+  const n = Number.parseInt(hex.replace("#", "").padEnd(6, "0").slice(0, 6), 16);
+  if (Number.isNaN(n)) return "#000000";
+  const [r, g, b] = [(n >> 16) & 255, (n >> 8) & 255, n & 255];
+  const light = (r! * 299 + g! * 587 + b! * 114) / 1000 > 128;
+  const to = (v: number) => Math.round(light ? v * 0.45 : v + (255 - v) * 0.55);
+  return `#${((to(r!) << 16) | (to(g!) << 8) | to(b!)).toString(16).padStart(6, "0")}`;
 }

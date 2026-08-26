@@ -1,3 +1,4 @@
+import { averageColour } from "./gradient.js";
 import type { Doc } from "./model.js";
 
 const INDEX = "flashcc:v3:index";
@@ -45,6 +46,13 @@ export function loadDoc(id: string): Doc | null {
   return { ...d, media: Array.isArray(d.media) ? d.media : [] };
 }
 
+/** One flat colour for the project card, even when the first slide is a ramp. */
+function summaryColour(doc: Doc): string {
+  const first = doc.slides[0];
+  if (!first) return "#12161c";
+  return first.gradient ? averageColour(first.gradient) : first.background;
+}
+
 export function saveDoc(doc: Doc): boolean {
   const stamped = { ...doc, updatedAt: new Date().toISOString() };
   const ok = write(KEY(doc.id), stamped);
@@ -53,7 +61,7 @@ export function saveDoc(doc: Doc): boolean {
     name: stamped.name,
     updatedAt: stamped.updatedAt,
     slideCount: stamped.slides.length,
-    background: stamped.slides[0]?.background ?? "#12161c",
+    background: summaryColour(stamped),
     width: stamped.width,
     height: stamped.height,
     ...(stamped.group ? { group: stamped.group } : {}),

@@ -1,6 +1,7 @@
 import type { CSSProperties } from "react";
 
 import { ICON_PATHS, ICON_VIEWBOX } from "../render/icons.js";
+import { gradientCss } from "./gradient.js";
 import { fontStack, type Layer } from "./model.js";
 
 /** Paints one layer. Pure — no interaction, no selection chrome. */
@@ -47,6 +48,15 @@ export function LayerView({
       whiteSpace: "pre-wrap",
       wordBreak: "break-word",
       overflow: "visible",
+      // A gradient on text is the ramp painted behind it and clipped to the glyphs.
+      ...(layer.gradient
+        ? {
+            backgroundImage: gradientCss(layer.gradient),
+            backgroundClip: "text",
+            WebkitBackgroundClip: "text",
+            color: "transparent",
+          }
+        : {}),
     };
 
     if (editing && onCommitText) {
@@ -135,31 +145,39 @@ export function LayerView({
     );
   }
 
-  const stroked = layer.stroke && layer.strokeWidth > 0;
-
-  if (layer.kind === "ellipse") {
-    return (
-      <svg style={box} viewBox="0 0 100 100" preserveAspectRatio="none">
-        <ellipse
-          cx="50"
-          cy="50"
-          rx="50"
-          ry="50"
-          fill={layer.fill === "none" ? "none" : layer.fill}
-          stroke={stroked ? layer.stroke! : "none"}
-          strokeWidth={layer.strokeWidth}
-          vectorEffect="non-scaling-stroke"
-        />
-      </svg>
-    );
-  }
+  const stroked = Boolean(layer.stroke) && layer.strokeWidth > 0;
+  const paint: CSSProperties = layer.gradient
+    ? { backgroundImage: gradientCss(layer.gradient) }
+    : { background: layer.fill === "none" ? "transparent" : layer.fill };
 
   if (layer.kind === "triangle") {
+    // The one shape a border cannot follow, so it stays SVG — and SVG needs the ramp
+    // as a paint server rather than as CSS.
+    const id = `g-${layer.id}`;
+    const g = layer.gradient;
     return (
       <svg style={box} viewBox="0 0 100 100" preserveAspectRatio="none">
+        {g ? (
+          <defs>
+            {g.kind === "radial" ? (
+              <radialGradient id={id} cx={`${g.cx * 100}%`} cy={`${g.cy * 100}%`} r="70%">
+                {g.stops.map((st, i) => (
+                  <stop key={i} offset={`${st.at * 100}%`} stopColor={st.colour} />
+                ))}
+              </radialGradient>
+            ) : (
+              // SVG has no conic ramp; a conic falls back to linear here.
+              <linearGradient id={id} gradientTransform={`rotate(${g.angle - 90} 0.5 0.5)`}>
+                {g.stops.map((st, i) => (
+                  <stop key={i} offset={`${st.at * 100}%`} stopColor={st.colour} />
+                ))}
+              </linearGradient>
+            )}
+          </defs>
+        ) : null}
         <polygon
           points="50,0 100,100 0,100"
-          fill={layer.fill === "none" ? "none" : layer.fill}
+          fill={g ? `url(#${id})` : layer.fill === "none" ? "none" : layer.fill}
           stroke={stroked ? layer.stroke! : "none"}
           strokeWidth={layer.strokeWidth}
           vectorEffect="non-scaling-stroke"
@@ -168,13 +186,14 @@ export function LayerView({
     );
   }
 
-  // rect + line
+  // rect, line and ellipse are all a box — ellipse is just a fully rounded one,
+  // which keeps gradients and borders working on it without a paint server.
   return (
     <div
       style={{
         ...box,
-        background: layer.fill === "none" ? "transparent" : layer.fill,
-        borderRadius: layer.radius,
+        ...paint,
+        borderRadius: layer.kind === "ellipse" ? "50%" : layer.radius,
         border: stroked ? `${layer.strokeWidth}px solid ${layer.stroke}` : undefined,
       }}
     />

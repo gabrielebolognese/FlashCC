@@ -14,6 +14,7 @@ import {
   type Handle,
   type Rect,
 } from "./geometry.js";
+import { slidePaint } from "./paint.js";
 import { LayerView } from "./LayerView.js";
 import { MEDIA_DRAG_TYPE } from "./MediaPool.js";
 import { makeLayer, type Layer, type Tool } from "./model.js";
@@ -447,7 +448,7 @@ export function Canvas({ studio }: { studio: Studio }) {
           style={{
             width: doc.width * zoom,
             height: doc.height * zoom,
-            background: slide?.background ?? "#12161c",
+            ...slidePaint(slide),
           }}
         >
           <div

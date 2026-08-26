@@ -394,6 +394,7 @@ export function buildSlides(
     // ends up dragged over the other later.
     return {
       ...makeSlide(theme.bg, comp.id === "title" ? "Hook" : `Slide ${i + 1}`),
+      ...(theme.bgGradient ? { gradient: theme.bgGradient } : {}),
       layers: images ? [imagePlaceholder(image, theme), ...built] : built,
     };
   });

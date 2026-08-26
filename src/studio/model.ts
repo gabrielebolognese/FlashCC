@@ -11,6 +11,8 @@
  * is in an image editor — content keeps its position.
  */
 
+import type { Gradient } from "./gradient.js";
+
 export type LayerKind = "text" | "rect" | "ellipse" | "triangle" | "line" | "icon" | "image";
 
 export type Layer = {
@@ -27,6 +29,8 @@ export type Layer = {
   locked: boolean;
 
   fill: string;
+  /** Painted instead of `fill` when set. Works on text as well as shapes. */
+  gradient?: Gradient | undefined;
   stroke: string | null;
   strokeWidth: number;
   radius: number;
@@ -66,6 +70,8 @@ export type Slide = {
   id: string;
   name: string;
   background: string;
+  /** Painted instead of `background` when set. */
+  gradient?: Gradient | undefined;
   layers: Layer[];
 };
 

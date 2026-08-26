@@ -8,6 +8,7 @@ import { Canvas } from "./Canvas.js";
 import { Filmstrip } from "./Filmstrip.js";
 import { LayersPanel } from "./LayersPanel.js";
 import { MediaPool } from "./MediaPool.js";
+import { slidePaint } from "./paint.js";
 import { LayerView } from "./LayerView.js";
 import type { Doc } from "./model.js";
 import { Properties } from "./Properties.js";
@@ -148,7 +149,7 @@ export function Studio({ initial, onHome }: { initial: Doc; onHome: () => void }
                     position: "relative",
                     width: doc.width,
                     height: doc.height,
-                    background: s.background,
+                    ...slidePaint(s),
                     breakAfter: "page",
                     overflow: "hidden",
                   }}

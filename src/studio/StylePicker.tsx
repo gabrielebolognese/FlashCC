@@ -2,6 +2,7 @@ import { ArrowLeft, Check, Palette, X } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 
 import { buildSlides } from "./compositions.js";
+import { slidePaint } from "./paint.js";
 import { LayerView } from "./LayerView.js";
 import { allFonts } from "./model.js";
 import type { BuildOptions } from "./compositions.js";
@@ -88,7 +89,7 @@ function StyleCard({
           "overflow-hidden rounded-2xl border-2 transition-[border-color,transform] duration-micro ease-out group-hover:-translate-y-0.5",
           selected ? "border-accent" : "border-hairline group-hover:border-accent-dim",
         ].join(" ")}
-        style={{ width: W * scale, height: CARD_H, background: slide?.background }}
+        style={{ width: W * scale, height: CARD_H, ...slidePaint(slide) }}
       >
         <div
           className="pointer-events-none relative origin-top-left"
@@ -262,7 +263,7 @@ function CustomStyle({
         <div className="mx-auto flex max-w-[880px] flex-col items-center gap-8 px-6 py-10 md:flex-row md:items-start">
           <div
             className="shrink-0 overflow-hidden rounded-2xl border border-hairline shadow-overlay"
-            style={{ width: W * scale, height: 460, background: slide?.background }}
+            style={{ width: W * scale, height: 460, ...slidePaint(slide) }}
           >
             <div
               className="pointer-events-none relative origin-top-left"

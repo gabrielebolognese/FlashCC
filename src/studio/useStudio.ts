@@ -10,6 +10,7 @@ import {
   type Slide,
   type Tool,
 } from "./model.js";
+import type { Gradient } from "./gradient.js";
 import { saveDoc } from "./storage.js";
 
 const LIMIT = 120;
@@ -221,7 +222,12 @@ export function useStudio(initial: Doc) {
   );
 
   const setBackground = useCallback(
-    (hex: string) => patchSlide(index, (s) => ({ ...s, background: hex }), "bg"),
+    (hex: string) => patchSlide(index, (s) => ({ ...s, background: hex, gradient: undefined }), "bg"),
+    [index, patchSlide],
+  );
+
+  const setBackgroundGradient = useCallback(
+    (gradient: Gradient | undefined) => patchSlide(index, (s) => ({ ...s, gradient }), "bggrad"),
     [index, patchSlide],
   );
 
@@ -318,6 +324,7 @@ export function useStudio(initial: Doc) {
     deleteSlide,
     moveSlide,
     setBackground,
+    setBackgroundGradient,
     setFormat,
     setName,
     replaceDoc,

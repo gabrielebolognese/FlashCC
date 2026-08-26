@@ -5,6 +5,7 @@
  * it chose lands on ordinary layers you can change afterwards. It is a starting
  * point, not a theme the document keeps referring back to.
  */
+import { makeGradient } from "./gradient.js";
 import type { Theme } from "./presets.js";
 
 export type Style = {
@@ -71,7 +72,43 @@ export const STYLES: Style[] = [
   ),
 ];
 
+/** The same slot system, with a ramp behind it instead of a flat ground. */
+const gradientStyle = (
+  id: string,
+  name: string,
+  note: string,
+  colours: string[],
+  fg: string,
+  accent: string,
+  muted: string,
+  kind: Parameters<typeof makeGradient>[1] = "linear",
+  angle = 160,
+): Style => ({
+  id,
+  name,
+  note,
+  theme: {
+    bg: colours[0]!,
+    fg,
+    accent,
+    muted,
+    displayFont: "sans",
+    bodyFont: "sans",
+    bgGradient: makeGradient(colours, kind, angle),
+  },
+});
+
+STYLES.push(
+  gradientStyle("dusk", "Dusk", "Indigo into magenta", ["#1e1b4b", "#6d28d9", "#be185d"], "#ffffff", "#fbbf24", "#c9c2e8"),
+  gradientStyle("ember", "Ember", "Deep red into burnt amber", ["#3f0a0a", "#b91c1c", "#92400e"], "#fff7ed", "#fde68a", "#f0c9b0"),
+  gradientStyle("deepsea", "Deep sea", "Navy into teal", ["#082f49", "#075985", "#0e7490"], "#f0fdff", "#67e8f9", "#a8d8e4"),
+  gradientStyle("halo", "Halo", "A lit centre on near-black", ["#312e81", "#0b1020"], "#eef2ff", "#818cf8", "#a5a9c9", "radial"),
+  gradientStyle("dawn", "Dawn", "Cream into rose", ["#fef3c7", "#fda4af"], "#3b0a1a", "#9f1239", "#7c5461", "linear", 200),
+);
+
 export const DEFAULT_STYLE = STYLES[0]!;
+
+export const GRADIENT_STYLE_IDS = ["dusk", "ember", "deepsea", "halo", "dawn"];
 
 export const styleById = (id: string): Style => STYLES.find((s) => s.id === id) ?? DEFAULT_STYLE;
 

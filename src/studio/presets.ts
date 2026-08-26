@@ -5,6 +5,7 @@
  * and then it is gone — there is no live template to fight with, nothing is re-derived,
  * and every layer it produced is as editable as one you drew yourself.
  */
+import type { Gradient } from "./gradient.js";
 import { makeLayer, makeSlide, uid, type Doc, type Layer, type Slide } from "./model.js";
 
 export type Theme = {
@@ -15,6 +16,8 @@ export type Theme = {
   /** FONTS ids. Display carries headings and statements; body carries prose. */
   displayFont?: string | undefined;
   bodyFont?: string | undefined;
+  /** Painted behind every slide instead of the flat bg. */
+  bgGradient?: Gradient | undefined;
 };
 
 export const THEMES: Record<string, Theme> = {

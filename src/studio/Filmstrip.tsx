@@ -1,6 +1,7 @@
 import { Copy, Plus, Trash2 } from "lucide-react";
 import { useState } from "react";
 
+import { slidePaint } from "./paint.js";
 import { LayerView } from "./LayerView.js";
 import type { Studio } from "./useStudio.js";
 
@@ -69,7 +70,7 @@ export function Filmstrip({ studio }: { studio: Studio }) {
                   i === index ? "border-accent" : "border-hairline hover:border-surface-5",
                   from === i ? "opacity-40" : "",
                 ].join(" ")}
-                style={{ width: thumbW, height: THUMB_H, background: s.background }}
+                style={{ width: thumbW, height: THUMB_H, ...slidePaint(s) }}
               >
                 <div
                   className="pointer-events-none relative origin-top-left"

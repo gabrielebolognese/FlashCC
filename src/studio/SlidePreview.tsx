@@ -1,5 +1,6 @@
 import { useLayoutEffect, useRef, useState } from "react";
 
+import { slidePaint } from "./paint.js";
 import { LayerView } from "./LayerView.js";
 import type { Slide } from "./model.js";
 
@@ -40,7 +41,7 @@ export function SlidePreview({
     <div
       ref={ref}
       className={`relative overflow-hidden ${className}`}
-      style={{ aspectRatio: `${w} / ${h}`, background: slide?.background, ...style }}
+      style={{ aspectRatio: `${w} / ${h}`, ...slidePaint(slide), ...style }}
     >
       {scale > 0 ? (
         <div

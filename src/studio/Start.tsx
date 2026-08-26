@@ -2,6 +2,7 @@ import { Copy, Folder, Layers, PenLine, Plus, Trash2 } from "lucide-react";
 import { useMemo, useState } from "react";
 
 import { LayerView } from "./LayerView.js";
+import { slidePaint } from "./paint.js";
 import type { Doc } from "./model.js";
 import { buildDoc, PRESETS, THEMES } from "./presets.js";
 import {
@@ -155,7 +156,7 @@ export function Start({
               <button key={p.id} type="button" onClick={() => create(p.id)} className="group text-left">
                 <div
                   className="overflow-hidden rounded-2xl border border-hairline transition-[border-color,transform] duration-micro ease-out group-hover:-translate-y-px group-hover:border-accent-dim"
-                  style={{ width: doc.width * scale, height: CARD_H, background: first?.background }}
+                  style={{ width: doc.width * scale, height: CARD_H, ...slidePaint(first) }}
                 >
                   <div
                     className="pointer-events-none relative origin-top-left"
