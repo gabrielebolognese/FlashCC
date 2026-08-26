@@ -28,10 +28,13 @@ export function Filmstrip({ studio }: { studio: Studio }) {
       <div className="scroll-quiet flex flex-1 items-start gap-1 overflow-x-auto px-3 pb-3">
         {doc.slides.map((s, i) => (
           <div key={s.id} className="flex h-full items-start">
+            {/* The landing line. Wide and lit, so it reads at thumbnail scale. */}
             <div
               className={[
-                "mx-0.5 h-[88px] w-0.5 shrink-0 self-center rounded-full",
-                over === i && from !== null && from !== i ? "bg-accent" : "bg-transparent",
+                "h-[88px] shrink-0 self-center rounded-full transition-[width,background-color] duration-instant ease-out",
+                over === i && from !== null && from !== i
+                  ? "mx-1 w-[3px] bg-accent shadow-[0_0_10px_rgba(217,165,33,.7)]"
+                  : "mx-0.5 w-0.5 bg-transparent",
               ].join(" ")}
             />
 

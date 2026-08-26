@@ -24,7 +24,15 @@ export function AiChat({
   const [loading, setLoading] = useState(true);
   const [brief, setBrief] = useState("");
   const [phase, setPhase] = useState<Phase>({ kind: "idle" });
+  const [handingOver, setHandingOver] = useState(false);
   const abort = useRef<AbortController | null>(null);
+
+  // A short beat so the screen change is a transition rather than a flicker.
+  useEffect(() => {
+    if (!handingOver) return;
+    const t = window.setTimeout(onWriteMyself, 200);
+    return () => window.clearTimeout(t);
+  }, [handingOver, onWriteMyself]);
 
   useEffect(() => {
     const t = window.setTimeout(() => setLoading(false), 300);
@@ -48,7 +56,7 @@ export function AiChat({
     }
   }
 
-  if (loading) {
+  if (loading || handingOver) {
     return (
       <div className="grid h-full place-items-center bg-base">
         <span className="fcc-spin block h-9 w-9 rounded-full border-2 border-hairline border-t-accent" />
@@ -141,7 +149,7 @@ export function AiChat({
 
                 <button
                   type="button"
-                  onClick={onWriteMyself}
+                  onClick={() => setHandingOver(true)}
                   className="mt-3 flex h-[56px] w-full items-center justify-center gap-2.5 rounded-3xl border border-hairline bg-surface-1 text-[15px] font-semibold text-secondary transition-[border-color,background-color,color] duration-instant ease-out hover:border-accent-dim hover:bg-accent-wash hover:text-accent"
                 >
                   <PenLine size={17} strokeWidth={2.5} />

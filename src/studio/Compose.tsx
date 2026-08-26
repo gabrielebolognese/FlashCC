@@ -1,5 +1,5 @@
 import { ArrowRight, GripVertical, Plus, Sparkles, Trash2, X } from "lucide-react";
-import { Fragment, useRef, useState } from "react";
+import { Fragment, useState } from "react";
 
 import { MAX_SLIDES } from "./compositions.js";
 import { THEMES } from "./presets.js";
@@ -38,7 +38,29 @@ export function Compose({
   );
   const [themeId, setThemeId] = useState<keyof typeof THEMES>(initialTheme);
   const [showing, setShowing] = useState<string | null>(null);
-  const dragFrom = useRef<number | null>(null);
+  // State rather than a ref: the indicator has to re-render as the pointer moves.
+  const [dragFrom, setDragFrom] = useState<number | null>(null);
+  const [dragOver, setDragOver] = useState<number | null>(null);
+
+  const clearDrag = () => {
+    setDragFrom(null);
+    setDragOver(null);
+  };
+
+  /** Where the card would land: after the target when moving down, before it when up. */
+  const landsAfter = dragFrom !== null && dragOver !== null && dragFrom < dragOver;
+
+  function move(to: number) {
+    const from = dragFrom;
+    clearDrag();
+    if (from === null || from === to) return;
+    setFields((fs) => {
+      const next = [...fs];
+      const [m] = next.splice(from, 1);
+      if (m) next.splice(to, 0, m);
+      return next;
+    });
+  }
 
   const filled = fields.filter((f) => f.text.trim().length > 0);
   const theme = THEMES[themeId]!;
@@ -200,28 +222,39 @@ export function Compose({
                   neither is a 12px target hidden until hover. Only the handle is
                   draggable — making the whole card draggable fights text selection. */}
               <div
-                className="flex min-w-0 flex-1 items-stretch gap-2"
-                onDragOver={(e) => e.preventDefault()}
-                onDrop={() => {
-                  const from = dragFrom.current;
-                  if (from === null || from === i) return;
-                  setFields((fs) => {
-                    const next = [...fs];
-                    const [m] = next.splice(from, 1);
-                    if (m) next.splice(i, 0, m);
-                    return next;
-                  });
-                  dragFrom.current = null;
+                className="relative flex min-w-0 flex-1 items-stretch gap-2"
+                onDragOver={(e) => {
+                  if (dragFrom === null) return;
+                  e.preventDefault();
+                  e.dataTransfer.dropEffect = "move";
+                  if (dragOver !== i) setDragOver(i);
+                }}
+                onDrop={(e) => {
+                  e.preventDefault();
+                  move(i);
                 }}
               >
+                {/* The landing line, on the edge the card would arrive at. */}
+                {dragOver === i && dragFrom !== null && dragFrom !== i ? (
+                  <div
+                    aria-hidden
+                    className="pointer-events-none absolute inset-x-0 z-overlay flex items-center gap-2"
+                    style={landsAfter ? { bottom: -7 } : { top: -7 }}
+                  >
+                    <span className="h-[3px] flex-1 rounded-full bg-accent shadow-[0_0_10px_rgba(217,165,33,.7)]" />
+                    <span className="rounded-md bg-accent px-1.5 py-0.5 text-[10px] font-semibold text-[color:var(--on-accent)]">
+                      {landsAfter ? i : i + 1}
+                    </span>
+                  </div>
+                ) : null}
+
                 <div
                   draggable
-                  onDragStart={() => {
-                    dragFrom.current = i;
+                  onDragStart={(e) => {
+                    setDragFrom(i);
+                    e.dataTransfer.effectAllowed = "move";
                   }}
-                  onDragEnd={() => {
-                    dragFrom.current = null;
-                  }}
+                  onDragEnd={clearDrag}
                   aria-label={`Reorder ${labelFor(labels, i)}`}
                   title="Drag to reorder"
                   className="grid w-8 shrink-0 cursor-grab place-items-center rounded-xl border border-hairline bg-surface-1 text-muted hover:border-surface-5 hover:text-primary active:cursor-grabbing"
@@ -229,7 +262,12 @@ export function Compose({
                   <GripVertical size={15} strokeWidth={2} />
                 </div>
 
-                <div className="min-w-0 flex-1 rounded-2xl border border-hairline bg-surface-1 p-3 transition-[border-color] duration-instant ease-out focus-within:border-accent-dim hover:border-surface-5">
+                <div
+                  className={[
+                    "min-w-0 flex-1 rounded-2xl border bg-surface-1 p-3 transition-[border-color,opacity] duration-instant ease-out focus-within:border-accent-dim hover:border-surface-5",
+                    dragFrom === i ? "border-accent-dim opacity-40" : "border-hairline",
+                  ].join(" ")}
+                >
                   <div className="mb-2 flex items-center gap-2">
                     <span
                       className="grid h-6 min-w-6 place-items-center rounded-lg px-1.5 text-[10px] font-semibold"
