@@ -41,6 +41,11 @@ export function Canvas({ studio }: { studio: Studio }) {
   const [spaceDown, setSpaceDown] = useState(false);
   const [dropTarget, setDropTarget] = useState<string | null>(null);
 
+  // The wheel handler is registered once and needs today's zoom, not the zoom from
+  // whichever render installed it.
+  const zoomRef = useRef(zoom);
+  zoomRef.current = zoom;
+
   const layers = slide?.layers ?? [];
   const selectedLayers = layers.filter((l) => selection.includes(l.id));
   const box = bounds(selectedLayers);
@@ -186,22 +191,46 @@ export function Canvas({ studio }: { studio: Studio }) {
     };
   }, [fit, layers, selection, setEditingId, setSelection, setTool, studio]);
 
-  /* ── wheel: zoom with modifier, pan otherwise ────────────────────────── */
+  /* ── wheel: zoom by default, pan with a modifier ─────────────────────── */
   useEffect(() => {
     const host = hostRef.current;
     if (!host) return;
+
     const onWheel = (e: WheelEvent) => {
-      if (e.ctrlKey || e.metaKey) {
-        e.preventDefault();
-        setZoom((z) => Math.max(0.05, Math.min(4, z * (e.deltaY < 0 ? 1.08 : 0.92))));
-      } else {
-        e.preventDefault();
+      e.preventDefault();
+
+      // Inverse of the browser default: on a canvas the wheel is the zoom control
+      // people reach for. A modifier still pans, as does space-drag.
+      if (e.ctrlKey || e.metaKey || e.shiftKey) {
         setPan((p) => ({ x: p.x - e.deltaX, y: p.y - e.deltaY }));
+        return;
       }
+
+      const board = boardRef.current;
+      if (!board) return;
+      const z = zoomRef.current;
+      const next = Math.max(0.05, Math.min(4, z * (e.deltaY < 0 ? 1.12 : 1 / 1.12)));
+      if (next === z) return;
+
+      // Keep the artboard point under the cursor pinned, or zooming walks the slide
+      // away from wherever you were looking.
+      const boardRect = board.getBoundingClientRect();
+      const hostRect = host.getBoundingClientRect();
+      const bx = (e.clientX - boardRect.left) / z;
+      const by = (e.clientY - boardRect.top) / z;
+      const cx = hostRect.left + hostRect.width / 2;
+      const cy = hostRect.top + hostRect.height / 2;
+
+      setPan({
+        x: e.clientX - cx + (doc.width * next) / 2 - bx * next,
+        y: e.clientY - cy + (doc.height * next) / 2 - by * next,
+      });
+      setZoom(next);
     };
+
     host.addEventListener("wheel", onWheel, { passive: false });
     return () => host.removeEventListener("wheel", onWheel);
-  }, []);
+  }, [doc.width, doc.height]);
 
   /* ── pointer ─────────────────────────────────────────────────────────── */
 
@@ -515,7 +544,12 @@ export function Canvas({ studio }: { studio: Studio }) {
         >
           −
         </button>
-        <button type="button" onClick={fit} className="px-1 font-mono text-caption text-tertiary hover:text-primary">
+        <button
+          type="button"
+          onClick={fit}
+          title="Fit to view — scroll to zoom, hold Ctrl or Shift to pan"
+          className="px-1 font-mono text-caption text-tertiary hover:text-primary"
+        >
           {Math.round(zoom * 100)}%
         </button>
         <button

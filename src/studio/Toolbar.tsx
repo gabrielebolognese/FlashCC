@@ -125,7 +125,9 @@ export function Toolbar({ studio }: { studio: Studio }) {
       </div>
 
       <span className="ml-3 hidden text-caption text-muted lg:block">
-        {studio.tool === "select" ? "Click to select, drag to move" : "Drag on the canvas to draw"}
+        {studio.tool === "select"
+          ? "Click to select · drag to move · scroll to zoom"
+          : "Drag on the canvas to draw · scroll to zoom"}
       </span>
     </div>
   );
