@@ -87,6 +87,13 @@ export type Doc = {
   media: MediaItem[];
   /** Optional folder name. Projects with none sit under "Ungrouped". */
   group?: string | undefined;
+  /**
+   * How this carousel was made. Stamped once at generation and never re-derived,
+   * because it is what analytics attributes performance to — a post cannot tell you
+   * that Problem → Solution outperforms unless something remembered which one it was.
+   */
+  framework?: string | undefined;
+  styleId?: string | undefined;
   slides: Slide[];
   createdAt: string;
   updatedAt: string;

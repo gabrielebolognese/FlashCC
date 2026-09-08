@@ -5,14 +5,14 @@ import { BulkCreate } from "./studio/BulkCreate.js";
 import { buildSlides } from "./studio/compositions.js";
 import { Compose } from "./studio/Compose.js";
 import { FirstRun } from "./studio/FirstRun.js";
+import { Home } from "./studio/Home.js";
 import { Frameworks } from "./studio/Frameworks.js";
 import { makeDoc, type Doc } from "./studio/model.js";
 import { THEMES } from "./studio/presets.js";
 import { buildFrameworkSamples } from "./studio/samples.js";
-import { Start } from "./studio/Start.js";
 import { saveDoc } from "./studio/storage.js";
 import { Studio } from "./studio/Studio.js";
-import type { Structure } from "./studio/structures.js";
+import { STRUCTURES, type Structure } from "./studio/structures.js";
 import {
   decorScale,
   hasOnboarded,
@@ -166,6 +166,10 @@ export function App() {
           const t = style.theme;
           const doc: Doc = {
             ...makeDoc(draft.texts[0]?.slice(0, 40).trim() || "Untitled"),
+            // Recorded once, here, because analytics can only attribute performance to
+            // a framework if something remembered which one produced the slides.
+            framework: draft.structure.id,
+            styleId: style.id,
             palette: [
               t.bg, t.fg, t.accent, t.muted,
               "#ffffff", "#000000", "#e5545a", "#3dbe7a", "#4c86d6", "#db2777",
@@ -185,9 +189,14 @@ export function App() {
   }
 
   return (
-    <Start
+    <Home
       onOpen={(doc) => setScreen({ view: "studio", doc })}
-      onCompose={(theme) => setScreen({ view: "frameworks", theme })}
+      onCompose={(theme, framework) => {
+        // "Make another like this" arrives with a framework already chosen, so it skips
+        // the picker rather than asking a question it has the answer to.
+        const picked = framework ? STRUCTURES.find((s) => s.id === framework) : undefined;
+        setScreen(picked ? { view: "ai", structure: picked, theme } : { view: "frameworks", theme });
+      }}
       onBulk={() => setScreen({ view: "bulk" })}
     />
   );
