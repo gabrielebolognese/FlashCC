@@ -7,10 +7,10 @@
  * before — localStorage only. That is not politeness, it is how the free tier
  * works and how the thing stays developable without a network.
  *
- * On keys: the anon key is meant to be in the bundle. It is a public identifier,
- * not a secret, and it authorises nothing by itself — the row level security
- * policies in supabase/01-schema.sql are the boundary. The service role key is the
- * opposite of that and must never appear in this directory.
+ * On keys: the publishable key is meant to be in the bundle. It is a public
+ * identifier, not a secret, and it authorises nothing by itself — the row level
+ * security policies in supabase/01-schema.sql are the boundary. The secret /
+ * service role key is the opposite of that and must never appear in this folder.
  */
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 
@@ -18,7 +18,12 @@ import type { Doc } from "./model.js";
 import type { Metrics, Platform, Post, Stage } from "./pipeline.js";
 
 const URL = import.meta.env.VITE_SUPABASE_URL?.trim();
-const ANON = import.meta.env.VITE_SUPABASE_ANON_KEY?.trim();
+// Supabase is moving projects from the legacy JWT `anon` key to sb_publishable_*.
+// Both authorise the same thing — nothing, on their own — so either is accepted
+// and a key copied from today's dashboard works without renaming anything.
+const ANON =
+  import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY?.trim() ??
+  import.meta.env.VITE_SUPABASE_ANON_KEY?.trim();
 
 export const isCloudConfigured = (): boolean => Boolean(URL && ANON);
 
