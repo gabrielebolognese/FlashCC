@@ -15,6 +15,7 @@
  */
 
 import { uid, type Doc } from "./model.js";
+import { markDeleted } from "./tombstones.js";
 
 /* ── stages ───────────────────────────────────────────────────────────── */
 
@@ -303,6 +304,7 @@ export function upsertPost(post: Post): Post[] {
 export function removePost(id: string): Post[] {
   const next = listPosts().filter((p) => p.id !== id);
   savePosts(next);
+  markDeleted("post", id);
   return next;
 }
 

@@ -28,6 +28,7 @@ import { Outliers } from "./Outliers.js";
 import {
   isMeasured,
   listPosts,
+  removePost,
   savePosts,
   upcoming,
   type Post,
@@ -262,7 +263,9 @@ export function Home({
         <PostSheet
           post={editing}
           onSave={(p) => commit(posts.map((x) => (x.id === p.id ? p : x)))}
-          onDelete={(id) => commit(posts.filter((x) => x.id !== id))}
+          // Through removePost, not a filter: it records the tombstone that carries
+          // the deletion to the account's other devices.
+          onDelete={(id) => setPosts(removePost(id))}
           onClose={() => setEditing(null)}
         />
       ) : null}

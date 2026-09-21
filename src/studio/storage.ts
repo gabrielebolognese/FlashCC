@@ -1,5 +1,6 @@
 import { averageColour } from "./gradient.js";
 import type { Doc } from "./model.js";
+import { markDeleted } from "./tombstones.js";
 
 const INDEX = "flashcc:v3:index";
 const KEY = (id: string) => `flashcc:v3:doc:${id}`;
@@ -53,8 +54,19 @@ function summaryColour(doc: Doc): string {
   return first.gradient ? averageColour(first.gradient) : first.background;
 }
 
+/** An edit: stamps updatedAt, because the user just changed something. */
 export function saveDoc(doc: Doc): boolean {
-  const stamped = { ...doc, updatedAt: new Date().toISOString() };
+  return putDoc({ ...doc, updatedAt: new Date().toISOString() });
+}
+
+/**
+ * A verbatim write. Sync applies remote records through here rather than through
+ * saveDoc: restamping a record the moment it arrives would make the local copy
+ * look newer than the server's, and the next merge would push it straight back
+ * and win. The two sides would then take turns overwriting each other forever.
+ */
+export function putDoc(doc: Doc): boolean {
+  const stamped = doc;
   const ok = write(KEY(doc.id), stamped);
   const summary: DocSummary = {
     id: stamped.id,
@@ -103,7 +115,20 @@ export function setDocGroup(id: string, group: string | undefined): void {
   saveDoc(group ? { ...doc, group } : { ...doc, group: undefined });
 }
 
+/** The user threw it away: remembered, so the deletion reaches other devices. */
 export function deleteDoc(id: string): void {
+  dropDoc(id);
+  // Recorded even with no account: signing in later has to carry the deletion up.
+  markDeleted("doc", id);
+}
+
+/**
+ * Removed without a tombstone. For the two cases that are not a deletion at all:
+ * applying one the server already knows about, and clearing the machine on sign
+ * out. Tombstoning either would push a delete back up for work that is still very
+ * much alive on the account.
+ */
+export function dropDoc(id: string): void {
   try {
     localStorage.removeItem(KEY(id));
   } catch {

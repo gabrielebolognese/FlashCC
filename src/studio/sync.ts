@@ -1,0 +1,315 @@
+/**
+ * Keeping the browser and the database agreeing.
+ *
+ * The model is deliberately the dull one: LAST WRITE WINS on the record's own
+ * `updatedAt`. Not CRDTs, not operational transforms, not field-level merging.
+ * One person editing on a laptop and a phone almost never touches the same
+ * carousel in the same minute, and when they do, "the newer edit survives" is a
+ * result they can predict. A clever merge that silently interleaves two versions
+ * of a slide produces something neither device ever had, and nobody can explain
+ * it afterwards.
+ *
+ * Deletion is not a special case. A deleted record becomes an entry whose value is
+ * null and whose timestamp is when it went, so it competes on exactly the same
+ * terms as an edit. That is the only way a delete on one device survives contact
+ * with a second device that still has the row — see tombstones.ts.
+ *
+ * `mergeEntries` is pure and has no idea localStorage or Supabase exist. That is
+ * where the reasoning lives, and it is the part worth testing.
+ */
+
+import {
+  cloud,
+  docToRow,
+  forWrite,
+  postToRow,
+  rowToDoc,
+  rowToPost,
+  type DocRow,
+  type PostRow,
+} from "./cloud.js";
+import type { Doc } from "./model.js";
+import { listPosts, savePosts, type Post } from "./pipeline.js";
+import { dropDoc, listDocs, loadDoc, putDoc } from "./storage.js";
+import { clearAllTombstones, clearTombstones, listTombstones } from "./tombstones.js";
+
+/* ── the pure part ────────────────────────────────────────────────────────── */
+
+/** One record's state on one side. A null value means "deleted at this time". */
+export type Entry<T> = { id: string; updatedAt: string; value: T | null };
+
+export type Merge<T> = {
+  /** What both sides should end up holding. */
+  merged: Entry<T>[];
+  /** Local was newer: send these up. */
+  toPush: Entry<T>[];
+  /** Remote was newer: write these down. */
+  toApply: Entry<T>[];
+};
+
+/**
+ * Ties resolve to "do nothing" rather than to either side, which is what makes a
+ * repeated sync free: run it twice with no edits in between and the second run
+ * pushes nothing and applies nothing.
+ */
+export function mergeEntries<T>(local: Entry<T>[], remote: Entry<T>[]): Merge<T> {
+  const byId = new Map<string, { local?: Entry<T>; remote?: Entry<T> }>();
+
+  for (const e of local) byId.set(e.id, { ...byId.get(e.id), local: e });
+  for (const e of remote) byId.set(e.id, { ...byId.get(e.id), remote: e });
+
+  const merged: Entry<T>[] = [];
+  const toPush: Entry<T>[] = [];
+  const toApply: Entry<T>[] = [];
+
+  for (const { local: l, remote: r } of byId.values()) {
+    if (l && !r) {
+      merged.push(l);
+      toPush.push(l);
+    } else if (r && !l) {
+      merged.push(r);
+      toApply.push(r);
+    } else if (l && r) {
+      const cmp = l.updatedAt.localeCompare(r.updatedAt);
+      if (cmp > 0) {
+        merged.push(l);
+        toPush.push(l);
+      } else if (cmp < 0) {
+        merged.push(r);
+        toApply.push(r);
+      } else {
+        merged.push(r);
+      }
+    }
+  }
+
+  return { merged, toPush, toApply };
+}
+
+/** The surviving records, deletions stripped out. */
+export const live = <T>(entries: Entry<T>[]): T[] =>
+  entries.flatMap((e) => (e.value === null ? [] : [e.value]));
+
+/* ── local state as entries ───────────────────────────────────────────────── */
+
+function localDocEntries(): Entry<Doc>[] {
+  const alive: Entry<Doc>[] = listDocs().flatMap((summary) => {
+    const doc = loadDoc(summary.id);
+    return doc ? [{ id: doc.id, updatedAt: doc.updatedAt, value: doc }] : [];
+  });
+  const gone: Entry<Doc>[] = listTombstones("doc").map((t) => ({
+    id: t.id,
+    updatedAt: t.deletedAt,
+    value: null,
+  }));
+  return [...alive, ...gone];
+}
+
+function localPostEntries(): Entry<Post>[] {
+  const alive: Entry<Post>[] = listPosts().map((p) => ({
+    id: p.id,
+    updatedAt: p.updatedAt,
+    value: p,
+  }));
+  const gone: Entry<Post>[] = listTombstones("post").map((t) => ({
+    id: t.id,
+    updatedAt: t.deletedAt,
+    value: null,
+  }));
+  return [...alive, ...gone];
+}
+
+/**
+ * A remote row carries its own deletion in `deleted_at`. When it is set, the row's
+ * timestamp for merge purposes is when it was deleted, not when it was last
+ * edited — otherwise an old delete would lose to the edit that preceded it.
+ */
+const docRowToEntry = (row: DocRow): Entry<Doc> =>
+  row.deleted_at
+    ? { id: row.id, updatedAt: row.deleted_at, value: null }
+    : { id: row.id, updatedAt: row.updated_at, value: rowToDoc(row) };
+
+const postRowToEntry = (row: PostRow): Entry<Post> =>
+  row.deleted_at
+    ? { id: row.id, updatedAt: row.deleted_at, value: null }
+    : { id: row.id, updatedAt: row.updated_at, value: rowToPost(row) };
+
+/* ── the round trip ───────────────────────────────────────────────────────── */
+
+export type SyncResult = {
+  ok: boolean;
+  pushed: number;
+  applied: number;
+  error?: string;
+};
+
+const CURSOR = "flashcc:v1:sync-cursor";
+
+const readCursor = (): string | null => {
+  try {
+    return localStorage.getItem(CURSOR);
+  } catch {
+    return null;
+  }
+};
+
+const writeCursor = (at: string): void => {
+  try {
+    localStorage.setItem(CURSOR, at);
+  } catch {
+    /* ignore */
+  }
+};
+
+export function clearCursor(): void {
+  try {
+    localStorage.removeItem(CURSOR);
+  } catch {
+    /* ignore */
+  }
+}
+
+/**
+ * Pull everything, merge, push what we won, apply what we lost.
+ *
+ * The pull is full rather than incremental on purpose. An incremental pull keyed
+ * on the server clock is a worthwhile optimisation later, but it can only be
+ * correct once every device is known to have seen every tombstone — and getting
+ * that wrong resurrects deleted records, which is precisely the bug tombstones
+ * exist to prevent. At the scale of one person's carousels the whole set is a
+ * cheap read.
+ */
+export async function syncAll(userId: string): Promise<SyncResult> {
+  const db = cloud();
+  if (!db) return { ok: false, pushed: 0, applied: 0, error: "Cloud is not configured" };
+
+  try {
+    const [docsRes, postsRes] = await Promise.all([
+      db.from("docs").select("*").eq("user_id", userId),
+      db.from("posts").select("*").eq("user_id", userId),
+    ]);
+
+    if (docsRes.error) throw new Error(docsRes.error.message);
+    if (postsRes.error) throw new Error(postsRes.error.message);
+
+    const docMerge = mergeEntries(
+      localDocEntries(),
+      (docsRes.data as DocRow[]).map(docRowToEntry),
+    );
+    const postMerge = mergeEntries(
+      localPostEntries(),
+      (postsRes.data as PostRow[]).map(postRowToEntry),
+    );
+
+    /* ── push ── */
+    const docRows = docMerge.toPush.map((e) =>
+      forWrite(
+        e.value
+          ? docToRow(e.value, userId)
+          : // A deletion still needs a row to land on, so the placeholder carries
+            // the id and the timestamp and nothing else worth keeping.
+            docToRow(emptyDoc(e.id, e.updatedAt), userId, e.updatedAt),
+      ),
+    );
+    const postRows = postMerge.toPush.map((e) =>
+      forWrite(
+        e.value
+          ? postToRow(e.value, userId)
+          : postToRow(emptyPost(e.id, e.updatedAt), userId, e.updatedAt),
+      ),
+    );
+
+    if (docRows.length > 0) {
+      const { error } = await db.from("docs").upsert(docRows, { onConflict: "user_id,id" });
+      if (error) throw new Error(error.message);
+    }
+    // Posts reference docs, so the carousels have to exist before the posts do.
+    if (postRows.length > 0) {
+      const { error } = await db.from("posts").upsert(postRows, { onConflict: "user_id,id" });
+      if (error) throw new Error(error.message);
+    }
+
+    /* ── apply ── */
+    for (const e of docMerge.toApply) {
+      if (e.value) putDoc(e.value);
+      else dropDoc(e.id);
+    }
+
+    if (postMerge.toApply.length > 0) {
+      savePosts(live(postMerge.merged));
+    }
+
+    // Only now is it safe to forget what was deleted: the server has it.
+    clearTombstones("doc", docMerge.toPush.filter((e) => e.value === null).map((e) => e.id));
+    clearTombstones("post", postMerge.toPush.filter((e) => e.value === null).map((e) => e.id));
+
+    writeCursor(new Date().toISOString());
+
+    return {
+      ok: true,
+      pushed: docRows.length + postRows.length,
+      applied: docMerge.toApply.length + postMerge.toApply.length,
+    };
+  } catch (err) {
+    return {
+      ok: false,
+      pushed: 0,
+      applied: 0,
+      error: err instanceof Error ? err.message : "Sync failed",
+    };
+  }
+}
+
+/** Placeholders for a tombstone push. Never read back — deleted_at hides them. */
+const emptyDoc = (id: string, at: string): Doc => ({
+  version: 3,
+  id,
+  name: "Deleted",
+  width: 1080,
+  height: 1350,
+  palette: [],
+  media: [],
+  slides: [],
+  createdAt: at,
+  updatedAt: at,
+});
+
+const emptyPost = (id: string, at: string): Post => ({
+  id,
+  docId: null,
+  title: "Deleted",
+  stage: "idea",
+  platform: "linkedin",
+  framework: null,
+  slideCount: 0,
+  hook: "",
+  styleId: null,
+  scheduledFor: null,
+  postedAt: null,
+  url: null,
+  caption: "",
+  notes: "",
+  metrics: null,
+  createdAt: at,
+  updatedAt: at,
+});
+
+/**
+ * The first sign-in. Everything already on this machine becomes the starting
+ * point for the account, which is what makes signing up feel like a rescue rather
+ * than a reset — and it is the only moment the upgrade prompt is genuinely
+ * persuasive, because the work is right there.
+ */
+export function hasLocalWork(): boolean {
+  return listDocs().length > 0 || listPosts().length > 0;
+}
+
+/** Signing out leaves the machine clean, so the next person sees their own work. */
+export function forgetLocal(): void {
+  for (const d of listDocs()) dropDoc(d.id);
+  savePosts([]);
+  clearAllTombstones();
+  clearCursor();
+}
+
+export const lastSyncedAt = (): string | null => readCursor();
