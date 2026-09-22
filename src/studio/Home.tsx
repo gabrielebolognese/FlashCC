@@ -43,8 +43,9 @@ import {
 import { PostSheet } from "./PostSheet.js";
 import type { THEMES } from "./presets.js";
 import { Projects } from "./Projects.js";
+import { SeriesDue } from "./SeriesDue.js";
 import { SignIn } from "./SignIn.js";
-import { listDocs } from "./storage.js";
+import { listDocs, loadDoc } from "./storage.js";
 import { useAccount } from "./useAccount.js";
 import { Upgrade } from "./Upgrade.js";
 
@@ -119,10 +120,12 @@ export function Home({
   onOpen,
   onCompose,
   onBulk,
+  onLongForm,
 }: {
   onOpen: (doc: Doc) => void;
   onCompose: (theme: keyof typeof THEMES, framework?: string) => void;
   onBulk: () => void;
+  onLongForm: () => void;
 }) {
   const [view, setView] = useState<View>("projects");
   const [posts, setPosts] = useState<Post[]>(() => listPosts());
@@ -251,8 +254,30 @@ export function Home({
           }
         >
           <div className={boardLike ? "h-full" : "mx-auto max-w-[1100px] pb-10"}>
+            {/*
+              Shown on the two screens somebody is already planning on, and
+              nowhere else. A banner that follows you into the analytics tab is a
+              banner people learn to look past — and the board is a fixed-height
+              column layout that a banner would squeeze.
+            */}
+            {view === "projects" || view === "scheduled" ? (
+              <SeriesDue
+                posts={posts}
+                onOpen={(docId) => {
+                  const doc = loadDoc(docId);
+                  if (doc) onOpen(doc);
+                }}
+              />
+            ) : null}
+
             {view === "projects" ? (
-              <Projects onOpen={onOpen} onCompose={onCompose} onBulk={onBulk} onQueue={queue} />
+              <Projects
+                onOpen={onOpen}
+                onCompose={onCompose}
+                onBulk={onBulk}
+                onLongForm={onLongForm}
+                onQueue={queue}
+              />
             ) : null}
 
             {view === "brands" ? <Brands plan={account.profile?.plan} /> : null}

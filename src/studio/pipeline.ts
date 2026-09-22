@@ -104,6 +104,14 @@ export type Post = {
   slideCount: number;
   hook: string;
   styleId: string | null;
+  /**
+   * Copied from the document when the post is made, and then owned by the post.
+   *
+   * Copied rather than looked up for the same reason `framework` and `hook` are:
+   * a post is the record of what went out, and a carousel renumbered afterwards
+   * must not silently rewrite what "part 2" meant on the day it was published.
+   */
+  series: { id: string; part: number } | null;
 
   scheduledFor: string | null;
   postedAt: string | null;
@@ -130,6 +138,7 @@ export function makePost(patch: Partial<Post> = {}): Post {
     slideCount: 0,
     hook: "",
     styleId: null,
+    series: null,
     scheduledFor: null,
     postedAt: null,
     url: null,
@@ -160,6 +169,7 @@ export function postFromDoc(doc: Doc, platform: Platform = "linkedin"): Post {
     slideCount: doc.slides.length,
     hook: hookOf(doc),
     styleId: doc.styleId ?? null,
+    series: doc.series ?? null,
   });
 }
 

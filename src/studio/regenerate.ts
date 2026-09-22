@@ -74,6 +74,53 @@ export function regenerate(
   return mergeRegenerated(doc, fresh);
 }
 
+/**
+ * Rewrite one slide's copy and lay it out again.
+ *
+ * Used by hook variants, where only slide 1 changes. It goes back through
+ * `buildSlides` rather than writing the new text onto the existing layer,
+ * because a layer's box and font size were chosen for the OLD words — a longer
+ * hook on a box measured for a shorter one is the "text too small to read"
+ * complaint, arriving by a different door.
+ *
+ * The whole deck is rebuilt and one slide taken, not the slide alone: composition
+ * selection depends on the index, the total and a seed derived from the deck's
+ * own words, so rebuilding slide 0 in isolation would hand it a different layout
+ * than the one it has.
+ *
+ * When the rewrite is long enough to need splitting, the slide count changes and
+ * there is no longer a single slide to swap in. That is a genuinely different
+ * deck, so the whole merged regeneration is returned instead — and `replaced`
+ * tells the caller which happened.
+ */
+export function restateSlide(
+  doc: Doc,
+  index: number,
+  text: string,
+  theme: Theme,
+  options: BuildOptions = {},
+  roles?: string[],
+): MergeResult {
+  const texts = textsOf(doc);
+  if (index < 0 || index >= texts.length) return { doc, replaced: 0, kept: 0 };
+
+  const next = [...texts];
+  next[index] = text;
+  const fresh = buildSlides(next, theme, roles, options);
+
+  if (fresh.length !== doc.slides.length) return mergeRegenerated(doc, fresh);
+
+  const rebuilt = fresh[index];
+  const old = doc.slides[index];
+  if (!rebuilt || !old) return { doc, replaced: 0, kept: 0 };
+
+  const mine = old.layers.filter((l) => l.handEdited);
+  const slides = [...doc.slides];
+  slides[index] = { ...rebuilt, layers: [...rebuilt.layers, ...mine] };
+
+  return { doc: { ...doc, slides }, replaced: rebuilt.layers.length, kept: mine.length };
+}
+
 export const handEditedCount = (doc: Doc): number =>
   doc.slides.reduce((n, s) => n + s.layers.filter((l) => l.handEdited).length, 0);
 

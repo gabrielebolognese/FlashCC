@@ -9,6 +9,7 @@ import { nameFromHook } from "./studio/search.js";
 import { Compose } from "./studio/Compose.js";
 import { FirstRun } from "./studio/FirstRun.js";
 import { Home } from "./studio/Home.js";
+import { Repurpose } from "./studio/Repurpose.js";
 import { Frameworks } from "./studio/Frameworks.js";
 import { makeDoc, type Doc } from "./studio/model.js";
 import { THEMES } from "./studio/presets.js";
@@ -36,6 +37,7 @@ type Screen =
   | { view: "firstRun" }
   | { view: "start" }
   | { view: "bulk" }
+  | { view: "longform" }
   | { view: "frameworks"; theme: keyof typeof THEMES }
   | { view: "ai"; structure: Structure; theme: keyof typeof THEMES }
   | { view: "compose"; structure: Structure; theme: keyof typeof THEMES; texts?: string[] }
@@ -110,6 +112,15 @@ export function App() {
           const first = docs[0];
           setScreen(first ? { view: "studio", doc: first } : { view: "start" });
         }}
+      />
+    );
+  }
+
+  if (screen.view === "longform") {
+    return (
+      <Repurpose
+        onHome={() => setScreen({ view: "start" })}
+        onOpen={(doc: Doc) => setScreen({ view: "studio", doc })}
       />
     );
   }
@@ -213,6 +224,7 @@ export function App() {
         setScreen(picked ? { view: "ai", structure: picked, theme } : { view: "frameworks", theme });
       }}
       onBulk={() => setScreen({ view: "bulk" })}
+      onLongForm={() => setScreen({ view: "longform" })}
     />
   );
 }

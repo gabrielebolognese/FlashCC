@@ -433,6 +433,7 @@ const emptyPost = (id: string, at: string): Post => ({
   slideCount: 0,
   hook: "",
   styleId: null,
+  series: null,
   scheduledFor: null,
   postedAt: null,
   url: null,

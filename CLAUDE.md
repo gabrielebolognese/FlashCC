@@ -11,8 +11,10 @@ guidance in `src/studio/structures.ts`.
 **AI drafting is part of the product** — this reversed an earlier "no AI" position, so ignore that
 line if you find it anywhere else. `server/index.ts` holds the API key and calls `claude-opus-5`
 through `client.messages.parse()` with a zod output format. The browser only ever talks to
-`/api/draft` on its own origin: **the key must never reach the bundle.** Everything except drafting
-works with no key set, and the UI degrades to "write it yourself" when the server says it has none.
+`/api/draft` and `/api/hooks` on its own origin: **the key must never reach the bundle.** Everything
+except drafting works with no key set, and the UI degrades to "write it yourself" when the server
+says it has none — including long-form ingest, which is entirely deterministic on purpose (see
+invariant 5 and `longform.ts`).
 
 Sibling project to **FlashFX**, whose visual language it uses — but it does **not** import or
 depend on the FlashFX engine (no WebGPU, no compositor, no keyframes).
@@ -70,6 +72,15 @@ Invariants worth keeping:
    path all render through it, so there is no second rendering path to drift.
 4. **`geometry.ts` is pure and tested.** Resize, hit testing, marquee and snapping have no
    DOM dependency, because that is where a drag editor actually breaks.
+5. **AI writes text. It never writes layout.** Every server route returns words —
+   `/api/draft` returns `{role, text}`, `/api/hooks` returns `{angle, text}` — and every visual
+   decision is made by `compositions.ts` from those words, deterministically. This is not a
+   stylistic preference. Every documented complaint about AI carousels in the research is about
+   layout: *"Text sizing shifted from slide to slide with no clear logic."* *"Some text ending up
+   too small to read."* People value a model for splitting prose into headline-length beats and
+   reject it for type scale, emphasis and colour. A new AI feature that returns a size, a
+   position, a colour or a composition breaks this — and the way it breaks is invisible until
+   somebody's deck ships looking wrong.
 
 ## Conventions
 

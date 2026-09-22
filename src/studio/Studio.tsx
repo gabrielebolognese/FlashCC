@@ -1,4 +1,4 @@
-import { ChevronLeft, ClipboardPaste, Download, Redo2, Shuffle, Undo2, X } from "lucide-react";
+import { ChevronLeft, ClipboardPaste, Download, Redo2, Shuffle, Sparkles, Undo2, X } from "lucide-react";
 import { useState } from "react";
 import { createPortal } from "react-dom";
 
@@ -17,7 +17,9 @@ import { applyBrand, listBrands, stampLogo, themeOf } from "./brand.js";
 import { logoResolver } from "./library.js";
 import { BrandMenu } from "./BrandMenu.js";
 import { ExportDialog } from "./ExportDialog.js";
-import { regenerate } from "./regenerate.js";
+import { HookPicker } from "./HookPicker.js";
+import { regenerate, restateSlide } from "./regenerate.js";
+import { STRUCTURES } from "./structures.js";
 import { THEMES } from "./presets.js";
 import { Toolbar } from "./Toolbar.js";
 import { useStudio } from "./useStudio.js";
@@ -29,6 +31,7 @@ export function Studio({ initial, onHome }: { initial: Doc; onHome: () => void }
   const [pasteOpen, setPasteOpen] = useState(false);
   const [exporting, setExporting] = useState(false);
   const [relaid, setRelaid] = useState<number | null>(null);
+  const [hooking, setHooking] = useState(false);
   const [pasted, setPasted] = useState("");
 
   const printRoot = document.getElementById("print-root");
@@ -87,6 +90,22 @@ export function Studio({ initial, onHome }: { initial: Doc; onHome: () => void }
             {relaid > 0 ? `kept ${relaid} of your edits` : "re-laid"}
           </span>
         )}
+
+        {/*
+          Hooks get their own control rather than living inside Re-lay: people
+          iterate on the first slide far more often than they re-lay the deck,
+          and burying the thing that is done twenty times behind the thing that
+          is done twice is how a tool acquires a reputation for being fiddly.
+        */}
+        <button
+          type="button"
+          title="Several ways to open the same carousel. Nothing else in the deck moves."
+          onClick={() => setHooking(true)}
+          className="flex h-7 items-center gap-1.5 rounded-md border border-hairline bg-surface-1 px-2.5 text-body text-secondary hover:bg-surface-3 hover:text-primary"
+        >
+          <Sparkles size={14} strokeWidth={2} />
+          Hooks
+        </button>
 
         <BrandMenu
           brands={listBrands()}
@@ -176,6 +195,21 @@ export function Studio({ initial, onHome }: { initial: Doc; onHome: () => void }
       ) : null}
 
       {exporting ? <ExportDialog doc={doc} onClose={() => setExporting(false)} /> : null}
+
+      {hooking ? (
+        <HookPicker
+          doc={doc}
+          framework={STRUCTURES.find((f) => f.id === doc.framework)?.name}
+          onPick={(text) => {
+            // Back through the generator, not typed onto the layer: the box and
+            // the font size were chosen for the old words.
+            const result = restateSlide(doc, 0, text, themeOf(doc, listBrands()));
+            studio.replaceDoc(result.doc);
+            setHooking(false);
+          }}
+          onClose={() => setHooking(false)}
+        />
+      ) : null}
 
       {/* Ctrl+P still works, and still prints the same LayerView the canvas uses. */}
       {printRoot

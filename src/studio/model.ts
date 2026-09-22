@@ -122,6 +122,16 @@ export type Doc = {
    */
   framework?: string | undefined;
   styleId?: string | undefined;
+  /**
+   * Which series this is part of, and where in it.
+   *
+   * On the document rather than in a table of its own: a series is two fields,
+   * every screen that shows a carousel wants them, and a join to find out
+   * whether something is part 3 of 6 would be a round trip for a badge. See
+   * series.ts — the shape is declared there because that is where the reasoning
+   * lives, and `Doc` only has to carry it.
+   */
+  series?: { id: string; part: number } | undefined;
   /** Archived work stays yours and stays synced; it just leaves the grid. */
   archived?: boolean | undefined;
   slides: Slide[];

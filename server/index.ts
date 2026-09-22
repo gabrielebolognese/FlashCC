@@ -10,7 +10,7 @@
 import { createServer, type IncomingMessage, type ServerResponse } from "node:http";
 
 import { billingConfigured, checkout, portal, status, webhook } from "./billing.js";
-import { draft, draftConfigured, draftStatus } from "./draft.js";
+import { draft, draftConfigured, draftStatus, hooks } from "./draft.js";
 import { exportDeck, renderDocument, renderImages } from "./export.js";
 import { HttpError, json } from "./http.js";
 import { hasServiceRole } from "./supabase.js";
@@ -29,6 +29,7 @@ type Handler = (req: IncomingMessage, res: ServerResponse) => Promise<void>;
 const ROUTES: Record<string, Record<string, Handler>> = {
   POST: {
     "/api/draft": draft,
+    "/api/hooks": hooks,
     "/api/export": exportDeck,
     "/api/slides": renderImages,
     "/api/document": renderDocument,

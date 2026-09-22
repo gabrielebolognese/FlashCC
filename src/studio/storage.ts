@@ -1,5 +1,6 @@
 import { dehydrateDoc } from "./assets.js";
 import { averageColour } from "./gradient.js";
+import { makeSeries, renumber, type Series, type SeriesMember } from "./series.js";
 import type { Doc } from "./model.js";
 import { searchBlob } from "./search.js";
 import { markDeleted } from "./tombstones.js";
@@ -8,7 +9,7 @@ const INDEX = "flashcc:v3:index";
 const KEY = (id: string) => `flashcc:v3:doc:${id}`;
 /** Bumped when a summary field is added, to trigger one rebuild from the docs. */
 const INDEX_VERSION = "flashcc:v3:index-version";
-const CURRENT_INDEX_VERSION = "2";
+const CURRENT_INDEX_VERSION = "3";
 
 export type DocSummary = {
   id: string;
@@ -22,6 +23,8 @@ export type DocSummary = {
   /** Stamped once at generation. The facets read these; nobody types them. */
   framework?: string | undefined;
   styleId?: string | undefined;
+  /** Part of a series. The grid draws a badge from it; nothing else needs the doc. */
+  series?: { id: string; part: number } | undefined;
   /** Out of the way rather than gone. Absent means active. */
   archived?: boolean | undefined;
   /**
@@ -120,6 +123,7 @@ export function summaryOf(doc: Doc): DocSummary {
     ...(doc.group ? { group: doc.group } : {}),
     ...(doc.framework ? { framework: doc.framework } : {}),
     ...(doc.styleId ? { styleId: doc.styleId } : {}),
+    ...(doc.series ? { series: doc.series } : {}),
     ...(doc.archived ? { archived: true } : {}),
   };
 }
@@ -194,11 +198,52 @@ export function setDocGroup(id: string, group: string | undefined): void {
   saveDoc(group ? { ...doc, group } : { ...doc, group: undefined });
 }
 
+export function setDocSeries(id: string, series: Series | undefined): void {
+  const doc = loadDoc(id);
+  if (!doc) return;
+  saveDoc(series ? { ...doc, series } : { ...doc, series: undefined });
+}
+
+/**
+ * Numbers a run of carousels 1..n, in the order given.
+ *
+ * The order given is the order on screen. Sorting here would quietly disagree
+ * with what the person was looking at when they pressed the button.
+ */
+export function makeDocSeries(ids: readonly string[]): void {
+  const members: SeriesMember[] = ids.flatMap((id) => {
+    const doc = loadDoc(id);
+    return doc ? [{ id: doc.id, name: doc.name }] : [];
+  });
+  for (const m of makeSeries(members)) setDocSeries(m.id, m.series);
+}
+
+/**
+ * Closes the gap a deleted part leaves.
+ *
+ * Called from `deleteDoc` rather than from the screens, so a series stays
+ * correctly numbered however the carousel was removed. A caption reading "Part 4
+ * of 5" beside a list that stops at 5 is small, and reads as carelessness.
+ */
+function resealSeries(seriesId: string): void {
+  const members = listDocs()
+    .filter((d) => d.series?.id === seriesId)
+    .sort((a, b) => (a.series?.part ?? 0) - (b.series?.part ?? 0))
+    .map((d) => ({ id: d.id, name: d.name, series: d.series }));
+
+  for (const m of renumber(members)) {
+    const before = members.find((x) => x.id === m.id)?.series?.part;
+    if (before !== m.series?.part) setDocSeries(m.id, m.series);
+  }
+}
+
 /** The user threw it away: remembered, so the deletion reaches other devices. */
 export function deleteDoc(id: string): void {
+  const seriesId = loadDoc(id)?.series?.id;
   dropDoc(id);
   // Recorded even with no account: signing in later has to carry the deletion up.
   markDeleted("doc", id);
+  if (seriesId) resealSeries(seriesId);
 }
 
 /**

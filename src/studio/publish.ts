@@ -23,8 +23,8 @@ import { publicUrl, SLIDES_BUCKET, storageReady, uploadObject } from "./cloud.js
 import { renderPayload } from "./exporter.js";
 import type { Doc } from "./model.js";
 import type { Platform } from "./platforms.js";
-import { textsOf } from "./regenerate.js";
 import { altFromTexts, type PublishedCarousel } from "./schedulers.js";
+import { captionOf, deckTexts } from "./transcript.js";
 
 export type PublishResult =
   | { ok: true; carousel: PublishedCarousel }
@@ -151,17 +151,17 @@ export async function publishDeck(
 
   // Alt text comes from the words already on each slide. Asking for it produces
   // empty fields; a headline IS the slide's description.
-  const texts = textsOf(doc);
-  const alts = doc.slides.map((_, i) =>
-    altFromTexts([texts[i] ?? ""], i, doc.slides.length),
-  );
+  const texts = deckTexts(doc);
+  const alts = doc.slides.map((_, i) => altFromTexts([texts[i] ?? ""], i, doc.slides.length));
 
   return {
     ok: true,
     carousel: {
       id: doc.id,
       name: doc.name,
-      caption: options.caption ?? texts[0] ?? doc.name,
+      // Slides 1 and 2 and the closer, which is the text post creators already
+      // hand-roll out of the deck. The hook alone reads as a truncated caption.
+      caption: options.caption ?? (captionOf(doc, { platform: platform.id }) || doc.name),
       urls,
       alts,
       platform: platform.id,

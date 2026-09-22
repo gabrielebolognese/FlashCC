@@ -18,8 +18,8 @@ is still current.
 | --- | --- |
 | **Orientation** | [1 What it is](#1-what-it-is) · [2 Running it](#2-running-it) · [3 The invariants](#3-the-invariants) |
 | **The canvas** | [4 Data model](#4-the-data-model) · [5 Canvas](#5-the-canvas) · [6 Text](#6-text-measurement-and-fitting) · [7 Colour](#7-colour-and-contrast) · [8 Gradients](#8-gradients) · [9 Format change](#9-changing-format-reflow) |
-| **Making a deck** | [10 Frameworks](#10-the-four-frameworks) · [11 Generation](#11-generation) · [12 Styles](#12-styles-and-themes) · [13 Onboarding](#13-onboarding) · [14 AI drafting](#14-ai-drafting) · [15 Bulk](#15-bulk-create) · [16 Media, fonts and assets](#16-media-and-fonts) · [17 Screen flow](#17-screen-flow) |
-| **The product** | [18 Pipeline](#18-the-pipeline) · [19 Analytics](#19-analytics) · [20 Library](#20-the-library) · [21 Export](#21-export) |
+| **Making a deck** | [10 Frameworks](#10-the-four-frameworks) · [11 Generation](#11-generation) · [12 Styles](#12-styles-and-themes) · [13 Onboarding](#13-onboarding) · [14 AI drafting](#14-ai-drafting) · [15 Bulk and long form](#15-bulk-create-and-long-form-ingest) · [16 Media, fonts and assets](#16-media-and-fonts) · [17 Screen flow](#17-screen-flow) |
+| **The product** | [18 Pipeline and series](#18-the-pipeline) · [19 Analytics](#19-analytics) · [20 Library](#20-the-library) · [21 Export](#21-export) |
 | **Infrastructure** | [22 Persistence](#22-persistence) · [23 Sync](#23-sync) · [24 Auth](#24-auth) · [25 Billing](#25-billing) · [26 Database](#26-database) · [27 Design tokens](#27-design-tokens) · [28 Testing](#28-testing) |
 | **Reality check** | [29 Known defects](#29-known-defects) |
 
@@ -586,9 +586,39 @@ process exists.
    positionally. One pass swallowed the CTA whenever the model answered out of order — the three
    `point` slots sharing an id is exactly what breaks a naive match.
 
+### AI writes text. It never writes layout.
+
+Invariant 5, and the reason both routes return only words. Every documented complaint about AI
+carousels in the research is about layout — *"Text sizing shifted from slide to slide with no clear
+logic."* *"Some text ending up too small to read."* — while people value a model for exactly one
+thing: splitting prose into headline-length beats. So `/api/draft` returns `{role, text}`,
+`/api/hooks` returns `{angle, text}`, and `compositions.ts` decides everything visible from those
+words deterministically.
+
+A route that returned a size, a position, a colour or a composition would break this, and the
+breakage is invisible until somebody's deck ships looking wrong.
+
+### Hook variants (`/api/hooks`, `variants.ts`, `HookPicker.tsx`)
+
+A separate route rather than a flag on `draft`: one line in, several out, each labelled with the
+**angle** it takes. The whole deck is sent, not just the current hook — a hook rewritten in
+isolation promises whatever sounds best, one written against the slides promises what is in them.
+
+`angle` is not decoration. Five near-identical rewordings do not help somebody iterating; five
+genuinely different approaches do, and naming the approach is what lets a choice be made on
+judgement.
+
+**Nothing is ranked**, and that is load-bearing. The most-upvoted complaint in the corpus is about
+exactly that: *"its virality score and my audience disagree, constantly... I have stopped trusting
+the ranking and now I scrub the whole thing myself anyway, which defeats the point of paying."*
+
+`distinctHooks` drops anything matching the current hook or another variant once punctuation and
+case are stripped. Picking one calls `restateSlide`, which rebuilds the deck and takes one slide —
+see §11 — rather than writing new text onto a layer whose box was measured for the old words.
+
 ---
 
-## 15. Bulk create
+## 15. Bulk create, and long-form ingest
 
 `---` on its own line separates carousels; a blank line separates slides.
 
@@ -599,6 +629,40 @@ parseBulk: normalise CRLF → split /^[ \t]*-{3,}[ \t]*$/m → trim, drop emptie
 
 `"A --- B"` on one line does not split, and neither does `"Cut on motion - not on beat"`. Empty
 blocks are dropped.
+
+### Long form: one asset, several carousels (`longform.ts`, `Repurpose.tsx`)
+
+Paste an article, a newsletter or a transcript; pick the moments; get a carousel each. It produces
+the same `BulkBlock[]` bulk create already consumes, so there is one generation path rather than
+two that drift.
+
+**Two steps, and the order is the design.** Nobody in the research complains that the slides look
+bad. They complain that the machine picked the wrong material. So: candidates, then a choice, then
+the work — never a finished series handed back for approval.
+
+**Deterministic, and it runs with no API key.** The thing people distrust is a model choosing their
+material, and a heading is a choice the author already made.
+
+| Shape | Detected by | Candidates from |
+| --- | --- | --- |
+| `markdown` | `#` headings, or a setext underline | one per heading; text before the first is its own |
+| `transcript` | timestamps or `Speaker:` on a third of lines | timestamps and labels stripped, sentences regrouped in threes, then windowed |
+| `prose` | anything else | even ~1400-character stretches, never splitting a paragraph, **labelled as exactly that** |
+
+**Every cut lands on a sentence boundary.** `sentences()` is the one function in the file that
+matters, because *"The Quotes, Hooks & Timestamps pick up in the middle of a sentence so it does not
+make any sense"* is the most-cited failure of every competing tool. It rejects a boundary when the
+preceding word is a known abbreviation, a single initial, or a number — `3.` is a list marker, not
+the end of a thought.
+
+Each candidate reports its title, where it came from, its size and how many slides it would make.
+Nothing is scored, pre-ticked or called recommended. A section under `THIN_CHARS` (400) is offered
+anyway, **labelled short** rather than hidden.
+
+`toSlides` maps a candidate to 3–10 slides: short paragraphs whole, long ones divided at sentence
+ends, and anything past the ceiling **folded into the last slide rather than dropped** — generation's
+own split pass will give an overlong slide another slide, whereas material thrown away here is gone
+without anyone being told.
 
 ---
 
@@ -743,6 +807,65 @@ ratio downstream divides by reach, so zero has to be turned away at the door.
 Seven metrics are entered by hand, each labelled with the platform's own word for it, because the
 fastest way to make manual entry hurt is to make people guess which number goes in which box.
 `engagements = likes + comments + shares + saves` — clicks and follows excluded.
+
+### Series (`series.ts`, `SeriesDue.tsx`)
+
+`Doc.series` and `Post.series` are both `{ id, part }`. Two fields, not a table: every screen
+showing a carousel wants to know whether it is part 3 of 6, and a join for a badge is a round trip.
+The series **name** is taken from the lowest-numbered part, so a deleted part 1 does not blank it.
+
+On `docs` the columns are a projection of the blob, like `framework` beside them. On `posts` they
+are a **copy**: a post is the record of what went out, and renumbering afterwards must not rewrite
+what "part 2" meant on the day it was published.
+
+The roadmap had this as a numbering feature. The research says numbering is the least of it:
+
+**Discovery** — *"My Part 4 has 1M views but Part 1 has only 5K — because viewers can't find it."*
+Neither platform lets a carousel link to another post, so `seriesCaption` is the only fix available:
+a list of every part, carrying real URLs for the ones already live, `(coming)` for the ones not,
+and a marker on the current part. Copyable from `PostSheet`.
+
+**Momentum** — *"by the time you make the part two in the series, it's like a month later and
+there's just no momentum anymore."* `dueParts` reports a series with something live and an
+unpublished next part, after `MOMENTUM_DAYS` (3), marked stale after `STALE_DAYS` (10). Three rules
+keep it from becoming wallpaper: an unstarted series is not losing momentum, an already-scheduled
+next part is a decision rather than a lapse, and it measures from the most recent live part rather
+than from part one.
+
+It is a **banner**, not a notification, because there is no background job and no permission to send
+anything. Shown on Projects and Scheduled only — the board is a fixed-height column layout a banner
+would squeeze.
+
+**Reconciliation** — `renumber` closes the gap a deleted part leaves, breaking ties in place order,
+and returns members in the caller's order rather than the sorted one: it fixes numbers, it does not
+rearrange anybody's grid. Called from `deleteDoc`, so it happens however a carousel was removed.
+
+`spread` answers the question people ask out loud — *"Drop them all at once? One per day?"* — with
+the three cadences they describe, carrying the time of day across every part and skipping anything
+already posted.
+
+### Caption, transcript and first comment (`transcript.ts`)
+
+All three read the **layers**, not a source text, because what is stored is what renders. Hidden
+layers are excluded: a screen reader being told about something sighted readers cannot see is worse
+than no transcript.
+
+`slideText` sorts by font size — reading order on a slide IS type hierarchy — flattens soft line
+breaks to spaces (a break inside a headline is where the line wrapped on a 1080px artboard, and
+carrying it into a caption produces a post that looks broken on a phone), and undoes an `uppercase`
+override, which is styling a screen reader spells out letter by letter.
+
+**The transcript exists because per-slide alt text is impossible**, not merely unimplemented.
+LinkedIn's Documents API carries a `title` and nothing else; Meta's excludes `alt_text` from
+carousel children. A plain-text version in the caption or first comment is the only fix on either
+platform, and nobody ships it. Numbered `1/` rather than `1.`, because a full stop starts an ordered
+list in every editor on both platforms and silently renumbers from 1.
+
+`captionOf` is slides 1 and 2 plus the closer — the rearrangement experienced creators already
+hand-roll: *"write the carousel first, then pull the text post out of slides 1 and 2. You're forced
+to fix the hook."* Deterministic, because those words are already approved. `CAPTION_LIMIT` is per
+platform and `clamp` cuts on a word boundary, since a caption is truncated **live** rather than
+rejected and nothing says so.
 
 ---
 
@@ -1041,6 +1164,13 @@ be indexed usefully for that.
 
 `doc_id` has **no foreign key**, deliberately: a composite FK would need `ON DELETE SET NULL
 (doc_id)`, which is Postgres 15+ only, and it makes account deletion order-sensitive.
+
+### Series (`05-series.sql`)
+
+Two nullable columns on `docs` and `posts`, a positive-part check, and a partial index — partial
+because most carousels are not part of anything. No RLS changes: both tables already gate every
+verb on `auth.uid() = user_id`, and a new column on a row-scoped policy is covered by it, which is
+the advantage of gating on the row rather than per column.
 
 ### Storage (`04-storage.sql`)
 

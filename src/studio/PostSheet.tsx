@@ -6,10 +6,13 @@
  * integration for it. The fields are laid out in the order the platforms show them so
  * it can be done by copying straight down the page.
  */
-import { ExternalLink, Trash2, X } from "lucide-react";
-import { useState } from "react";
+import { Check, Copy, ExternalLink, Sparkles, Trash2, X } from "lucide-react";
+import { useMemo, useState } from "react";
 
 import { Chip } from "./Dash.js";
+import { collectSeries, seriesCaption, seriesTitle } from "./series.js";
+import { listDocs, loadDoc } from "./storage.js";
+import { captionFit, captionOf, firstCommentOf } from "./transcript.js";
 import {
   EMPTY_METRICS,
   METRIC_FIELDS,
@@ -28,6 +31,33 @@ import { percent } from "./insights.js";
 
 const field =
   "h-8 w-full rounded-xl border border-hairline bg-surface-1 px-2.5 text-body text-primary outline-none placeholder:text-muted focus:border-accent-dim";
+
+/** A blank line between two blocks of caption text. */
+const BREAK = "\n\n";
+
+function SmallButton({
+  icon: Icon,
+  label,
+  onClick,
+  title,
+}: {
+  icon: typeof Copy;
+  label: string;
+  onClick: () => void;
+  title?: string;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      title={title}
+      className="flex h-7 items-center gap-1.5 rounded-lg border border-hairline px-2.5 text-caption text-tertiary hover:border-accent-dim hover:text-accent"
+    >
+      <Icon size={12} strokeWidth={2} />
+      {label}
+    </button>
+  );
+}
 
 function Row({ label, hint, children }: { label: string; hint?: string; children: React.ReactNode }) {
   return (
@@ -52,6 +82,30 @@ export function PostSheet({
 }) {
   const [draft, setDraft] = useState<Post>(post);
   const [confirmDelete, setConfirmDelete] = useState(false);
+  const [copied, setCopied] = useState<string | null>(null);
+
+  /**
+   * The carousel this publishes, loaded once.
+   *
+   * Everything below derives from the DECK rather than from the post, because
+   * the deck is what goes out. A caption pulled from a stale copy of the words
+   * would describe a carousel nobody published.
+   */
+  const doc = useMemo(() => (draft.docId ? loadDoc(draft.docId) : null), [draft.docId]);
+
+  const series = useMemo(() => {
+    if (!draft.series) return null;
+    const views = collectSeries(listDocs(), [draft]);
+    return views.find((v) => v.id === draft.series?.id) ?? null;
+  }, [draft]);
+
+  const fit = captionFit(draft.caption, draft.platform);
+
+  const copy = (what: string, text: string) => {
+    void navigator.clipboard?.writeText(text);
+    setCopied(what);
+    setTimeout(() => setCopied((c) => (c === what ? null : c)), 1600);
+  };
 
   const set = (patch: Partial<Post>) => setDraft((d) => ({ ...d, ...patch }));
   const metrics: Metrics = draft.metrics ?? EMPTY_METRICS;
@@ -196,7 +250,102 @@ export function PostSheet({
               className={`${field} h-auto resize-y py-2 leading-4`}
               placeholder="The text that goes around the carousel."
             />
+            <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
+              {/*
+                The workflow experienced creators already hand-roll: write the
+                carousel first, then pull the text post out of slides 1 and 2.
+                Deterministic, because those words are already approved — a model
+                rewriting them here would be answering a question nobody asked.
+              */}
+              {doc ? (
+                <>
+                  <SmallButton
+                    icon={Sparkles}
+                    label="Pull from the deck"
+                    onClick={() => set({ caption: captionOf(doc, { platform: draft.platform }) })}
+                  />
+                  <SmallButton
+                    icon={copied === "transcript" ? Check : Copy}
+                    label={copied === "transcript" ? "Copied" : "Copy transcript"}
+                    title="The whole deck as plain text, for the first comment. Per-slide alt text is impossible on both platforms, so this is the only fix there is."
+                    onClick={() =>
+                      copy("transcript", firstCommentOf(doc, { platform: draft.platform }))
+                    }
+                  />
+                </>
+              ) : (
+                <span className="text-caption text-muted">
+                  Link this post to a carousel and the caption can be pulled from it.
+                </span>
+              )}
+              <div className="flex-1" />
+              <span className={fit.over ? "text-caption text-danger" : "text-caption text-muted"}>
+                {fit.used} / {fit.limit}
+              </span>
+            </div>
+            {fit.over ? (
+              <p className="mt-1 text-caption leading-4 text-danger">
+                Over the limit for {draft.platform}. It will be cut off live rather than rejected,
+                which is worse, because nothing will say so.
+              </p>
+            ) : null}
           </Row>
+
+          {/*
+            The evidenced pain is discovery: "My Part 4 has 1M views but Part 1
+            has only 5K — because viewers can't find it." Neither platform lets a
+            carousel link to another post, so a list in the caption is the only
+            surface left.
+          */}
+          {series && draft.series ? (
+            <div className="rounded-2xl border border-hairline bg-surface-1 p-3">
+              <div className="flex items-center gap-2">
+                <span className="text-overline uppercase text-tertiary">Series</span>
+                <Chip>
+                  {draft.series.part} of {series.parts.length}
+                </Chip>
+                <div className="flex-1" />
+                <span className="text-caption text-muted">{series.posted} live</span>
+              </div>
+
+              <p className="mt-2 text-body text-secondary">
+                {seriesTitle(series.name, draft.series.part, series.parts.length)}
+              </p>
+
+              <pre className="scroll-quiet mt-2 max-h-[132px] overflow-auto whitespace-pre-wrap rounded-xl border border-hairline bg-surface-2 p-2.5 font-mono text-caption leading-4 text-tertiary">
+                {seriesCaption(series, { current: draft.series.part })}
+              </pre>
+
+              <div className="mt-2 flex items-center gap-1.5">
+                <SmallButton
+                  icon={copied === "series" ? Check : Copy}
+                  label={copied === "series" ? "Copied" : "Copy the list"}
+                  onClick={() =>
+                    copy("series", seriesCaption(series, { current: draft.series?.part }))
+                  }
+                />
+                <SmallButton
+                  icon={Sparkles}
+                  label="Add it to the caption"
+                  onClick={() =>
+                    set({
+                      caption: [
+                        draft.caption.trim(),
+                        seriesCaption(series, { current: draft.series?.part }),
+                      ]
+                        .filter(Boolean)
+                        .join(BREAK),
+                    })
+                  }
+                />
+              </div>
+
+              <p className="mt-2 text-caption leading-4 text-muted">
+                Parts already live carry their real link. Paste this into every part and somebody
+                who lands on part four can find part one.
+              </p>
+            </div>
+          ) : null}
 
           <Row label="Notes">
             <textarea

@@ -5,7 +5,7 @@
  * the pipeline bridge on each card — "Add to pipeline" is where a document stops
  * being a file and becomes something with a date and, eventually, numbers.
  */
-import { Archive, ArchiveRestore, CalendarPlus, Copy, Folder, Layers, PenLine, Plus, Send, Table, Trash2 } from "lucide-react";
+import { Archive, ArchiveRestore, CalendarPlus, Copy, FileText, Folder, Layers, Link2, PenLine, Plus, Send, Table, Trash2 } from "lucide-react";
 import { useMemo, useState } from "react";
 
 import { LayerView } from "./LayerView.js";
@@ -14,6 +14,7 @@ import { slidePaint } from "./paint.js";
 import { applyBrand, listBrands, stampLogo, themeOf } from "./brand.js";
 import { logoResolver } from "./library.js";
 import { PublishBatch } from "./PublishBatch.js";
+import { seriesTitle } from "./series.js";
 import { BrandMenu } from "./BrandMenu.js";
 import { detachDoc, listPosts, postFromDoc, type Post } from "./pipeline.js";
 import { ProjectFilters } from "./ProjectFilters.js";
@@ -24,6 +25,7 @@ import {
   duplicateDoc,
   listDocs,
   loadDoc,
+  makeDocSeries,
   renameDoc,
   saveDoc,
   setDocArchived,
@@ -34,15 +36,21 @@ import {
 
 const CARD_H = 186;
 
+/** How many parts a series has, counted from the index rather than a stored total. */
+const partsIn = (docs: readonly DocSummary[], seriesId: string): number =>
+  docs.filter((d) => d.series?.id === seriesId).length;
+
 export function Projects({
   onOpen,
   onCompose,
   onBulk,
+  onLongForm,
   onQueue,
 }: {
   onOpen: (doc: Doc) => void;
   onCompose: (theme: keyof typeof THEMES) => void;
   onBulk: () => void;
+  onLongForm: () => void;
   onQueue: (post: Post) => void;
 }) {
   const [docs, setDocs] = useState<DocSummary[]>(() => listDocs());
@@ -134,6 +142,29 @@ export function Projects({
           <span className="block text-[15px] font-semibold leading-5 text-primary">Bulk create</span>
           <span className="mt-0.5 block text-body text-tertiary">
             Paste a batch of posts and get one carousel each, in the same style.
+          </span>
+        </span>
+      </button>
+
+      {/*
+        Third, not second: bulk create is the one people arrive knowing they
+        want. This is the one they discover, and it is the one that turns a
+        single asset into a week of them.
+      */}
+      <button
+        type="button"
+        onClick={onLongForm}
+        className="group mt-3 flex w-full items-center gap-4 rounded-3xl border border-hairline bg-surface-1 p-5 text-left hover:border-accent-dim"
+      >
+        <span className="grid h-12 w-12 shrink-0 place-items-center rounded-2xl border border-hairline text-tertiary group-hover:border-accent-dim group-hover:text-accent">
+          <FileText size={20} strokeWidth={2.2} />
+        </span>
+        <span className="min-w-0 flex-1">
+          <span className="block text-[15px] font-semibold leading-5 text-primary">
+            One post, several carousels
+          </span>
+          <span className="mt-0.5 block text-body text-tertiary">
+            Paste an article, a newsletter or a transcript. You pick the moments worth using.
           </span>
         </span>
       </button>
@@ -272,6 +303,31 @@ export function Projects({
               {name === UNGROUPED && grouped.length === 1 ? "Your projects" : name}
             </span>
             <span className="text-caption text-muted">{items.length}</span>
+
+            {/*
+              A series is made from a group because a group is already the set
+              somebody gathered on purpose. Numbered in the order on screen, not
+              sorted — guessing from names puts "Part 10" before "Part 2", which
+              is wrong in the one case it would be reached for.
+            */}
+            {items.length > 1 ? (
+              <button
+                type="button"
+                title={
+                  items.every((d) => d.series)
+                    ? "Number these again, in the order shown"
+                    : "Number these 1 to N. Each part then carries a list of the others in its caption, so an audience can find part one."
+                }
+                onClick={() => {
+                  makeDocSeries(items.map((d) => d.id));
+                  refresh();
+                }}
+                className="flex h-6 items-center gap-1.5 rounded-lg border border-hairline px-2 text-caption text-tertiary hover:border-accent-dim hover:text-accent"
+              >
+                <Link2 size={11} strokeWidth={2} />
+                {items.every((d) => d.series) ? "Renumber" : "Make a series"}
+              </button>
+            ) : null}
           </div>
 
           <div className="grid grid-cols-[repeat(auto-fill,minmax(200px,1fr))] gap-4">
@@ -289,6 +345,15 @@ export function Projects({
                   ].join(" ")}
                 >
                   <div className="relative h-[140px]" style={{ background: d.background }}>
+                    {d.series ? (
+                      <span
+                        title={`Part ${d.series.part} of a series`}
+                        className="absolute right-2 top-2 flex h-5 items-center gap-1 rounded-md bg-black/55 px-1.5 text-overline uppercase text-white/85 backdrop-blur"
+                      >
+                        <Link2 size={9} strokeWidth={2.4} />
+                        Part {d.series.part}
+                      </span>
+                    ) : null}
                     {publishedIds.has(d.id) ? (
                       <span
                         title="This one went out"
@@ -331,7 +396,9 @@ export function Projects({
                         }}
                         className="truncate text-body-strong text-primary"
                       >
-                        {d.name}
+                        {d.series
+                          ? seriesTitle(d.name, d.series.part, partsIn(docs, d.series.id))
+                          : d.name}
                       </div>
                     )}
                     <div className="mt-0.5 text-caption text-tertiary">

@@ -650,7 +650,7 @@ field, not a failed import.
 
 ## Batch 6 — One asset becomes many
 
-**Status:** next
+**Status:** done
 **Size:** medium
 **Why here:** the stated gap in every repurposing tool is that they are *"one-and-done"* when
 *"the whole point is volume."*
@@ -720,11 +720,63 @@ emphasis and colour: *"Text sizing shifted from slide to slide with no clear log
 ending up too small to read."* People value AI for splitting prose into headline-length beats and
 reject it for visual decisions. Keep layout deterministic.
 
+### Built as
+
+All six, and the sixth turned out to be free.
+
+**6.6 was already the architecture.** Every route returns words and nothing else;
+`compositions.ts` makes every visual decision from them. There was no code to
+write, so it went into `CLAUDE.md` as invariant 5 instead — a rule that lives
+only in a roadmap is a rule the next feature quietly breaks.
+
+**6.1's candidate detection is deterministic and runs with no API key.** That was
+not in the plan and it is the most important decision in the batch. The thing
+people distrust is a model choosing their material — "I have stopped trusting the
+ranking and now I scrub the whole thing myself anyway" — and a heading is a choice
+the author already made. `longform.ts` follows headings where there are any and
+falls back to even stretches cut at sentence ends, labelled as exactly that.
+Nothing is scored, nothing is pre-ticked, nothing is called recommended.
+
+**Every cut lands on a sentence boundary, and there is a test for each way that
+goes wrong.** "The Quotes, Hooks & Timestamps pick up in the middle of a sentence
+so it does not make any sense" is the single most-cited failure of the competing
+tools, so `sentences()` knows about abbreviations, initials and numbered list
+markers, and the slide packer never cuts anywhere else.
+
+**6.2 grew a fourth job the roadmap did not list: reseal.** Deleting part 3 of six
+leaves 1,2,4,5,6, and a caption reading "Part 4 of 5" beside a list that stops at
+5 reads as carelessness. `deleteDoc` renumbers the survivors, so it happens
+however the carousel was removed rather than only on the screen that remembered
+to ask.
+
+**The momentum prompt is a banner, not a notification, and says so.** There is no
+background job in this product and no permission to send anything. Promising a
+reminder that arrives while the app is closed would be a promise it cannot keep.
+Three rules keep it from becoming wallpaper: an unstarted series is not losing
+momentum, an already-scheduled next part is a decision rather than a lapse, and
+nothing shows until the gap is genuinely open.
+
+**6.3 lays slide 1 out again rather than typing over the layer.** The box and the
+font size were chosen for the old words; writing longer text into them is how
+"some text ending up too small to read" arrives by a different door. `restateSlide`
+rebuilds the whole deck and takes one slide, because composition selection depends
+on the index, the total and the seed — and returns the whole regeneration when the
+rewrite is long enough to change the slide count.
+
+**6.4 is deterministic on purpose.** The words are already approved; a model
+rewriting them would be answering a question nobody asked. It is the rearrangement
+experienced creators already hand-roll — slides 1 and 2 and the closer — with a
+character count against the platform's real ceiling, because a caption is
+truncated live rather than rejected and nothing says so.
+
+**6.5 also fixed the published CSV.** `PublishedCarousel.caption` was the hook
+alone, which reads as a truncated caption; it is now the same derived text post.
+
 ---
 
 ## Batch 7 — Clients and approval
 
-**Status:** queued
+**Status:** next
 **Size:** large
 **Why here:** the agency tier already exists in `profiles.plan` and is empty. This fills it.
 

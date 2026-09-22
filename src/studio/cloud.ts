@@ -70,6 +70,8 @@ export type DocRow = {
   doc_group: string | null;
   framework: string | null;
   style_id: string | null;
+  series_id: string | null;
+  series_part: number | null;
   data: Doc;
   created_at: string;
   updated_at: string;
@@ -88,6 +90,8 @@ export type PostRow = {
   slide_count: number;
   hook: string;
   style_id: string | null;
+  series_id: string | null;
+  series_part: number | null;
   scheduled_for: string | null;
   posted_at: string | null;
   url: string | null;
@@ -170,6 +174,8 @@ export function docToRow(doc: Doc, userId: string, deletedAt: string | null = nu
     doc_group: doc.group ?? null,
     framework: doc.framework ?? null,
     style_id: doc.styleId ?? null,
+    series_id: doc.series?.id ?? null,
+    series_part: doc.series?.part ?? null,
     data: doc,
     created_at: doc.createdAt,
     updated_at: doc.updatedAt,
@@ -187,6 +193,12 @@ export const rowToDoc = (row: DocRow): Doc => ({
   ...(row.doc_group ? { group: row.doc_group } : {}),
   ...(row.framework ? { framework: row.framework } : {}),
   ...(row.style_id ? { styleId: row.style_id } : {}),
+  // The columns arrive with 05-series.sql. Until then `data` still carries it,
+  // which the spread above has already applied — so a project that has not run
+  // the migration keeps its series locally and simply cannot query by it.
+  ...(row.series_id && row.series_part
+    ? { series: { id: row.series_id, part: row.series_part } }
+    : {}),
 });
 
 /* ── posts ────────────────────────────────────────────────────────────────── */
@@ -203,6 +215,8 @@ export function postToRow(post: Post, userId: string, deletedAt: string | null =
     slide_count: post.slideCount,
     hook: post.hook,
     style_id: post.styleId,
+    series_id: post.series?.id ?? null,
+    series_part: post.series?.part ?? null,
     scheduled_for: post.scheduledFor,
     posted_at: post.postedAt,
     url: post.url,
@@ -226,6 +240,7 @@ export const rowToPost = (row: PostRow): Post => ({
   slideCount: row.slide_count,
   hook: row.hook,
   styleId: row.style_id,
+  series: row.series_id && row.series_part ? { id: row.series_id, part: row.series_part } : null,
   scheduledFor: row.scheduled_for,
   postedAt: row.posted_at,
   url: row.url,

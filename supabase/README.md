@@ -71,6 +71,7 @@ it should stay deleted. That second half is the one that catches real bugs.
 | `02-pro-gate.sql` | After Stripe. Makes the cloud pipeline Pro-only, enforced by Postgres. |
 | `03-brands.sql` | Now. The brands table, and the tier limit as an INSERT policy. |
 | `04-storage.sql` | Now. Two buckets, the `assets` library table, and `brands.logos`. |
+| `05-series.sql` | Now. Two nullable columns on `docs` and `posts`, so a series can be queried. |
 
 ## 6. The asset library (`04-storage.sql`)
 
