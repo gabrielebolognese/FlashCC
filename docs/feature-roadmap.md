@@ -195,7 +195,7 @@ scheduled.
 
 ## Batch 2 — Find anything
 
-**Status:** next
+**Status:** done
 **Size:** small. Everything needed is already stored locally.
 **Why here:** cheapest batch in the document and pure churn prevention. There is currently **no
 search box anywhere in FlashCC** — less than any competitor, all of whom get complained about for
@@ -258,6 +258,26 @@ them."* And on filing being actively broken there: moving an asset to a folder l
 and Uploads too — *"now they live in three different places in my UI... there's no way to select
 multiple items at once."*
 
+### Built as
+
+All seven as written, with two corrections to the plan.
+
+**No migration was needed.** The plan said archive required an `archived` column
+on `docs` and a `03-archive.sql`. It does not: `Doc.archived` lives inside the
+`data` jsonb blob that already round-trips through sync, and nothing queries it
+server-side. A column would only have been worth it for server-side filtering,
+which does not exist.
+
+**`DocSummary` could not do this alone.** It carried no slide text, no framework
+and no style, so 2.1 and 2.3 had nothing to read. The summary now carries a
+flattened lowercase `search` blob written at save time, plus `framework`,
+`styleId` and `archived`. Parsing every document on every keystroke was the
+alternative, and a document carries its media as base64 — so that would have made
+search feel broken at exactly the volume where search starts to matter.
+
+A one-time index rebuild backfills all of it from the stored documents, because a
+search box that cannot find anything made before today reads as broken.
+
 ### 2.7 A used / published state on each carousel
 
 **What:** mark a carousel as published, and filter on it.
@@ -276,7 +296,7 @@ Cheap here, because `posts` already carries the stage.
 
 ## Batch 3 — Brands
 
-**Status:** queued
+**Status:** next
 **Size:** medium
 **Why here:** brand-kit *count* is the proven monetisation ladder in this market (Canva: 1 free,
 5 Pro, 100 Business at $25/user). Contentdrips gives one away on its free tier. And `Theme` is

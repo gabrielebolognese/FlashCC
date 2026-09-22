@@ -5,20 +5,24 @@
  * the pipeline bridge on each card — "Add to pipeline" is where a document stops
  * being a file and becomes something with a date and, eventually, numbers.
  */
-import { CalendarPlus, Copy, Folder, Layers, PenLine, Plus, Trash2 } from "lucide-react";
+import { Archive, ArchiveRestore, CalendarPlus, Copy, Folder, Layers, PenLine, Plus, Send, Trash2 } from "lucide-react";
 import { useMemo, useState } from "react";
 
 import { LayerView } from "./LayerView.js";
 import type { Doc } from "./model.js";
 import { slidePaint } from "./paint.js";
-import { detachDoc, postFromDoc, type Post } from "./pipeline.js";
+import { detachDoc, listPosts, postFromDoc, type Post } from "./pipeline.js";
+import { ProjectFilters } from "./ProjectFilters.js";
+import { applyFilters, facetsOf, NO_FILTERS, type Filters } from "./search.js";
 import { buildDoc, PRESETS, THEMES } from "./presets.js";
 import {
   deleteDoc,
   duplicateDoc,
   listDocs,
   loadDoc,
+  renameDoc,
   saveDoc,
+  setDocArchived,
   setDocGroup,
   UNGROUPED,
   type DocSummary,
@@ -40,17 +44,40 @@ export function Projects({
   const [docs, setDocs] = useState<DocSummary[]>(() => listDocs());
   const [theme, setTheme] = useState<keyof typeof THEMES>("ink");
   const [moving, setMoving] = useState<string | null>(null);
+  const [filters, setFilters] = useState<Filters>(NO_FILTERS);
+  const [renaming, setRenaming] = useState<string | null>(null);
 
   const refresh = () => setDocs(listDocs());
 
+  /**
+   * Which carousels already went out.
+   *
+   * Derived from the pipeline rather than stored on the document, so the two can
+   * never disagree about what was posted — there is one fact and one place it
+   * lives.
+   */
+  const publishedIds = useMemo(
+    () =>
+      new Set(
+        listPosts()
+          .filter((p) => p.stage === "posted" && p.docId !== null)
+          .map((p) => p.docId as string),
+      ),
+    [docs],
+  );
+
+  const ctx = useMemo(() => ({ publishedIds }), [publishedIds]);
+  const facets = useMemo(() => facetsOf(docs, ctx), [docs, ctx]);
+  const visible = useMemo(() => applyFilters(docs, filters, ctx), [docs, filters, ctx]);
+
   const grouped = useMemo(() => {
     const map = new Map<string, DocSummary[]>();
-    for (const d of docs) {
+    for (const d of visible) {
       const key = d.group ?? UNGROUPED;
       map.set(key, [...(map.get(key) ?? []), d]);
     }
     return [...map.entries()].sort(([a], [b]) => (a === UNGROUPED ? 1 : b === UNGROUPED ? -1 : 0));
-  }, [docs]);
+  }, [visible]);
 
   const groupNames = useMemo(
     () => [...new Set(docs.map((d) => d.group).filter((g): g is string => Boolean(g)))],
@@ -158,6 +185,28 @@ export function Projects({
         })}
       </div>
 
+      {docs.length > 0 ? (
+        <div className="mt-12">
+          <ProjectFilters
+            filters={filters}
+            facets={facets}
+            onChange={setFilters}
+            showing={visible.length}
+            total={docs.filter((d) => !d.archived).length}
+          />
+        </div>
+      ) : null}
+
+      {docs.length > 0 && visible.length === 0 ? (
+        <div className="rounded-3xl border border-dashed border-hairline px-6 py-12 text-center">
+          <p className="text-body text-tertiary">
+            {filters.scope === "archived"
+              ? "Nothing archived."
+              : "No project matches that. Try fewer words, or clear the filters."}
+          </p>
+        </div>
+      ) : null}
+
       {grouped.map(([name, items]) => (
         <section key={name} className="mt-12">
           <div className="mb-3 flex items-center gap-2">
@@ -177,11 +226,57 @@ export function Projects({
                     const full = loadDoc(d.id);
                     if (full) onOpen(full);
                   }}
-                  className="w-full overflow-hidden rounded-2xl border border-hairline bg-surface-1 text-left hover:border-accent-dim"
+                  className={[
+                    "w-full overflow-hidden rounded-2xl border border-hairline bg-surface-1 text-left hover:border-accent-dim",
+                    d.archived ? "opacity-60" : "",
+                  ].join(" ")}
                 >
-                  <div className="h-[140px]" style={{ background: d.background }} />
+                  <div className="relative h-[140px]" style={{ background: d.background }}>
+                    {publishedIds.has(d.id) ? (
+                      <span
+                        title="This one went out"
+                        className="absolute left-2 top-2 flex h-5 items-center gap-1 rounded-md bg-black/55 px-1.5 text-overline uppercase text-white/85 backdrop-blur"
+                      >
+                        <Send size={9} strokeWidth={2.4} />
+                        Posted
+                      </span>
+                    ) : null}
+                  </div>
                   <div className="p-3">
-                    <div className="truncate text-body-strong text-primary">{d.name}</div>
+                    {renaming === d.id ? (
+                      <input
+                        autoFocus
+                        defaultValue={d.name}
+                        // The card is a button, so every event here has to be kept
+                        // from reaching it or typing would open the editor.
+                        onClick={(e) => e.stopPropagation()}
+                        onKeyDown={(e) => {
+                          e.stopPropagation();
+                          if (e.key === "Enter") e.currentTarget.blur();
+                          if (e.key === "Escape") {
+                            e.currentTarget.value = d.name;
+                            e.currentTarget.blur();
+                          }
+                        }}
+                        onBlur={(e) => {
+                          renameDoc(d.id, e.target.value);
+                          setRenaming(null);
+                          refresh();
+                        }}
+                        className="h-6 w-full rounded-md border border-accent-dim bg-surface-2 px-1.5 text-body-strong text-primary outline-none"
+                      />
+                    ) : (
+                      <div
+                        title="Double-click to rename"
+                        onDoubleClick={(e) => {
+                          e.stopPropagation();
+                          setRenaming(d.id);
+                        }}
+                        className="truncate text-body-strong text-primary"
+                      >
+                        {d.name}
+                      </div>
+                    )}
                     <div className="mt-0.5 text-caption text-tertiary">
                       {d.slideCount} slide{d.slideCount === 1 ? "" : "s"} · {d.width}×{d.height}
                     </div>
@@ -207,6 +302,14 @@ export function Projects({
                     label="Duplicate"
                     onClick={() => {
                       duplicateDoc(d.id);
+                      refresh();
+                    }}
+                  />
+                  <CardButton
+                    icon={d.archived ? ArchiveRestore : Archive}
+                    label={d.archived ? "Put it back" : "Archive"}
+                    onClick={() => {
+                      setDocArchived(d.id, !d.archived);
                       refresh();
                     }}
                   />

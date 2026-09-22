@@ -9,6 +9,7 @@ import { buildSlides, type BuildOptions } from "./compositions.js";
 import { makeDoc, type Doc } from "./model.js";
 import type { Theme } from "./presets.js";
 import type { Structure } from "./structures.js";
+import { nameFromHook } from "./search.js";
 
 export const SEPARATOR = "---";
 
@@ -34,7 +35,7 @@ export function parseBulk(source: string): BulkBlock[] {
       const first = texts[0] ?? "";
       return {
         texts,
-        title: first.split("\n")[0]?.slice(0, 48).trim() || "Untitled",
+        title: nameFromHook(first.split("\n")[0] ?? ""),
       };
     })
     .filter((b) => b.texts.length > 0);

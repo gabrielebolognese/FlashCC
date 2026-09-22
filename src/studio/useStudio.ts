@@ -13,6 +13,7 @@ import {
 import type { Gradient } from "./gradient.js";
 import type { PlatformId } from "./platforms.js";
 import { reflowDoc } from "./reflow.js";
+import { isUnnamed, nameFromDoc } from "./search.js";
 import { saveDoc } from "./storage.js";
 
 const LIMIT = 120;
@@ -41,7 +42,14 @@ export function useStudio(initial: Doc) {
   const index = Math.min(slideIndex, Math.max(0, doc.slides.length - 1));
   const slide = doc.slides[index];
 
-  const commit = useCallback((next: Doc, coalesce?: string) => {
+  const commit = useCallback((raw: Doc, coalesce?: string) => {
+    // A blank canvas has no hook to be named after yet. Rather than leaving it
+    // "Untitled" forever, it takes a name the moment there is one to take —
+    // which is also the only point at which the name would be right. A name the
+    // user chose is never overwritten, because isUnnamed only matches the ones
+    // the app supplied.
+    const next = isUnnamed(raw.name) ? { ...raw, name: nameFromDoc(raw) } : raw;
+
     setDoc((cur) => {
       if (!(coalesce !== undefined && tag.current === coalesce)) {
         past.current = [...past.current.slice(-LIMIT), cur];

@@ -3,6 +3,7 @@ import { useMemo, useState } from "react";
 import { AiChat } from "./studio/AiChat.js";
 import { BulkCreate } from "./studio/BulkCreate.js";
 import { buildSlides } from "./studio/compositions.js";
+import { nameFromHook } from "./studio/search.js";
 import { Compose } from "./studio/Compose.js";
 import { FirstRun } from "./studio/FirstRun.js";
 import { Home } from "./studio/Home.js";
@@ -165,7 +166,7 @@ export function App() {
         onUse={(style: Style) => {
           const t = style.theme;
           const doc: Doc = {
-            ...makeDoc(draft.texts[0]?.slice(0, 40).trim() || "Untitled"),
+            ...makeDoc(nameFromHook(draft.texts[0] ?? "")),
             // Recorded once, here, because analytics can only attribute performance to
             // a framework if something remembered which one produced the slides.
             framework: draft.structure.id,

@@ -7,8 +7,9 @@
  * positioned, resizable and restylable. Array order IS z-order (0 = back).
  *
  * Coordinates are ARTBOARD PIXELS, not fractions: 1080×1350 is a canvas, and a layer
- * at x=540 is at x=540. Changing the artboard size is a canvas resize, exactly as it
- * is in an image editor — content keeps its position.
+ * at x=540 is at x=540. Changing the artboard size re-lays the layers that are there
+ * (see reflow.ts) rather than leaving them at their old pixel positions, which used to
+ * strand every one of them in the top corner of a taller board.
  */
 
 import type { Gradient } from "./gradient.js";
@@ -94,6 +95,8 @@ export type Doc = {
    */
   framework?: string | undefined;
   styleId?: string | undefined;
+  /** Archived work stays yours and stays synced; it just leaves the grid. */
+  archived?: boolean | undefined;
   slides: Slide[];
   createdAt: string;
   updatedAt: string;
