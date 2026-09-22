@@ -11,6 +11,12 @@ you; everything else can stay default. The free tier is enough to build on.
 
 **SQL Editor → New query**, paste the whole of `01-schema.sql`, run it.
 
+The editor runs the whole script inside **one transaction**, so it is all or
+nothing: a single error anywhere rolls back every table above it and leaves the
+schema completely empty. That failure looks a lot like success if you do not read
+the output, so check the result pane says *Success* before moving on — and if it
+does not, the error text is the useful thing to keep.
+
 It is idempotent, so you can re-run it after editing without dropping anything. **Do not run
 `02-pro-gate.sql`** — that one turns the paywall on and belongs after Stripe exists.
 

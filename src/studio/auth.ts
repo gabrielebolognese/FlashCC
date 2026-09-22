@@ -106,6 +106,37 @@ export async function loadProfile(userId: string): Promise<Profile | null> {
   };
 }
 
+/**
+ * Makes the profile row if this is the first sign-in.
+ *
+ * The obvious home for this is a trigger on auth.users, and that is what Supabase
+ * documents — but creating one now fails on many projects with "must be owner of
+ * relation users", and because the SQL editor runs a script in a single
+ * transaction, that one error rolls the whole schema back. Doing it from here
+ * needs no privileged DDL.
+ *
+ * Nothing is trusted to the client by moving it: the INSERT privilege is narrowed
+ * to (id, email, display_name), so `plan` takes its default of 'free' no matter
+ * what this sends, and the RLS policy pins the row to the caller's own id.
+ */
+export async function ensureProfile(user: User): Promise<Profile | null> {
+  const db = cloud();
+  if (!db) return null;
+
+  const existing = await loadProfile(user.id);
+  if (existing) return existing;
+
+  const { error } = await db
+    .from("profiles")
+    .insert({ id: user.id, email: user.email ?? null });
+
+  // 23505 is a unique violation: another tab signed in first and won the race,
+  // which is a success from here.
+  if (error && error.code !== "23505") return null;
+
+  return loadProfile(user.id);
+}
+
 export async function setDisplayName(userId: string, name: string): Promise<boolean> {
   const db = cloud();
   if (!db) return false;

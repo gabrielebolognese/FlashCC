@@ -25,10 +25,11 @@
 --    server has no record that it ever went, and the merge dutifully puts it back.
 --    Deletion is just another edit, so LWW settles it like any other conflict.
 --
--- 4. THE PLAN IS NOT USER-WRITABLE. `profiles.plan` has its UPDATE privilege
---    revoked from the `authenticated` role, so a signed-in user can change their
---    display name but cannot set themselves to Pro. Only the service role (your
---    Stripe webhook) can. RLS alone would NOT do this — an owner policy on the
+-- 4. THE PLAN IS NOT USER-WRITABLE. `profiles.plan` has its INSERT and UPDATE
+--    privileges narrowed to a column list that excludes it, so a signed-in user
+--    can set their display name but can neither edit their way to Pro nor create
+--    themselves there on first sign-in. Only the service role (your Stripe
+--    webhook) can write it. RLS alone would NOT do this — an owner policy on the
 --    row lets them write every column in it.
 -- ─────────────────────────────────────────────────────────────────────────────
 
@@ -109,11 +110,12 @@ create table if not exists public.posts (
 
   primary key (user_id, id),
 
-  -- Composite, so a post can never point at somebody else's carousel. The column
-  -- list on SET NULL is required: a plain SET NULL would try to null user_id too,
-  -- which is NOT NULL. (Needs Postgres 15+; every current Supabase project is.)
-  constraint posts_doc_fk foreign key (user_id, doc_id)
-    references public.docs (user_id, id) on delete set null (doc_id),
+  -- doc_id is a soft reference, with no foreign key behind it on purpose. A
+  -- composite FK would need ON DELETE SET NULL (doc_id), which is Postgres 15+
+  -- only, and it makes deleting an account order-sensitive because both tables
+  -- cascade from auth.users at once. RLS already stops anyone reading a carousel
+  -- that is not theirs, and detachDoc() nulls these when a project is thrown
+  -- away, so the constraint was buying very little for that much fragility.
 
   constraint posts_stage_known check (stage in ('idea', 'drafting', 'ready', 'scheduled', 'posted')),
   constraint posts_platform_known check (platform in ('linkedin', 'instagram', 'tiktok', 'x'))
@@ -131,6 +133,7 @@ alter table public.posts
 create index if not exists docs_sync_idx  on public.docs  (user_id, server_updated_at desc);
 create index if not exists posts_sync_idx on public.posts (user_id, server_updated_at desc);
 create index if not exists posts_stage_idx on public.posts (user_id, stage) where deleted_at is null;
+create index if not exists posts_doc_idx on public.posts (user_id, doc_id) where doc_id is not null;
 create index if not exists posts_measured_idx on public.posts (user_id, posted_at desc)
   where deleted_at is null and posted_at is not null and impressions > 0;
 
@@ -157,23 +160,13 @@ drop trigger if exists profiles_touch on public.profiles;
 create trigger profiles_touch before insert or update on public.profiles
   for each row execute function public.touch_server_updated_at();
 
--- ── profile on signup ───────────────────────────────────────────────────────
--- security definer because auth.users is not writable by the authenticated role.
--- The empty search_path is the hardening Supabase asks for: it forces every name
--- below to be schema-qualified so nothing can be shadowed by a table a user made.
-
-create or replace function public.handle_new_user()
-returns trigger language plpgsql security definer set search_path = '' as $$
-begin
-  insert into public.profiles (id, email)
-  values (new.id, new.email)
-  on conflict (id) do nothing;
-  return new;
-end $$;
-
-drop trigger if exists on_auth_user_created on auth.users;
-create trigger on_auth_user_created after insert on auth.users
-  for each row execute function public.handle_new_user();
+-- ── profiles are made by the client ────────────────────────────────────────
+-- Deliberately NOT a trigger on auth.users. Supabase has tightened ownership of
+-- that table, so `create trigger ... on auth.users` now fails on many projects
+-- with "must be owner of relation users" — and because the SQL editor runs the
+-- whole script in one transaction, that single error silently rolls back every
+-- table above it. Nothing here needs privileged DDL; auth.ts creates the row on
+-- first sign-in instead.
 
 -- ── row level security ──────────────────────────────────────────────────────
 -- This is the whole security boundary. The anon key in the browser is public by
@@ -193,6 +186,11 @@ create policy profiles_select on public.profiles
 drop policy if exists profiles_update on public.profiles;
 create policy profiles_update on public.profiles
   for update using (auth.uid() = id) with check (auth.uid() = id);
+
+-- Only ever your own row, and only the row whose id is your user id.
+drop policy if exists profiles_insert on public.profiles;
+create policy profiles_insert on public.profiles
+  for insert with check (auth.uid() = id);
 
 drop policy if exists docs_owner on public.docs;
 create policy docs_owner on public.docs
@@ -217,8 +215,14 @@ create policy posts_owner on public.posts
 revoke update on public.profiles from authenticated, anon;
 grant  update (display_name) on public.profiles to authenticated;
 
--- Creating or deleting a profile is nobody's business but the signup trigger's.
--- No RLS policy grants either, and RLS denies whatever it does not allow.
+-- Same reasoning for INSERT, and it matters more here: without it a user simply
+-- creates their own row with plan = 'pro' on first sign-in and never pays. The
+-- column list is what they may set; plan is not in it, so it takes its default.
+revoke insert on public.profiles from authenticated, anon;
+grant  insert (id, email, display_name) on public.profiles to authenticated;
+
+-- Deleting a profile is nobody's business. No RLS policy allows it, and RLS
+-- denies whatever it does not explicitly permit.
 
 -- ── plan lookup ─────────────────────────────────────────────────────────────
 -- Used by 02-pro-gate.sql once billing is live, and safe to have sitting here
