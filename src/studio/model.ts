@@ -110,7 +110,18 @@ export const FORMATS = [
   { id: "story", label: "9:16", w: 1080, h: 1920 },
 ] as const;
 
-export type FontChoice = { id: string; label: string; stack: string; custom?: boolean };
+export type FontChoice = {
+  id: string;
+  label: string;
+  stack: string;
+  custom?: boolean;
+  /**
+   * The brand this face belongs to, when it belongs to one. Faces with no brand
+   * are available everywhere; a branded face only appears for its own brand, so
+   * a client's licensed type does not turn up in another client's picker.
+   */
+  brandId?: string | undefined;
+};
 
 /** Faces that exist on essentially every machine, so nothing has to be downloaded. */
 export const FONTS: FontChoice[] = [
@@ -138,7 +149,16 @@ export function unregisterFont(id: string): void {
   runtime.delete(id);
 }
 
-export const allFonts = (): FontChoice[] => [...FONTS, ...runtime.values()];
+/**
+ * The built-ins, plus every uploaded face that belongs here.
+ *
+ * Passing no brand gives you the unscoped faces only — which is the right
+ * default: an unknown context should not leak one brand's type into another's.
+ */
+export const allFonts = (brandId?: string | undefined): FontChoice[] => [
+  ...FONTS,
+  ...[...runtime.values()].filter((f) => !f.brandId || f.brandId === brandId),
+];
 
 export const fontStack = (id: string | undefined): string =>
   (id ? runtime.get(id)?.stack : undefined) ??

@@ -16,6 +16,7 @@ import type { ReactNode } from "react";
 import { IconButton } from "../ui/IconButton.js";
 import { GradientEditor } from "./GradientEditor.js";
 import { averageColour, makeGradient, type Gradient } from "./gradient.js";
+import { brandIdOf } from "./brand.js";
 import { FORMATS, allFonts, type Layer } from "./model.js";
 import type { Studio } from "./useStudio.js";
 
@@ -106,7 +107,7 @@ export function Properties({ studio }: { studio: Studio }) {
               onChange={(e) => set({ fontFamily: e.target.value })}
               className="h-7 w-full rounded-md border border-hairline bg-surface-1 px-1.5 text-caption text-primary outline-none"
             >
-              {allFonts().map((f) => (
+              {allFonts(brandIdOf(doc.styleId ?? "") ?? undefined).map((f) => (
                 <option key={f.id} value={f.id}>
                   {f.label}
                 </option>

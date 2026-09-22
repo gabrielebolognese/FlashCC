@@ -513,6 +513,37 @@ checked against **every stop**, not just the first: contrast against `theme.bg` 
 of a ramp that text sits across the whole of. That test caught two real failures during
 development.
 
+### Brands
+
+A **brand is a named, saved `Theme`** — nothing more ambitious, and the restraint is the point. The
+moment a brand becomes something documents *refer to* rather than something applied *once*, the
+"nothing is derived" invariant goes and every carousel starts changing under the user when they
+touch a swatch.
+
+Brands join the style gallery as ordinary entries with the id `brand:<id>`, so nothing downstream
+knows the difference.
+
+**Applying one to an existing carousel** (`brand.ts#applyBrand`) is inference, and it says so. The
+primary rule is an exact colour match against the theme the document was generated with, knowable
+because `styleId` is stamped. That catches hand-drawn shapes that reached for a palette colour and
+never touches a colour the old theme cannot explain.
+
+A name-based fallback covers generator layers whose colour was since changed — but it is skipped
+whenever the layer already wears one of the *target* theme's colours. That guard is load-bearing
+rather than tidy: several compositions emit a layer called `Text` meaning different things, and the
+CTA block's copy is deliberately `theme.bg` because it sits **on** the accent block. Without the
+check, a second application "corrects" it to `fg` and makes it invisible against its own
+background. The idempotence test is what caught that.
+
+It returns `{ changed, skipped }` so the UI can report what happened instead of claiming success.
+
+**Tier limits are enforced in Postgres**, not the browser — one free, three on Pro, unlimited on
+Agency. The limit is an INSERT policy, so editing an existing brand is never refused and somebody
+who downgrades keeps the brands they made. They simply cannot add another until they are back under
+the line.
+
+Brands are the first thing in the product that genuinely *is* Pro rather than advertised as Pro.
+
 ---
 
 ## 13. Onboarding
@@ -790,6 +821,7 @@ deflating costs time and saves nothing.
 | `flashcc:v3:fonts` | Uploaded faces as data URLs |
 | `flashcc:v3:onboarded` / `:prefs` | Onboarding state and answers |
 | `flashcc:v1:posts` | The entire pipeline in one key |
+| `flashcc:v1:brands` | Saved brands, also read as a set |
 | `flashcc:v1:tombstones` | Deletions, both kinds |
 | `flashcc:v1:sync-cursor` | Last successful sync — read only for the "Synced 3m ago" label |
 
@@ -880,7 +912,7 @@ paid.
 
 ## 26. Database
 
-Three tables, all with `(user_id, id)` composite primary keys.
+Four tables, all with `(user_id, id)` composite primary keys.
 
 **Identity is the client's.** The app mints ids offline and creates records before anyone signs in,
 so there is no id remapping on sync and ids only need to be unique per person.
@@ -915,6 +947,11 @@ narrow it is to drop the table privilege and grant back the one safe column.
 Get it wrong and the paywall is decorative: any signed-in user can `PATCH /rest/v1/profiles` with
 `{"plan":"pro"}` from the console. The INSERT narrowing matters more — without it someone creates
 their own row at `plan: 'pro'` on first sign-in and never pays.
+
+`03-brands.sql` adds the brands table and the allowance policy. It **is** safe to run now —
+nothing depends on it, and until it exists the client degrades brands to local-only (PostgREST
+answers `PGRST205`, which `syncAll` treats as "not yet" rather than as a failure, so docs and posts
+keep syncing).
 
 `02-pro-gate.sql` makes the cloud pipeline Pro-only **and has not been run.** Until it is, a free
 account syncs its pipeline exactly like a paying one. Reads stay open to lapsed subscribers, because

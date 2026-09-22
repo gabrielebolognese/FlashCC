@@ -8,7 +8,15 @@
  */
 import { registerFont, unregisterFont, type FontChoice } from "./model.js";
 
-export type CustomFont = { id: string; label: string; family: string; src: string; bytes: number };
+export type CustomFont = {
+  id: string;
+  label: string;
+  family: string;
+  src: string;
+  bytes: number;
+  /** Scoped to one brand when set. Absent means available everywhere. */
+  brandId?: string | undefined;
+};
 
 const KEY = "flashcc:v3:fonts";
 
@@ -62,7 +70,12 @@ async function install(font: CustomFont): Promise<boolean> {
     const face = new FontFace(font.family, `url(${font.src})`);
     await face.load();
     document.fonts.add(face);
-    registerFont({ id: font.id, label: font.label, stack: `"${font.family}", sans-serif` });
+    registerFont({
+      id: font.id,
+      label: font.label,
+      stack: `"${font.family}", sans-serif`,
+      ...(font.brandId ? { brandId: font.brandId } : {}),
+    });
     return true;
   } catch {
     return false;
@@ -79,7 +92,10 @@ const readFile = (file: File): Promise<string> =>
 
 export type AddFontResult = { ok: true; font: CustomFont } | { ok: false; error: string };
 
-export async function addCustomFont(file: File): Promise<AddFontResult> {
+export async function addCustomFont(
+  file: File,
+  brandId?: string,
+): Promise<AddFontResult> {
   if (!/\.(woff2?|ttf|otf)$/i.test(file.name)) {
     return { ok: false, error: "That is not a font file. Use .woff2, .woff, .ttf or .otf." };
   }
@@ -100,6 +116,7 @@ export async function addCustomFont(file: File): Promise<AddFontResult> {
     // Namespaced so an uploaded "Inter" cannot shadow a system face of that name.
     family: `FCC ${label} ${Date.now().toString(36)}`,
     src: await readFile(file),
+    ...(brandId ? { brandId } : {}),
     bytes: file.size,
   };
 

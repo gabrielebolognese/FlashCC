@@ -296,7 +296,7 @@ Cheap here, because `posts` already carries the stage.
 
 ## Batch 3 — Brands
 
-**Status:** next
+**Status:** done
 **Size:** medium
 **Why here:** brand-kit *count* is the proven monetisation ladder in this market (Canva: 1 free,
 5 Pro, 100 Business at $25/user). Contentdrips gives one away on its free tier. And `Theme` is
@@ -328,6 +328,24 @@ of inconsistency issues."* The pain is consistency after the fact, not the first
 **Why:** `fonts.ts` has `MAX_FONTS = 6` in localStorage, global and uncloudy. That is a hard
 ceiling for anyone with more than a couple of clients. Full fix needs Batch 5; scope them here.
 
+### Built as
+
+All four, with two things the plan did not anticipate.
+
+**The tier limit went into Postgres, not the client.** A client-side count is a suggestion anyone
+can edit, and `reference.md` §29 already records that every other tier claim in the product is
+aspirational because nothing reads `plan`. `03-brands.sql` puts the allowance in an INSERT policy
+using the existing `is_pro()`. It sits on INSERT only, so editing is never refused and a downgrade
+does not confiscate brands somebody already made.
+
+**An idempotence test caught a real bug in the remap.** The CTA block prints `theme.bg` on
+`theme.accent`, and the name-based fallback saw a layer called `Text`, reached for `fg`, and would
+have made that copy invisible against its own block. The fix — skip the fallback whenever a layer
+already wears one of the target theme's colours — is now guarded by its own test.
+
+**Still thin until Batch 5.** Brand logos need Supabase Storage, so a brand is currently colours,
+typefaces and a default format. Per-brand fonts are scoped but still capped at six in localStorage.
+
 ### 3.4 Brand switcher and tier limits
 
 **Free 1 brand · Pro 3 · Agency unlimited.** Matches the proven ladder.
@@ -336,7 +354,7 @@ ceiling for anyone with more than a couple of clients. Full fix needs Batch 5; s
 
 ## Batch 4 — Batch creation, done properly
 
-**Status:** queued
+**Status:** next
 **Size:** large
 **Why here:** this is the wedge. No tool in the market offers a human-writable batch format.
 Contentdrips comes closest and its API turns out to be a **renderer, not a splitter** — the caller

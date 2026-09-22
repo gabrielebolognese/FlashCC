@@ -2,6 +2,7 @@ import { useMemo, useState } from "react";
 
 import { AiChat } from "./studio/AiChat.js";
 import { BulkCreate } from "./studio/BulkCreate.js";
+import { brandToStyle, listBrands } from "./studio/brand.js";
 import { buildSlides } from "./studio/compositions.js";
 import { nameFromHook } from "./studio/search.js";
 import { Compose } from "./studio/Compose.js";
@@ -48,7 +49,14 @@ export function App() {
   const [prefs, setPrefs] = useState<Prefs | null>(() => loadPrefs());
 
   // The answers become the gallery's first style and two real build settings.
-  const styles = useMemo(() => stylesFor(prefs), [prefs]);
+  // Brands lead it: a saved brand is a stronger default than a stock palette, and
+  // it is the reason someone made one.
+  const styles = useMemo(
+    () => [...listBrands().map(brandToStyle), ...stylesFor(prefs)],
+    // Recomputed whenever a screen changes, because a brand made on the Brands
+    // screen has to appear in the picker without a reload.
+    [prefs, screen.view],
+  );
   const build = useMemo(
     () =>
       prefs

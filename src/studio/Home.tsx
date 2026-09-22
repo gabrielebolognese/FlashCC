@@ -12,6 +12,7 @@ import {
   Flame,
   KanbanSquare,
   LayoutGrid,
+  Palette,
   RefreshCw,
   Send,
 } from "lucide-react";
@@ -20,6 +21,8 @@ import { useMemo, useState } from "react";
 
 import { AccountCard } from "./AccountCard.js";
 import { Analytics } from "./Analytics.js";
+import { Brands } from "./Brands.js";
+import { listBrands } from "./brand.js";
 import { Board } from "./Board.js";
 import { demoPosts } from "./demo.js";
 import { Empty } from "./Dash.js";
@@ -42,7 +45,7 @@ import { listDocs } from "./storage.js";
 import { useAccount } from "./useAccount.js";
 import { Upgrade } from "./Upgrade.js";
 
-type View = "projects" | "board" | "scheduled" | "posted" | "analytics" | "outliers";
+type View = "projects" | "brands" | "board" | "scheduled" | "posted" | "analytics" | "outliers";
 
 type NavItem = {
   id: View;
@@ -54,7 +57,10 @@ type NavItem = {
 const NAV: { section: string; items: NavItem[] }[] = [
   {
     section: "Library",
-    items: [{ id: "projects", label: "Projects", icon: LayoutGrid, count: (c) => c.docs }],
+    items: [
+      { id: "projects", label: "Projects", icon: LayoutGrid, count: (c) => c.docs },
+      { id: "brands", label: "Brands", icon: Palette, count: () => listBrands().length },
+    ],
   },
   {
     section: "Pipeline",
@@ -85,6 +91,7 @@ const NAV: { section: string; items: NavItem[] }[] = [
 
 const TITLES: Record<View, { title: string; sub: string }> = {
   projects: { title: "Projects", sub: "Every carousel you have made, and two ways to start another." },
+  brands: { title: "Brands", sub: "Your colours and typefaces, saved. Applied once, never live." },
   board: { title: "Pipeline", sub: "Idea to posted. Drag a card to move it along." },
   scheduled: { title: "Scheduled", sub: "What is going out, and what has slipped past its slot." },
   posted: { title: "Posted", sub: "What went live. Add the numbers and the insight screens wake up." },
@@ -231,6 +238,8 @@ export function Home({
             {view === "projects" ? (
               <Projects onOpen={onOpen} onCompose={onCompose} onBulk={onBulk} onQueue={queue} />
             ) : null}
+
+            {view === "brands" ? <Brands plan={account.profile?.plan} /> : null}
 
             {view === "board" ? (
               <Board posts={posts} onChange={commit} onOpen={setEditing} />

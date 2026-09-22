@@ -13,6 +13,8 @@ import { LayerView } from "./LayerView.js";
 import type { Doc } from "./model.js";
 import { Properties } from "./Properties.js";
 import { buildSlides } from "./compositions.js";
+import { applyBrand, listBrands } from "./brand.js";
+import { BrandMenu } from "./BrandMenu.js";
 import { ExportDialog } from "./ExportDialog.js";
 import { THEMES } from "./presets.js";
 import { Toolbar } from "./Toolbar.js";
@@ -64,6 +66,14 @@ export function Studio({ initial, onHome }: { initial: Doc; onHome: () => void }
         <span className="text-caption text-muted">
           {doc.slides.length} slide{doc.slides.length === 1 ? "" : "s"} · {doc.width}×{doc.height}
         </span>
+        <BrandMenu
+          brands={listBrands()}
+          onApply={(brand) => {
+            const result = applyBrand(doc, brand, undefined);
+            studio.replaceDoc(result.doc);
+            return result;
+          }}
+        />
         <button
           type="button"
           onClick={() => setPasteOpen(true)}

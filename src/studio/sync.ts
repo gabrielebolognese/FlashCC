@@ -19,15 +19,19 @@
  */
 
 import {
+  brandToRow,
   cloud,
   docToRow,
   forWrite,
   postToRow,
+  rowToBrand,
   rowToDoc,
   rowToPost,
+  type BrandRow,
   type DocRow,
   type PostRow,
 } from "./cloud.js";
+import { listBrands, saveBrands, type Brand } from "./brand.js";
 import type { Doc } from "./model.js";
 import { listPosts, savePosts, type Post } from "./pipeline.js";
 import { dropDoc, listDocs, loadDoc, putDoc } from "./storage.js";
@@ -105,6 +109,20 @@ function localDocEntries(): Entry<Doc>[] {
   return [...alive, ...gone];
 }
 
+function localBrandEntries(): Entry<Brand>[] {
+  const alive: Entry<Brand>[] = listBrands().map((b) => ({
+    id: b.id,
+    updatedAt: b.updatedAt,
+    value: b,
+  }));
+  const gone: Entry<Brand>[] = listTombstones("brand").map((t) => ({
+    id: t.id,
+    updatedAt: t.deletedAt,
+    value: null,
+  }));
+  return [...alive, ...gone];
+}
+
 function localPostEntries(): Entry<Post>[] {
   const alive: Entry<Post>[] = listPosts().map((p) => ({
     id: p.id,
@@ -128,6 +146,11 @@ const docRowToEntry = (row: DocRow): Entry<Doc> =>
   row.deleted_at
     ? { id: row.id, updatedAt: row.deleted_at, value: null }
     : { id: row.id, updatedAt: row.updated_at, value: rowToDoc(row) };
+
+const brandRowToEntry = (row: BrandRow): Entry<Brand> =>
+  row.deleted_at
+    ? { id: row.id, updatedAt: row.deleted_at, value: null }
+    : { id: row.id, updatedAt: row.updated_at, value: rowToBrand(row) };
 
 const postRowToEntry = (row: PostRow): Entry<Post> =>
   row.deleted_at
@@ -184,13 +207,20 @@ export async function syncAll(userId: string): Promise<SyncResult> {
   if (!db) return { ok: false, pushed: 0, applied: 0, error: "Cloud is not configured" };
 
   try {
-    const [docsRes, postsRes] = await Promise.all([
+    const [docsRes, postsRes, brandsRes] = await Promise.all([
       db.from("docs").select("*").eq("user_id", userId),
       db.from("posts").select("*").eq("user_id", userId),
+      db.from("brands").select("*").eq("user_id", userId),
     ]);
 
     if (docsRes.error) throw new Error(docsRes.error.message);
     if (postsRes.error) throw new Error(postsRes.error.message);
+
+    // Brands are optional: the table arrives with 03-brands.sql, and until it is
+    // run PostgREST answers PGRST205. Everything else must still sync, so a
+    // missing table degrades brands to local-only rather than failing the sync.
+    const brandsTableMissing = brandsRes.error?.code === "PGRST205";
+    if (brandsRes.error && !brandsTableMissing) throw new Error(brandsRes.error.message);
 
     const docMerge = mergeEntries(
       localDocEntries(),
@@ -200,6 +230,12 @@ export async function syncAll(userId: string): Promise<SyncResult> {
       localPostEntries(),
       (postsRes.data as PostRow[]).map(postRowToEntry),
     );
+    const brandMerge = brandsTableMissing
+      ? { merged: [], toPush: [], toApply: [] }
+      : mergeEntries(
+          localBrandEntries(),
+          ((brandsRes.data ?? []) as BrandRow[]).map(brandRowToEntry),
+        );
 
     /* ── push ── */
     const docRows = docMerge.toPush.map((e) =>
@@ -218,6 +254,13 @@ export async function syncAll(userId: string): Promise<SyncResult> {
           : postToRow(emptyPost(e.id, e.updatedAt), userId, e.updatedAt),
       ),
     );
+    const brandRows = brandMerge.toPush.map((e) =>
+      forWrite(
+        e.value
+          ? brandToRow(e.value, userId)
+          : brandToRow(emptyBrand(e.id, e.updatedAt), userId, e.updatedAt),
+      ),
+    );
 
     if (docRows.length > 0) {
       const { error } = await db.from("docs").upsert(docRows, { onConflict: "user_id,id" });
@@ -227,6 +270,13 @@ export async function syncAll(userId: string): Promise<SyncResult> {
     if (postRows.length > 0) {
       const { error } = await db.from("posts").upsert(postRows, { onConflict: "user_id,id" });
       if (error) throw new Error(error.message);
+    }
+    if (brandRows.length > 0) {
+      const { error } = await db.from("brands").upsert(brandRows, { onConflict: "user_id,id" });
+      // A brand past the plan's allowance is refused by the INSERT policy. That
+      // is the paywall working, not a sync failure, so it must not take the rest
+      // of the sync down with it — the brand simply stays local.
+      if (error && error.code !== "42501") throw new Error(error.message);
     }
 
     /* ── apply ── */
@@ -239,16 +289,21 @@ export async function syncAll(userId: string): Promise<SyncResult> {
       savePosts(live(postMerge.merged));
     }
 
+    if (brandMerge.toApply.length > 0) {
+      saveBrands(live(brandMerge.merged));
+    }
+
     // Only now is it safe to forget what was deleted: the server has it.
     clearTombstones("doc", docMerge.toPush.filter((e) => e.value === null).map((e) => e.id));
     clearTombstones("post", postMerge.toPush.filter((e) => e.value === null).map((e) => e.id));
+    clearTombstones("brand", brandMerge.toPush.filter((e) => e.value === null).map((e) => e.id));
 
     writeCursor(new Date().toISOString());
 
     return {
       ok: true,
-      pushed: docRows.length + postRows.length,
-      applied: docMerge.toApply.length + postMerge.toApply.length,
+      pushed: docRows.length + postRows.length + brandRows.length,
+      applied: docMerge.toApply.length + postMerge.toApply.length + brandMerge.toApply.length,
     };
   } catch (err) {
     return {
@@ -259,6 +314,16 @@ export async function syncAll(userId: string): Promise<SyncResult> {
     };
   }
 }
+
+const emptyBrand = (id: string, at: string): Brand => ({
+  id,
+  name: "Deleted",
+  theme: { bg: "#000000", fg: "#ffffff", accent: "#ffffff", muted: "#888888" },
+  width: 1080,
+  height: 1350,
+  createdAt: at,
+  updatedAt: at,
+});
 
 /** Placeholders for a tombstone push. Never read back — deleted_at hides them. */
 const emptyDoc = (id: string, at: string): Doc => ({
@@ -301,13 +366,14 @@ const emptyPost = (id: string, at: string): Post => ({
  * persuasive, because the work is right there.
  */
 export function hasLocalWork(): boolean {
-  return listDocs().length > 0 || listPosts().length > 0;
+  return listDocs().length > 0 || listPosts().length > 0 || listBrands().length > 0;
 }
 
 /** Signing out leaves the machine clean, so the next person sees their own work. */
 export function forgetLocal(): void {
   for (const d of listDocs()) dropDoc(d.id);
   savePosts([]);
+  saveBrands([]);
   clearAllTombstones();
   clearCursor();
 }
