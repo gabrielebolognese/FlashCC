@@ -776,11 +776,15 @@ alone, which reads as a truncated caption; it is now the same derived text post.
 
 ## Batch 7 — Clients and approval
 
-**Status:** next
+**Status:** done
 **Size:** large
 **Why here:** the agency tier already exists in `profiles.plan` and is empty. This fills it.
 
-### 7.1 Client replaces the flat group string
+### 7.1 Client sits above the flat group string
+
+> **Corrected while building.** This originally said a client *replaces* `group`. It does
+> not: a group is a folder, somebody with one client still wants folders, and Batch 6
+> forms a series out of a group's contents. A client owns; a group organises.
 
 **What:** a Client owns brands, assets, projects and posts. Ship **both** per-client filter and
 all-client roll-up — the evidence demands both: *"I can separate each one so that nothing gets
@@ -818,11 +822,72 @@ Sprout charges **$499/month per external approver** and caps the account at thre
 loudest single complaint in the corpus. Planable, Gain and Ziflow all give reviewer seats away as
 an acquisition lever. Campaign against the anti-pattern.
 
+### Built as
+
+All six, and one of them was a paragraph rather than a feature.
+
+**7.1 does not replace the group string, and the roadmap was wrong to say it
+would.** `group` is a folder — "March", "Launch" — and somebody with one client
+still wants folders; Batch 6 also forms a series out of a group's contents, so
+removing it would have taken that with it. A client sits ABOVE the group: it owns
+brands, assets, projects and posts, and the folder is a drawer inside. `ALL_CLIENTS`
+is the default and the top entry in the switcher, not an escape hatch, because
+the CoSchedule complaint is precisely about a tool that only does separation.
+
+**Deleting a client does not delete their work.** Everything it owned becomes
+unassigned. A cascading foreign key here would mean an agency losing a client
+loses a year of carousels, with no undo — so `client_id` is a plain nullable
+column on four tables and deliberately not an FK, and the confirmation says so
+before anybody presses it.
+
+**7.2 is the first thing in FlashCC with no offline half.** A review link is a
+URL somebody else opens; there is no localStorage version of that. It is also the
+only place where RLS is not the boundary: a reviewer has no `auth.uid()`, and an
+anon policy that trusts a token in the row means letting the anon key read
+`shares` to find the match, which is the same as letting it read every share. So
+`server/review.ts` holds the service role key and is the boundary, written to be
+read end to end — and `strip()` is an allow list rather than a delete list, so a
+column added next year is absent by default instead of leaking by default.
+
+**A share is a SNAPSHOT of rendered slides, not a window onto the editor.** Three
+reasons, and only the third was in the plan: a logged-out reviewer cannot read
+the private `media` bucket or the owner's uploaded fonts; the client should
+approve what will be POSTED rather than a canvas that may have moved; and it
+makes 7.4 nearly free. Creating a share publishes through the Batch 5 path and
+records the public URLs.
+
+**7.4 is `docVersion` and one stored string.** The fingerprint covers geometry
+and colour as well as words, because "safeties to ensure that approved images
+aren't confused with modified ones" is about a nudged headline as much as a
+rewritten one — and it ignores ids and timestamps, so re-laying a deck to the
+identical result does not invalidate an approval. A stale approval is reported,
+never revoked: deciding for somebody that their sign-off is void is worse than
+telling them it is old.
+
+**7.3's filter lives on the server, not in the page.** A leak in that direction
+is the single worst bug this product could ship, so `scope` is hard-coded to
+`client` on the public insert route — a malformed body cannot mint an internal
+note — and the reviewer's read never selects one.
+
+**7.5 turned out to need a signing step nobody mentioned.** `brands.logos` holds
+asset IDS, and those assets live in the private `media` bucket. The server signs
+them with the service role at read time rather than at share time, so a link
+opened in six weeks still shows a logo.
+
+**7.6 was a paragraph.** There was nothing to build except not adding a seat cap.
+It is now invariant 6 in `CLAUDE.md`, a comment at the foot of `07-review.sql`,
+and `REVIEWER_PROMISE` on the pricing screen — because a commitment that lives
+only in a roadmap is one the next paywall quietly breaks.
+
+**Also:** a component may no longer share a name with a module beside it. This
+cost time for the fifth time in this batch (`Review`/`review`, `Clients`/`clients`),
+so the convention is written into `CLAUDE.md` with the four existing pairs named.
+
 ---
 
 ## Batch 8 — Trust, and the long tail
 
-**Status:** queued
+**Status:** next
 **Size:** small to medium
 
 ### 8.1 LinkedIn analytics CSV import

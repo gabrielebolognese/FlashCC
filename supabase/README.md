@@ -72,6 +72,8 @@ it should stay deleted. That second half is the one that catches real bugs.
 | `03-brands.sql` | Now. The brands table, and the tier limit as an INSERT policy. |
 | `04-storage.sql` | Now. Two buckets, the `assets` library table, and `brands.logos`. |
 | `05-series.sql` | Now. Two nullable columns on `docs` and `posts`, so a series can be queried. |
+| `06-clients.sql` | Now. The `clients` table, the tier limit, and `client_id` on four tables. |
+| `07-review.sql` | Now. Review links and comments. **Required** — review has no offline half. |
 
 ## 6. The asset library (`04-storage.sql`)
 

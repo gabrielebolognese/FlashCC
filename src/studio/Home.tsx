@@ -8,6 +8,7 @@
  */
 import {
   BarChart3,
+  Building2,
   CalendarClock,
   Flame,
   Images,
@@ -24,11 +25,20 @@ import { AccountCard } from "./AccountCard.js";
 import { Analytics } from "./Analytics.js";
 import { Brands } from "./Brands.js";
 import { listAssets } from "./assets.js";
+import { ClientAdmin, ClientSwitcher } from "./ClientAdmin.js";
+import {
+  ALL_CLIENTS,
+  belongsTo,
+  labelFor,
+  listClients,
+  loadSelectedClient,
+  saveSelectedClient,
+} from "./clients.js";
 import { listBrands } from "./brand.js";
 import { AssetLibrary } from "./AssetLibrary.js";
 import { Board } from "./Board.js";
 import { demoPosts } from "./demo.js";
-import { Empty } from "./Dash.js";
+import { Chip, Empty } from "./Dash.js";
 import { Posted, Scheduled } from "./Lists.js";
 import type { Doc } from "./model.js";
 import { Outliers } from "./Outliers.js";
@@ -51,6 +61,7 @@ import { Upgrade } from "./Upgrade.js";
 
 type View =
   | "projects"
+  | "clients"
   | "brands"
   | "library"
   | "board"
@@ -71,6 +82,7 @@ const NAV: { section: string; items: NavItem[] }[] = [
     section: "Library",
     items: [
       { id: "projects", label: "Projects", icon: LayoutGrid, count: (c) => c.docs },
+      { id: "clients", label: "Clients", icon: Building2, count: () => listClients().length },
       { id: "brands", label: "Brands", icon: Palette, count: () => listBrands().length },
       { id: "library", label: "Library", icon: Images, count: () => listAssets().length },
     ],
@@ -104,6 +116,10 @@ const NAV: { section: string; items: NavItem[] }[] = [
 
 const TITLES: Record<View, { title: string; sub: string }> = {
   projects: { title: "Projects", sub: "Every carousel you have made, and two ways to start another." },
+  clients: {
+    title: "Clients",
+    sub: "Who each carousel is for. Separate when you want it, all together when you do not.",
+  },
   brands: { title: "Brands", sub: "Your colours, typefaces and logo, saved. Applied once, never live." },
   library: {
     title: "Library",
@@ -132,6 +148,8 @@ export function Home({
   const [editing, setEditing] = useState<Post | null>(null);
   const [pricing, setPricing] = useState(false);
   const [signingIn, setSigningIn] = useState(false);
+  const [client, setClient] = useState<string>(() => loadSelectedClient());
+  const clients = useMemo(() => listClients(), [view]);
 
   // Bumped on every local write. useAccount debounces a push off it, so a burst of
   // edits becomes one sync rather than one per keystroke.
@@ -154,8 +172,17 @@ export function Home({
     setView("board");
   };
 
-  const measuredCount = posts.filter(isMeasured).length;
-  const ctx = { posts, docs: docCount };
+  /**
+   * Every screen below the rail reads THIS rather than `posts`.
+   *
+   * One filter at the top rather than one per view: an analytics tab that
+   * quietly ignored the client switcher would answer a question nobody asked,
+   * and the failure would look like bad data rather than like a missing filter.
+   */
+  const visiblePosts = useMemo(() => posts.filter((p) => belongsTo(p, client)), [posts, client]);
+
+  const measuredCount = visiblePosts.filter(isMeasured).length;
+  const ctx = { posts: visiblePosts, docs: docCount };
   const boardLike = view === "board";
 
   return (
@@ -171,6 +198,15 @@ export function Home({
           </span>
           <span className="text-title text-primary">FlashCC</span>
         </div>
+
+        <ClientSwitcher
+          clients={clients}
+          selected={client}
+          onSelect={(id) => {
+            setClient(id);
+            saveSelectedClient(id);
+          }}
+        />
 
         <nav className="scroll-quiet flex-1 overflow-y-auto px-2.5 pb-4">
           {NAV.map((group) => (
@@ -215,12 +251,22 @@ export function Home({
       <div className="flex min-w-0 flex-1 flex-col">
         <header className="flex h-14 shrink-0 items-center gap-3 border-b border-hairline px-6">
           <div className="min-w-0">
-            <div className="truncate text-title text-primary">{TITLES[view].title}</div>
+            <div className="flex items-center gap-2">
+              <span className="truncate text-title text-primary">{TITLES[view].title}</span>
+              {/*
+                Named in the header as well as in the switcher, because a filtered
+                view that does not say it is filtered is how somebody concludes
+                their projects have vanished.
+              */}
+              {client !== ALL_CLIENTS && clients.length > 0 ? (
+                <Chip>{labelFor(clients, client)}</Chip>
+              ) : null}
+            </div>
             <div className="truncate text-caption text-tertiary">{TITLES[view].sub}</div>
           </div>
           <div className="flex-1" />
 
-          {view !== "projects" && posts.length === 0 ? (
+          {view !== "projects" && view !== "clients" && posts.length === 0 ? (
             <button
               type="button"
               onClick={() => commit(demoPosts())}
@@ -262,7 +308,7 @@ export function Home({
             */}
             {view === "projects" || view === "scheduled" ? (
               <SeriesDue
-                posts={posts}
+                posts={visiblePosts}
                 onOpen={(docId) => {
                   const doc = loadDoc(docId);
                   if (doc) onOpen(doc);
@@ -270,8 +316,11 @@ export function Home({
               />
             ) : null}
 
+            {view === "clients" ? <ClientAdmin plan={account.profile?.plan} /> : null}
+
             {view === "projects" ? (
               <Projects
+                client={client}
                 onOpen={onOpen}
                 onCompose={onCompose}
                 onBulk={onBulk}
@@ -285,29 +334,29 @@ export function Home({
             {view === "library" ? <AssetLibrary /> : null}
 
             {view === "board" ? (
-              <Board posts={posts} onChange={commit} onOpen={setEditing} />
+              <Board posts={visiblePosts} onChange={commit} onOpen={setEditing} />
             ) : null}
 
             {view === "scheduled" ? (
-              <Scheduled posts={posts} onChange={commit} onOpen={setEditing} />
+              <Scheduled posts={visiblePosts} onChange={commit} onOpen={setEditing} />
             ) : null}
 
-            {view === "posted" ? <Posted posts={posts} onOpen={setEditing} /> : null}
+            {view === "posted" ? <Posted posts={visiblePosts} onOpen={setEditing} /> : null}
 
             {view === "analytics" ? (
-              posts.length === 0 ? (
+              visiblePosts.length === 0 ? (
                 <SampleGate onLoad={() => commit(demoPosts())} />
               ) : (
-                <Analytics posts={posts} onOpen={setEditing} />
+                <Analytics posts={visiblePosts} onOpen={setEditing} />
               )
             ) : null}
 
             {view === "outliers" ? (
-              posts.length === 0 ? (
+              visiblePosts.length === 0 ? (
                 <SampleGate onLoad={() => commit(demoPosts())} />
               ) : (
                 <Outliers
-                  posts={posts}
+                  posts={visiblePosts}
                   onOpen={setEditing}
                   onMakeAnother={(framework) => onCompose("ink", framework ?? undefined)}
                 />

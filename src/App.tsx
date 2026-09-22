@@ -10,6 +10,8 @@ import { Compose } from "./studio/Compose.js";
 import { FirstRun } from "./studio/FirstRun.js";
 import { Home } from "./studio/Home.js";
 import { Repurpose } from "./studio/Repurpose.js";
+import { ReviewLink } from "./studio/ReviewLink.js";
+import { tokenFromPath } from "./studio/sharing.js";
 import { Frameworks } from "./studio/Frameworks.js";
 import { makeDoc, type Doc } from "./studio/model.js";
 import { THEMES } from "./studio/presets.js";
@@ -44,7 +46,22 @@ type Screen =
   | { view: "style"; draft: Draft; theme: keyof typeof THEMES }
   | { view: "studio"; doc: Doc };
 
+/**
+ * A review link is checked before anything else, and returns before any of the
+ * app's own state is touched.
+ *
+ * There is no router in this product and this does not justify adding one: it is
+ * one path, read once at module scope so it cannot change under a render. Vite
+ * already serves index.html for any path, so /r/<token> reaches here in dev and
+ * in a build with SPA fallback.
+ */
+const REVIEW_TOKEN = typeof window === "undefined" ? null : tokenFromPath(window.location.pathname);
+
 export function App() {
+  // A stranger with a link gets the review page and nothing else — no onboarding,
+  // no welcome, no account prompt. See Review.tsx.
+  if (REVIEW_TOKEN) return <ReviewLink token={REVIEW_TOKEN} />;
+
   // First run gets the welcome; everyone else goes straight in.
   const [screen, setScreen] = useState<Screen>(() =>
     hasOnboarded() ? { view: "start" } : { view: "welcome" },

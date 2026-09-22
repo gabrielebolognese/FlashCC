@@ -21,21 +21,25 @@
 import {
   assetToRow,
   brandToRow,
+  clientToRow,
   cloud,
   docToRow,
   forWrite,
   postToRow,
   rowToAsset,
   rowToBrand,
+  rowToClient,
   rowToDoc,
   rowToPost,
   type AssetRow,
   type BrandRow,
+  type ClientRow,
   type DocRow,
   type PostRow,
 } from "./cloud.js";
 import { listAssets, saveAssets, type Asset } from "./assets.js";
 import { listBrands, saveBrands, type Brand } from "./brand.js";
+import { listClients, saveClients, type Client } from "./clients.js";
 import { forgetLibrary } from "./library.js";
 import type { Doc } from "./model.js";
 import { listPosts, savePosts, type Post } from "./pipeline.js";
@@ -148,6 +152,20 @@ function localAssetEntries(): Entry<Asset>[] {
   return [...alive, ...gone];
 }
 
+function localClientEntries(): Entry<Client>[] {
+  const alive: Entry<Client>[] = listClients().map((c) => ({
+    id: c.id,
+    updatedAt: c.updatedAt,
+    value: c,
+  }));
+  const gone: Entry<Client>[] = listTombstones("client").map((t) => ({
+    id: t.id,
+    updatedAt: t.deletedAt,
+    value: null,
+  }));
+  return [...alive, ...gone];
+}
+
 function localPostEntries(): Entry<Post>[] {
   const alive: Entry<Post>[] = listPosts().map((p) => ({
     id: p.id,
@@ -176,6 +194,11 @@ const brandRowToEntry = (row: BrandRow): Entry<Brand> =>
   row.deleted_at
     ? { id: row.id, updatedAt: row.deleted_at, value: null }
     : { id: row.id, updatedAt: row.updated_at, value: rowToBrand(row) };
+
+const clientRowToEntry = (row: ClientRow): Entry<Client> =>
+  row.deleted_at
+    ? { id: row.id, updatedAt: row.deleted_at, value: null }
+    : { id: row.id, updatedAt: row.updated_at, value: rowToClient(row) };
 
 const assetRowToEntry = (row: AssetRow): Entry<Asset> =>
   row.deleted_at
@@ -237,11 +260,12 @@ export async function syncAll(userId: string): Promise<SyncResult> {
   if (!db) return { ok: false, pushed: 0, applied: 0, error: "Cloud is not configured" };
 
   try {
-    const [docsRes, postsRes, brandsRes, assetsRes] = await Promise.all([
+    const [docsRes, postsRes, brandsRes, assetsRes, clientsRes] = await Promise.all([
       db.from("docs").select("*").eq("user_id", userId),
       db.from("posts").select("*").eq("user_id", userId),
       db.from("brands").select("*").eq("user_id", userId),
       db.from("assets").select("*").eq("user_id", userId),
+      db.from("clients").select("*").eq("user_id", userId),
     ]);
 
     if (docsRes.error) throw new Error(docsRes.error.message);
@@ -258,6 +282,13 @@ export async function syncAll(userId: string): Promise<SyncResult> {
     // because of it.
     const assetsTableMissing = assetsRes.error?.code === "PGRST205";
     if (assetsRes.error && !assetsTableMissing) throw new Error(assetsRes.error.message);
+
+    // And again for clients, which arrive with 06-clients.sql. Three optional
+    // tables is a pattern now rather than an exception: each migration ships
+    // separately, and a sync that fails because one has not been run yet would
+    // take the whole account offline over a feature nobody is using.
+    const clientsTableMissing = clientsRes.error?.code === "PGRST205";
+    if (clientsRes.error && !clientsTableMissing) throw new Error(clientsRes.error.message);
 
     const docMerge = mergeEntries(
       localDocEntries(),
@@ -279,6 +310,13 @@ export async function syncAll(userId: string): Promise<SyncResult> {
       : mergeEntries(
           localAssetEntries(),
           ((assetsRes.data ?? []) as AssetRow[]).map(assetRowToEntry),
+        );
+
+    const clientMerge = clientsTableMissing
+      ? { merged: [], toPush: [], toApply: [] }
+      : mergeEntries(
+          localClientEntries(),
+          ((clientsRes.data ?? []) as ClientRow[]).map(clientRowToEntry),
         );
 
     /* ── push ── */
@@ -305,6 +343,21 @@ export async function syncAll(userId: string): Promise<SyncResult> {
           : brandToRow(emptyBrand(e.id, e.updatedAt), userId, e.updatedAt),
       ),
     );
+
+    const clientRows = clientMerge.toPush.map((e) =>
+      forWrite(
+        e.value
+          ? clientToRow(e.value, userId)
+          : clientToRow(emptyClient(e.id, e.updatedAt), userId, e.updatedAt),
+      ),
+    );
+
+    if (clientRows.length > 0) {
+      const { error } = await db.from("clients").upsert(clientRows, { onConflict: "user_id,id" });
+      // Past the plan's allowance is the paywall working, not a sync failure —
+      // the same bargain brands strike. The client stays local.
+      if (error && error.code !== "42501") throw new Error(error.message);
+    }
 
     const assetRows = assetMerge.toPush.flatMap((e) =>
       e.value
@@ -363,6 +416,10 @@ export async function syncAll(userId: string): Promise<SyncResult> {
       saveBrands(live(brandMerge.merged));
     }
 
+    if (clientMerge.toApply.length > 0) {
+      saveClients(live(clientMerge.merged));
+    }
+
     if (assetMerge.toApply.length > 0) {
       // Locally-pending uploads are kept: they are the ones still carrying their
       // bytes, they are invisible to the server, and a merge that only saw the
@@ -376,17 +433,20 @@ export async function syncAll(userId: string): Promise<SyncResult> {
     clearTombstones("post", postMerge.toPush.filter((e) => e.value === null).map((e) => e.id));
     clearTombstones("brand", brandMerge.toPush.filter((e) => e.value === null).map((e) => e.id));
     clearTombstones("asset", assetTombstones.map((e) => e.id));
+    clearTombstones("client", clientMerge.toPush.filter((e) => e.value === null).map((e) => e.id));
 
     writeCursor(new Date().toISOString());
 
     return {
       ok: true,
-      pushed: docRows.length + postRows.length + brandRows.length + assetRows.length,
+      pushed:
+        docRows.length + postRows.length + brandRows.length + assetRows.length + clientRows.length,
       applied:
         docMerge.toApply.length +
         postMerge.toApply.length +
         brandMerge.toApply.length +
-        assetMerge.toApply.length,
+        assetMerge.toApply.length +
+        clientMerge.toApply.length,
     };
   } catch (err) {
     return {
@@ -397,6 +457,14 @@ export async function syncAll(userId: string): Promise<SyncResult> {
     };
   }
 }
+
+const emptyClient = (id: string, at: string): Client => ({
+  id,
+  name: "Deleted",
+  colour: "#888888",
+  createdAt: at,
+  updatedAt: at,
+});
 
 const emptyBrand = (id: string, at: string): Brand => ({
   id,
@@ -455,7 +523,8 @@ export function hasLocalWork(): boolean {
     listDocs().length > 0 ||
     listPosts().length > 0 ||
     listBrands().length > 0 ||
-    listAssets().length > 0
+    listAssets().length > 0 ||
+    listClients().length > 0
   );
 }
 
@@ -464,6 +533,7 @@ export function forgetLocal(): void {
   for (const d of listDocs()) dropDoc(d.id);
   savePosts([]);
   saveBrands([]);
+  saveClients([]);
   forgetLibrary();
   clearAllTombstones();
   clearCursor();

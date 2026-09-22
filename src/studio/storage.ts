@@ -9,7 +9,7 @@ const INDEX = "flashcc:v3:index";
 const KEY = (id: string) => `flashcc:v3:doc:${id}`;
 /** Bumped when a summary field is added, to trigger one rebuild from the docs. */
 const INDEX_VERSION = "flashcc:v3:index-version";
-const CURRENT_INDEX_VERSION = "3";
+const CURRENT_INDEX_VERSION = "4";
 
 export type DocSummary = {
   id: string;
@@ -20,6 +20,8 @@ export type DocSummary = {
   width: number;
   height: number;
   group?: string | undefined;
+  /** Whose project this is. The switcher filters on it without loading a doc. */
+  clientId?: string | undefined;
   /** Stamped once at generation. The facets read these; nobody types them. */
   framework?: string | undefined;
   styleId?: string | undefined;
@@ -121,6 +123,7 @@ export function summaryOf(doc: Doc): DocSummary {
     height: doc.height,
     search: searchBlob(doc),
     ...(doc.group ? { group: doc.group } : {}),
+    ...(doc.clientId ? { clientId: doc.clientId } : {}),
     ...(doc.framework ? { framework: doc.framework } : {}),
     ...(doc.styleId ? { styleId: doc.styleId } : {}),
     ...(doc.series ? { series: doc.series } : {}),
@@ -190,6 +193,12 @@ export function renameDoc(id: string, name: string): void {
   const trimmed = name.trim();
   if (trimmed === "") return;
   saveDoc({ ...doc, name: trimmed });
+}
+
+export function setDocClient(id: string, clientId: string | undefined): void {
+  const doc = loadDoc(id);
+  if (!doc) return;
+  saveDoc(clientId ? { ...doc, clientId } : { ...doc, clientId: undefined });
 }
 
 export function setDocGroup(id: string, group: string | undefined): void {

@@ -19,7 +19,7 @@ is still current.
 | **Orientation** | [1 What it is](#1-what-it-is) · [2 Running it](#2-running-it) · [3 The invariants](#3-the-invariants) |
 | **The canvas** | [4 Data model](#4-the-data-model) · [5 Canvas](#5-the-canvas) · [6 Text](#6-text-measurement-and-fitting) · [7 Colour](#7-colour-and-contrast) · [8 Gradients](#8-gradients) · [9 Format change](#9-changing-format-reflow) |
 | **Making a deck** | [10 Frameworks](#10-the-four-frameworks) · [11 Generation](#11-generation) · [12 Styles](#12-styles-and-themes) · [13 Onboarding](#13-onboarding) · [14 AI drafting](#14-ai-drafting) · [15 Bulk and long form](#15-bulk-create-and-long-form-ingest) · [16 Media, fonts and assets](#16-media-and-fonts) · [17 Screen flow](#17-screen-flow) |
-| **The product** | [18 Pipeline and series](#18-the-pipeline) · [19 Analytics](#19-analytics) · [20 Library](#20-the-library) · [21 Export](#21-export) |
+| **The product** | [17b Clients and review](#17b-clients-and-review) · [18 Pipeline and series](#18-the-pipeline) · [19 Analytics](#19-analytics) · [20 Library](#20-the-library) · [21 Export](#21-export) |
 | **Infrastructure** | [22 Persistence](#22-persistence) · [23 Sync](#23-sync) · [24 Auth](#24-auth) · [25 Billing](#25-billing) · [26 Database](#26-database) · [27 Design tokens](#27-design-tokens) · [28 Testing](#28-testing) |
 | **Reality check** | [29 Known defects](#29-known-defects) |
 
@@ -774,6 +774,122 @@ instant; this is the beat that shows it happened."*
 
 ---
 
+## 17b. Clients and review
+
+### Clients (`clients.ts`, `ClientAdmin.tsx`)
+
+A client owns brands, assets, projects and posts. `clientId` is a nullable field on all four, and
+**it does not replace `group`** — a group is a folder ("March", "Launch"), somebody with one client
+still wants folders, and Batch 6 forms a series out of a group's contents. A client owns; a group
+organises.
+
+Two sentinels, both first class:
+
+| Value | Means |
+| --- | --- |
+| `ALL_CLIENTS` | Everything, unassigned work included. The default and the top entry in the switcher |
+| `UNASSIGNED` | Only work with no client. A real bucket — most of anybody's library starts here |
+
+The roll-up is not an escape hatch. The evidence asks for both halves at once: *"I can separate
+each one so that nothing gets mixed"* (Gain) alongside *"it was a downside to have to toggle back
+and forth between clients instead of seeing everything under one view"* (CoSchedule), and a tool
+that only does the first is what the second complaint is about.
+
+`Home` filters `posts` once at the top into `visiblePosts`; every screen below reads that rather
+than `posts`. An analytics tab that ignored the switcher would look like bad data rather than a
+missing filter. `Projects` applies the client filter **before** counting facets, so a facet never
+offers a count that clicking it cannot produce.
+
+Limits are the ladder brands already use — free 1, pro 5, agency unlimited — enforced by an INSERT
+policy in `06-clients.sql`, so a downgrade keeps what you have and only refuses the next one.
+
+**Deleting a client does not delete their work.** `client_id` is deliberately not a foreign key: a
+cascade would mean an agency losing a client loses a year of carousels, with no undo. Everything it
+owned becomes unassigned, and the confirmation says so before anybody presses it.
+
+### Review links (`review.ts`, `sharing.ts`, `server/review.ts`, `ReviewLink.tsx`)
+
+The only feature in FlashCC with **no offline half**. A review link is a URL somebody else opens;
+there is no localStorage version of that.
+
+It is also the only place where **RLS is not the boundary**. A reviewer has no `auth.uid()` — that
+is the feature — and an anon policy trusting a token in the row means letting the anon key read
+`shares` to find the match, which is the same as letting it read every share. So the boundary is
+`server/review.ts`: the service role key, one lookup by token, and a response containing only what
+that token entitles the caller to.
+
+`strip()` builds a **new object** rather than deleting keys. An allow list cannot leak a column
+somebody adds next year; a deny list can.
+
+| Route | Who | Does |
+| --- | --- | --- |
+| `GET /api/review?token=` | anyone with the link | the share, its client-scoped comments, the brand's paint |
+| `POST /api/review/comment` | anyone with the link | one comment, scope hard-coded to `client` |
+| `POST /api/review/decision` | anyone with the link | approve or request changes, stamping the version |
+
+The owner's half goes through PostgREST as usual, gated by owner-only policies. **Shares and
+comments do not sync** — a comment written by somebody else cannot originate on this machine, so a
+local copy could only be a stale cache of a conversation. `sync.ts` is untouched by this.
+
+Open-endpoint ceilings: 2000 characters a comment, 60 a name, 500 comments a share, 20 writes a
+minute per token. A revoked link answers a plain **404** — saying "this link was turned off"
+confirms to whoever holds it that it was once real, and the person who revoked it did so to end the
+conversation.
+
+### A share is a snapshot
+
+Creating one publishes the deck through the Batch 5 path and records the public URLs plus a version
+fingerprint. Three reasons it is not a live view of the editor:
+
+1. a logged-out reviewer cannot read the private `media` bucket, and uploaded fonts live in the
+   owner's browser — a live render would show missing images in a face nobody chose
+2. the client should approve **what will be posted**, not a canvas that has moved since
+3. it makes approval-per-version nearly free
+
+### Approval, pinned to a version
+
+*"Three people approved the post. None of them approved the same version."*
+
+`docVersion(doc)` fingerprints geometry, colour, size and words of every **visible** layer —
+because *"safeties to ensure that approved images aren't confused with modified ones"* is about a
+nudged headline as much as a rewritten one. It ignores ids and timestamps, so re-laying a deck to
+the identical result does not invalidate an approval.
+
+Approving stamps `approved_version`. `stalenessOf` compares it to the deck as it stands and reports
+`current` or `stale`. A stale approval is **reported, never revoked** — deciding for somebody that
+their sign-off is void is worse than telling them it is old, because only they know whether the
+change mattered. Re-capturing resets the share to `open` and clears the decision, since leaving a
+tick on slides nobody has seen is the same failure wearing a badge.
+
+### Two comment scopes
+
+Internal and client-visible, in one thread for the owner and a shorter one for the client. The
+filter is on the **server** — `scope` is hard-coded to `client` on the public insert route, so a
+malformed body cannot mint an internal note, and the reviewer's read never selects one. A leak in
+that direction is the single worst bug this product could ship.
+
+Comments attach to a **slide index**, and that is the whole trick: every other proofing tool needs
+an x/y annotation engine because it reviews arbitrary artwork, while a carousel is already an
+ordered list of pictures. The index rather than the slide id is authoritative, because a comment is
+against a snapshot and re-laying a deck can change ids while the pictures keep their order.
+
+### White label
+
+The review page wears the agency's brand — theme colours and logo — falling back to a neutral light
+scheme rather than to FlashCC's dark chrome, so an unbranded page looks like a document rather than
+somebody else's product with the logo taken off. `brands.logos` holds asset ids pointing into the
+private bucket, so the server signs them at read time (one hour) rather than at share time; a link
+opened in six weeks still shows a logo. Gain gates this at $199/month.
+
+### No seats. Ever.
+
+There is no reviewer record, no invitation and nothing counting them. Sprout charges **$499/month
+per external approver** and caps the account at three; it is the loudest single complaint in the
+research corpus. See invariant 6, the note at the foot of `07-review.sql`, and `REVIEWER_PROMISE`
+on the pricing screen.
+
+---
+
 ## 18. The pipeline
 
 A **Post is not a Doc.** A Doc is the artwork; a Post is one publication of it, so the same carousel
@@ -1147,7 +1263,7 @@ paid.
 
 ## 26. Database
 
-Five tables, all with `(user_id, id)` composite primary keys.
+Eight tables, all with `(user_id, id)` composite primary keys.
 
 **Identity is the client's.** The app mints ids offline and creates records before anyone signs in,
 so there is no id remapping on sync and ids only need to be unique per person.
@@ -1164,6 +1280,21 @@ be indexed usefully for that.
 
 `doc_id` has **no foreign key**, deliberately: a composite FK would need `ON DELETE SET NULL
 (doc_id)`, which is Postgres 15+ only, and it makes account deletion order-sensitive.
+
+### Clients and review (`06-clients.sql`, `07-review.sql`)
+
+`clients` carries the same INSERT-only tier limit as `brands`. `client_id` is a nullable column on
+`docs`, `posts`, `brands` and `assets`, deliberately **not** a foreign key — see §17b.
+
+`shares` and `comments` are owner-only under RLS and are reached by a reviewer **only** through
+`server/review.ts`, which holds the service role key. That is the single exception to "the RLS
+policies are the boundary" in this schema, and the reason is in §17b.
+
+`shares.token` is `unique` across every account, because it is the only thing identifying the row
+on the way in. `approved_version` is separate from `snapshot.version` so that a re-capture can move
+the snapshot forward while the approval stays where it was.
+
+**There is no seat table and there will not be one.** See invariant 6.
 
 ### Series (`05-series.sql`)
 
@@ -1424,6 +1555,31 @@ Vite proxy and localhost. All of that needs revisiting before this is public.
 
 PNG export, AI drafting and the pipeline are advertised as Pro. No screen reads `plan`, no platform
 emits PNG, and `02-pro-gate.sql` is unrun. The tier list is currently aspirational copy.
+
+### D23 — A review link's slides outlive the link
+
+Revoking a share flips its status; the rendered slides stay in the public `slides` bucket at the
+same URLs. Anyone who noted a slide URL before the link was turned off can still open that image.
+
+Publishing means "anyone with the link can see this", so the pixels behaving that way is
+consistent — but "turn the link off" reads as stronger than it is, and it is the same shape of
+problem as D22.
+
+**Fix:** revoking should clear `<user>/<doc>/` from the bucket, or the button should say plainly
+that it stops the review page rather than the images.
+
+### D24 — The client filter does not reach the asset library or brands
+
+`Asset` and `Brand` both carry `clientId` and both sync it, but `AssetLibrary.tsx` and
+`Brands.tsx` still list everything regardless of the rail's selection. Only Projects, the pipeline
+views and the insight screens are filtered.
+
+Not wrong, exactly — `filterAssets` already treats a brand scope as inclusive, so shared stock
+should appear under every client — but it is inconsistent with the rest of the rail, and somebody
+with fifteen clients will notice.
+
+**Fix:** pass the selection into both screens and filter with `belongsTo`, keeping unscoped assets
+visible everywhere.
 
 ### D21 — Scheduler column names are unverified against live templates
 

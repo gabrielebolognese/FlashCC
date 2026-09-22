@@ -1,4 +1,4 @@
-import { ChevronLeft, ClipboardPaste, Download, Redo2, Shuffle, Sparkles, Undo2, X } from "lucide-react";
+import { ChevronLeft, ClipboardPaste, Download, Redo2, Send, Shuffle, Sparkles, Undo2, X } from "lucide-react";
 import { useState } from "react";
 import { createPortal } from "react-dom";
 
@@ -18,6 +18,7 @@ import { logoResolver } from "./library.js";
 import { BrandMenu } from "./BrandMenu.js";
 import { ExportDialog } from "./ExportDialog.js";
 import { HookPicker } from "./HookPicker.js";
+import { ShareDialog } from "./ShareDialog.js";
 import { regenerate, restateSlide } from "./regenerate.js";
 import { STRUCTURES } from "./structures.js";
 import { THEMES } from "./presets.js";
@@ -32,6 +33,7 @@ export function Studio({ initial, onHome }: { initial: Doc; onHome: () => void }
   const [exporting, setExporting] = useState(false);
   const [relaid, setRelaid] = useState<number | null>(null);
   const [hooking, setHooking] = useState(false);
+  const [sharing, setSharing] = useState(false);
   const [pasted, setPasted] = useState("");
 
   const printRoot = document.getElementById("print-root");
@@ -127,6 +129,15 @@ export function Studio({ initial, onHome }: { initial: Doc; onHome: () => void }
           <ClipboardPaste size={14} strokeWidth={2} />
           Paste post
         </button>
+        <button
+          type="button"
+          title="Send a link your client can open without an account."
+          onClick={() => setSharing(true)}
+          className="flex h-7 items-center gap-1.5 rounded-md border border-hairline bg-surface-1 px-2.5 text-body text-secondary hover:bg-surface-3 hover:text-primary"
+        >
+          <Send size={14} strokeWidth={2} />
+          Review
+        </button>
         <Button hero icon={Download} onClick={() => setExporting(true)}>
           Export
         </Button>
@@ -195,6 +206,8 @@ export function Studio({ initial, onHome }: { initial: Doc; onHome: () => void }
       ) : null}
 
       {exporting ? <ExportDialog doc={doc} onClose={() => setExporting(false)} /> : null}
+
+      {sharing ? <ShareDialog doc={doc} onClose={() => setSharing(false)} /> : null}
 
       {hooking ? (
         <HookPicker

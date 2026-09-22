@@ -113,7 +113,18 @@ export type Doc = {
   palette: string[];
   /** Uploaded images, shared across every slide in the project. */
   media: MediaItem[];
-  /** Optional folder name. Projects with none sit under "Ungrouped". */
+  /**
+   * Which client this belongs to. Absent is a real answer — most of anybody's
+   * library is unassigned, and the roll-up shows it either way. See clients.ts.
+   */
+  clientId?: string | undefined;
+  /**
+   * Optional folder name. Projects with none sit under "Ungrouped".
+   *
+   * NOT replaced by `clientId`. A client is the owner; a group is a drawer
+   * inside it, and somebody with one client still wants "March" and
+   * "Launch". Batch 6 also forms a series out of a group's contents.
+   */
   group?: string | undefined;
   /**
    * How this carousel was made. Stamped once at generation and never re-derived,

@@ -16,6 +16,7 @@ import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 
 import type { Asset, AssetKind, LogoRole } from "./assets.js";
 import type { Brand } from "./brand.js";
+import type { Client } from "./clients.js";
 import type { Doc } from "./model.js";
 import type { Metrics, Platform, Post, Stage } from "./pipeline.js";
 
@@ -68,6 +69,7 @@ export type DocRow = {
   slide_count: number;
   background: string | null;
   doc_group: string | null;
+  client_id: string | null;
   framework: string | null;
   style_id: string | null;
   series_id: string | null;
@@ -90,6 +92,7 @@ export type PostRow = {
   slide_count: number;
   hook: string;
   style_id: string | null;
+  client_id: string | null;
   series_id: string | null;
   series_part: number | null;
   scheduled_for: string | null;
@@ -114,6 +117,7 @@ export type BrandRow = {
   theme: Brand["theme"];
   /** Asset ids, by variant. See 04-storage.sql for why this is not three columns. */
   logos: Record<string, string>;
+  client_id: string | null;
   width: number;
   height: number;
   created_at: string;
@@ -134,6 +138,7 @@ export const brandToRow = (
   name: brand.name,
   theme: brand.theme,
   logos: brand.logos ?? {},
+  client_id: brand.clientId ?? null,
   width: brand.width,
   height: brand.height,
   created_at: brand.createdAt,
@@ -149,6 +154,7 @@ export const rowToBrand = (row: BrandRow): Brand => ({
   // The column arrives with 04-storage.sql; a project that has not run it yet
   // simply has no logos, which is the same as a brand that never had one.
   logos: row.logos ?? {},
+  ...(row.client_id ? { clientId: row.client_id } : {}),
   width: row.width,
   height: row.height,
   createdAt: row.created_at,
@@ -172,6 +178,7 @@ export function docToRow(doc: Doc, userId: string, deletedAt: string | null = nu
     slide_count: doc.slides.length,
     background: doc.slides[0]?.background ?? null,
     doc_group: doc.group ?? null,
+    client_id: doc.clientId ?? null,
     framework: doc.framework ?? null,
     style_id: doc.styleId ?? null,
     series_id: doc.series?.id ?? null,
@@ -191,6 +198,7 @@ export const rowToDoc = (row: DocRow): Doc => ({
   name: row.name,
   updatedAt: row.updated_at,
   ...(row.doc_group ? { group: row.doc_group } : {}),
+  ...(row.client_id ? { clientId: row.client_id } : {}),
   ...(row.framework ? { framework: row.framework } : {}),
   ...(row.style_id ? { styleId: row.style_id } : {}),
   // The columns arrive with 05-series.sql. Until then `data` still carries it,
@@ -215,6 +223,7 @@ export function postToRow(post: Post, userId: string, deletedAt: string | null =
     slide_count: post.slideCount,
     hook: post.hook,
     style_id: post.styleId,
+    client_id: post.clientId ?? null,
     series_id: post.series?.id ?? null,
     series_part: post.series?.part ?? null,
     scheduled_for: post.scheduledFor,
@@ -240,6 +249,7 @@ export const rowToPost = (row: PostRow): Post => ({
   slideCount: row.slide_count,
   hook: row.hook,
   styleId: row.style_id,
+  ...(row.client_id ? { clientId: row.client_id } : {}),
   series: row.series_id && row.series_part ? { id: row.series_id, part: row.series_part } : null,
   scheduledFor: row.scheduled_for,
   postedAt: row.posted_at,
@@ -283,6 +293,7 @@ export type AssetRow = {
   bytes: number;
   family: string | null;
   brand_id: string | null;
+  client_id: string | null;
   role: LogoRole | null;
   folder: string | null;
   created_at: string;
@@ -308,6 +319,7 @@ export const assetToRow = (
   bytes: asset.bytes,
   family: asset.family ?? null,
   brand_id: asset.brandId ?? null,
+  client_id: asset.clientId ?? null,
   role: asset.role ?? null,
   folder: asset.folder ?? null,
   created_at: asset.createdAt,
@@ -335,6 +347,7 @@ export const rowToAsset = (row: AssetRow): Asset => ({
   ...(row.height === null ? {} : { h: row.height }),
   ...(row.family === null ? {} : { family: row.family }),
   ...(row.brand_id === null ? {} : { brandId: row.brand_id }),
+  ...(row.client_id === null ? {} : { clientId: row.client_id }),
   ...(row.role === null ? {} : { role: row.role }),
   ...(row.folder === null ? {} : { folder: row.folder }),
   createdAt: row.created_at,
@@ -430,3 +443,45 @@ export function publicUrl(bucket: string, path: string): string {
   if (!db) return "";
   return db.storage.from(bucket).getPublicUrl(path).data.publicUrl;
 }
+
+/* ── clients ──────────────────────────────────────────────────────────────── */
+
+export type ClientRow = {
+  user_id: string;
+  id: string;
+  name: string;
+  colour: string;
+  brand_id: string | null;
+  archived: boolean;
+  created_at: string;
+  updated_at: string;
+  server_updated_at: string;
+  deleted_at: string | null;
+};
+
+export const clientToRow = (
+  client: Client,
+  userId: string,
+  deletedAt: string | null = null,
+): ClientRow => ({
+  user_id: userId,
+  id: client.id,
+  name: client.name,
+  colour: client.colour,
+  brand_id: client.brandId ?? null,
+  archived: client.archived ?? false,
+  created_at: client.createdAt,
+  updated_at: client.updatedAt,
+  server_updated_at: client.updatedAt,
+  deleted_at: deletedAt,
+});
+
+export const rowToClient = (row: ClientRow): Client => ({
+  id: row.id,
+  name: row.name,
+  colour: row.colour,
+  ...(row.brand_id === null ? {} : { brandId: row.brand_id }),
+  ...(row.archived ? { archived: true } : {}),
+  createdAt: row.created_at,
+  updatedAt: row.updated_at,
+});

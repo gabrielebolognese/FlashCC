@@ -26,6 +26,20 @@ type Tier = {
   featured?: boolean;
 };
 
+/**
+ * The one line on this screen that is a commitment rather than a description.
+ *
+ * Sprout charges $499/month per external approver and caps the account at three.
+ * It is the loudest single complaint in the whole research corpus, and Planable,
+ * Gain and Ziflow all give reviewer seats away as an acquisition lever. Saying
+ * so on the pricing page is free and nobody has taken it.
+ *
+ * See CLAUDE.md invariant 6. If this line ever has to come down, the product has
+ * changed into the thing it was built against.
+ */
+export const REVIEWER_PROMISE =
+  "Everyone you send a review link to is free. No seats, no per-approver fee, no cap on how many people can comment or approve. Not as an introductory offer — as the point.";
+
 export const PLANS: Tier[] = [
   {
     id: "free",
@@ -50,6 +64,8 @@ export const PLANS: Tier[] = [
     featured: true,
     features: [
       "Everything in Free",
+      "Up to 5 clients",
+      "Review links — unlimited reviewers, free",
       "Pipeline board and scheduling",
       "Analytics with structural attribution",
       "Outlier detection on your own baseline",
@@ -65,10 +81,10 @@ export const PLANS: Tier[] = [
     line: "More than one brand, more than one person.",
     features: [
       "Everything in Pro",
-      "Unlimited brand kits",
-      "Client folders and review links",
-      "Approvals before anything ships",
-      "Shared media pool",
+      "Unlimited clients and brand kits",
+      "White-labelled review pages",
+      "Approvals pinned to the version approved",
+      "Shared asset library",
     ],
   },
 ];
@@ -220,6 +236,11 @@ export function Upgrade({
             );
           })}
         </div>
+
+        {/* Not a footnote. See REVIEWER_PROMISE for why it is on this screen. */}
+        <p className="mt-4 rounded-2xl border border-hairline bg-surface-1 px-3.5 py-3 text-body leading-5 text-secondary">
+          {REVIEWER_PROMISE}
+        </p>
 
         {error ? (
           <p className="mt-4 rounded-2xl border border-danger-dim bg-danger-wash px-3.5 py-2.5 text-body text-danger">

@@ -13,7 +13,7 @@
 
 const KEY = "flashcc:v1:tombstones";
 
-export type Kind = "doc" | "post" | "brand" | "asset";
+export type Kind = "doc" | "post" | "brand" | "asset" | "client";
 
 export type Tombstone = {
   kind: Kind;

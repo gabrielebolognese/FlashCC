@@ -81,11 +81,25 @@ Invariants worth keeping:
    reject it for type scale, emphasis and colour. A new AI feature that returns a size, a
    position, a colour or a composition breaks this — and the way it breaks is invisible until
    somebody's deck ships looking wrong.
+6. **Reviewers are free and unlimited, and there is no seat anywhere in the schema.** A review
+   link costs nothing, is capped by nothing, and can be sent to as many people as you like.
+   Sprout charges **$499/month per external approver** and caps the account at three; it is the
+   loudest single complaint in the whole research corpus, and Planable, Gain and Ziflow all give
+   reviewer seats away to win against it. `07-review.sql` has no reviewer table, no invitation and
+   nothing counting them — deliberately. A migration that adds a seat count, or a paywall that
+   meters share links, undoes the reason the feature exists. The promise is stated on the pricing
+   screen as `REVIEWER_PROMISE` in `Upgrade.tsx`.
 
 ## Conventions
 
 - ESM only. Relative imports end in `.js` even in `.ts`/`.tsx` (Vite resolves `./App.js` →
   `App.tsx`; verified).
+- **A component may not share a name with a module beside it, case aside.** Windows and macOS
+  filesystems are case-insensitive and TypeScript refuses to hold `Review.tsx` and `review.ts` in
+  one program. This has cost time four times now — `Analytics`/`analytics`, `Library`/`library`,
+  `LongForm`/`longform`, `Review`/`review` — so the component takes the compound name:
+  `insights.ts` + `Analytics.tsx`, `library.ts` + `AssetLibrary.tsx`, `longform.ts` +
+  `Repurpose.tsx`, `review.ts` + `ReviewLink.tsx`.
 - Source in `src/`, tests colocated as `*.test.ts`.
 - Strict flags in force: `verbatimModuleSyntax` (use `import type`),
   `noUncheckedIndexedAccess` (indexed access is `T | undefined`),

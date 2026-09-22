@@ -59,6 +59,8 @@ export type Asset = {
 
   /** Scoped to one brand when set; otherwise available everywhere. */
   brandId?: string | undefined;
+  /** Whose asset this is. See clients.ts. */
+  clientId?: string | undefined;
   /** Which logo variant this is, when a brand points at it. */
   role?: LogoRole | undefined;
   /** The one organising idea the library needs. Absent means unfiled. */

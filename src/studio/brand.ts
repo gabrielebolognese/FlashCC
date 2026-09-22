@@ -38,6 +38,8 @@ export type Brand = {
   /** Colours and typefaces. The same shape the generator already consumes. */
   theme: Theme;
   logos: BrandLogos;
+  /** Whose brand this is. See clients.ts. */
+  clientId?: string | undefined;
   /** The artboard new carousels start at. */
   width: number;
   height: number;

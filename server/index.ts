@@ -13,6 +13,7 @@ import { billingConfigured, checkout, portal, status, webhook } from "./billing.
 import { draft, draftConfigured, draftStatus, hooks } from "./draft.js";
 import { exportDeck, renderDocument, renderImages } from "./export.js";
 import { HttpError, json } from "./http.js";
+import { addComment, decide, readShare } from "./review.js";
 import { hasServiceRole } from "./supabase.js";
 
 // Node reads .env itself; absent is fine, each route reports its own gap.
@@ -30,6 +31,8 @@ const ROUTES: Record<string, Record<string, Handler>> = {
   POST: {
     "/api/draft": draft,
     "/api/hooks": hooks,
+    "/api/review/comment": addComment,
+    "/api/review/decision": decide,
     "/api/export": exportDeck,
     "/api/slides": renderImages,
     "/api/document": renderDocument,
@@ -39,6 +42,8 @@ const ROUTES: Record<string, Record<string, Handler>> = {
   },
   GET: {
     "/api/billing/status": status,
+    // The one route that answers to somebody with no account. See review.ts.
+    "/api/review": readShare,
   },
 };
 

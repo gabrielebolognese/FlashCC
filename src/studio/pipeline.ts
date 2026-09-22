@@ -104,6 +104,8 @@ export type Post = {
   slideCount: number;
   hook: string;
   styleId: string | null;
+  /** Copied from the document when the post is made. See clients.ts. */
+  clientId?: string | undefined;
   /**
    * Copied from the document when the post is made, and then owned by the post.
    *
@@ -169,6 +171,7 @@ export function postFromDoc(doc: Doc, platform: Platform = "linkedin"): Post {
     slideCount: doc.slides.length,
     hook: hookOf(doc),
     styleId: doc.styleId ?? null,
+    ...(doc.clientId ? { clientId: doc.clientId } : {}),
     series: doc.series ?? null,
   });
 }

@@ -12,6 +12,7 @@ import { LayerView } from "./LayerView.js";
 import type { Doc } from "./model.js";
 import { slidePaint } from "./paint.js";
 import { applyBrand, listBrands, stampLogo, themeOf } from "./brand.js";
+import { ALL_CLIENTS, belongsTo, listClients, UNASSIGNED, type Client } from "./clients.js";
 import { logoResolver } from "./library.js";
 import { PublishBatch } from "./PublishBatch.js";
 import { seriesTitle } from "./series.js";
@@ -29,6 +30,7 @@ import {
   renameDoc,
   saveDoc,
   setDocArchived,
+  setDocClient,
   setDocGroup,
   UNGROUPED,
   type DocSummary,
@@ -41,12 +43,15 @@ const partsIn = (docs: readonly DocSummary[], seriesId: string): number =>
   docs.filter((d) => d.series?.id === seriesId).length;
 
 export function Projects({
+  client,
   onOpen,
   onCompose,
   onBulk,
   onLongForm,
   onQueue,
 }: {
+  /** The rail's current selection. See clients.ts for what the sentinels mean. */
+  client: string;
   onOpen: (doc: Doc) => void;
   onCompose: (theme: keyof typeof THEMES) => void;
   onBulk: () => void;
@@ -61,6 +66,10 @@ export function Projects({
   const [publishing, setPublishing] = useState(false);
 
   const refresh = () => setDocs(listDocs());
+
+  // Re-read on every render of the grid rather than held: a client made on the
+  // Clients screen has to appear in this menu without a reload.
+  const clients = listClients();
 
   /**
    * Which carousels already went out.
@@ -80,8 +89,17 @@ export function Projects({
   );
 
   const ctx = useMemo(() => ({ publishedIds }), [publishedIds]);
-  const facets = useMemo(() => facetsOf(docs, ctx), [docs, ctx]);
-  const visible = useMemo(() => applyFilters(docs, filters, ctx), [docs, filters, ctx]);
+
+  /**
+   * The client filter runs BEFORE the facets are counted.
+   *
+   * Otherwise a facet would offer "3 posted" while the grid shows one, because
+   * the other two belong to somebody else — and a count that does not match what
+   * clicking it produces is worse than no count.
+   */
+  const owned = useMemo(() => docs.filter((d) => belongsTo(d, client)), [docs, client]);
+  const facets = useMemo(() => facetsOf(owned, ctx), [owned, ctx]);
+  const visible = useMemo(() => applyFilters(owned, filters, ctx), [owned, filters, ctx]);
 
   const grouped = useMemo(() => {
     const map = new Map<string, DocSummary[]>();
@@ -97,9 +115,19 @@ export function Projects({
     [docs],
   );
 
+  /**
+   * A new project belongs to whoever is on screen.
+   *
+   * Assignment by default rather than by a step afterwards: somebody working
+   * inside a client is working on that client, and making them say so again is
+   * the "toggle back and forth" complaint in miniature. Sentinels are not
+   * clients, so the roll-up and the unassigned view both produce unassigned work.
+   */
   function create(presetId: string) {
     const preset = PRESETS.find((p) => p.id === presetId) ?? PRESETS[0]!;
-    const doc = buildDoc(preset, theme, preset.id === "blank" ? "Untitled" : preset.name);
+    const base = buildDoc(preset, theme, preset.id === "blank" ? "Untitled" : preset.name);
+    const real = client !== ALL_CLIENTS && client !== UNASSIGNED;
+    const doc = real ? { ...base, clientId: client } : base;
     saveDoc(doc);
     onOpen(doc);
   }
@@ -454,6 +482,13 @@ export function Projects({
                   <GroupMenu
                     current={d.group}
                     groups={groupNames}
+                    clients={clients}
+                    currentClient={d.clientId}
+                    onPickClient={(id) => {
+                      setDocClient(d.id, id);
+                      setMoving(null);
+                      refresh();
+                    }}
                     onPick={(g) => {
                       setDocGroup(d.id, g);
                       setMoving(null);
@@ -511,12 +546,26 @@ function CardButton({
   );
 }
 
+/**
+ * Where a project lives: which client owns it, and which folder it sits in.
+ *
+ * Both in one menu because they are the same gesture — "put this somewhere" —
+ * and two menus off one card would be two things to find. The client section is
+ * absent entirely when there are no clients, so somebody who never uses them
+ * never sees the concept.
+ */
 function GroupMenu({
   current,
   groups,
+  clients,
+  currentClient,
+  onPickClient,
   onPick,
   onClose,
 }: {
+  clients: readonly Client[];
+  currentClient: string | undefined;
+  onPickClient: (id: string | undefined) => void;
   current: string | undefined;
   groups: string[];
   onPick: (group: string | undefined) => void;
@@ -531,6 +580,40 @@ function GroupMenu({
         className="absolute right-2 top-11 z-modal w-52 rounded-2xl border border-hairline p-1.5 shadow-overlay"
         style={{ background: "rgba(20,35,56,.95)", backdropFilter: "blur(20px)" }}
       >
+        {clients.length > 0 ? (
+          <>
+            <div className="px-2 pb-1 pt-0.5 text-overline uppercase text-muted">Client</div>
+            <button
+              type="button"
+              onClick={() => onPickClient(undefined)}
+              className={[
+                "flex h-8 w-full items-center rounded-lg px-2 text-caption",
+                currentClient ? "text-secondary hover:bg-white/[0.06]" : "bg-accent-wash text-accent",
+              ].join(" ")}
+            >
+              Unassigned
+            </button>
+            {clients.map((c) => (
+              <button
+                key={c.id}
+                type="button"
+                onClick={() => onPickClient(c.id)}
+                className={[
+                  "flex h-8 w-full items-center gap-2 rounded-lg px-2 text-caption",
+                  c.id === currentClient
+                    ? "bg-accent-wash text-accent"
+                    : "text-secondary hover:bg-white/[0.06]",
+                ].join(" ")}
+              >
+                <span className="h-2 w-2 shrink-0 rounded-full" style={{ background: c.colour }} />
+                <span className="min-w-0 truncate">{c.name}</span>
+              </button>
+            ))}
+            <div className="my-1 border-t border-hairline" />
+            <div className="px-2 pb-1 text-overline uppercase text-muted">Folder</div>
+          </>
+        ) : null}
+
         <button
           type="button"
           onClick={() => onPick(undefined)}
