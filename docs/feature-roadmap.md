@@ -77,7 +77,7 @@ cancel. Nobody has taken the opposite position, and it costs nothing to take.
 
 ## Batch 1 — Ship a file people can actually post
 
-**Status:** next
+**Status:** done
 **Size:** large. The rendering path is a real decision, the rest is small.
 **Why first:** export is PDF-only, so FlashCC is accidentally LinkedIn-only. Half the target
 audience literally cannot ship. A $9/mo competitor does PNG. This is the highest
@@ -162,6 +162,26 @@ Magic Resize cannot do and users complain about constantly.
 **Done when:** every format switch produces a laid-out slide, and a test asserts nothing strands
 outside the safe box.
 
+### Built as
+
+1.1–1.4 and 1.6 as written. **1.5 was reduced deliberately.**
+
+The roadmap said "re-run the composition pass with the same content", which means
+calling `buildSlides` — regenerating from text. That would have silently deleted
+every hand-drawn shape, every moved block and every placed image: a worse bug than
+the stranded-layers one it fixes. `compositions.ts` also hardcodes `W`/`H`/`M` as
+module constants across 19 usages with 27 tests pinned to them, so making it
+size-aware is its own batch.
+
+What shipped instead (`reflow.ts`) re-lays the layers that are actually there:
+horizontal follows the board, vertical position follows the board, vertical size
+does not stretch, and text keeps its point size and is re-wrapped and re-measured
+against the new column. Backgrounds re-cover, shapes scale uniformly so circles
+stay circles, and ids survive so selection and undo still line up.
+
+Threading dimensions through `compositions.ts` remains worth doing and is not
+scheduled.
+
 ### 1.6 Two pieces of rot found while checking
 
 - `FORMATS` in `model.ts` is dead — never imported. `Properties.tsx` hardcodes its own inline
@@ -175,7 +195,7 @@ outside the safe box.
 
 ## Batch 2 — Find anything
 
-**Status:** queued
+**Status:** next
 **Size:** small. Everything needed is already stored locally.
 **Why here:** cheapest batch in the document and pure churn prevention. There is currently **no
 search box anywhere in FlashCC** — less than any competitor, all of whom get complained about for

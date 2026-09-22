@@ -13,6 +13,7 @@ import { LayerView } from "./LayerView.js";
 import type { Doc } from "./model.js";
 import { Properties } from "./Properties.js";
 import { buildSlides } from "./compositions.js";
+import { ExportDialog } from "./ExportDialog.js";
 import { THEMES } from "./presets.js";
 import { Toolbar } from "./Toolbar.js";
 import { useStudio } from "./useStudio.js";
@@ -22,6 +23,7 @@ export function Studio({ initial, onHome }: { initial: Doc; onHome: () => void }
   const { doc } = studio;
   const [naming, setNaming] = useState(false);
   const [pasteOpen, setPasteOpen] = useState(false);
+  const [exporting, setExporting] = useState(false);
   const [pasted, setPasted] = useState("");
 
   const printRoot = document.getElementById("print-root");
@@ -70,7 +72,7 @@ export function Studio({ initial, onHome }: { initial: Doc; onHome: () => void }
           <ClipboardPaste size={14} strokeWidth={2} />
           Paste post
         </button>
-        <Button hero icon={Download} onClick={() => window.print()}>
+        <Button hero icon={Download} onClick={() => setExporting(true)}>
           Export
         </Button>
       </header>
@@ -137,7 +139,9 @@ export function Studio({ initial, onHome }: { initial: Doc; onHome: () => void }
         </div>
       ) : null}
 
-      {/* Export prints the same LayerView the canvas uses — one rendering path. */}
+      {exporting ? <ExportDialog doc={doc} onClose={() => setExporting(false)} /> : null}
+
+      {/* Ctrl+P still works, and still prints the same LayerView the canvas uses. */}
       {printRoot
         ? createPortal(
             <>

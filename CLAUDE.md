@@ -83,15 +83,19 @@ Invariants worth keeping:
 
 ## Not built yet
 
-- Server-side Playwright export (`server/`). Export currently prints the same component tree via
-  the browser's own renderer — correct markup, PDF only, no PNG sequence.
-- Image upload (the `image` slot renders a placeholder), format switcher, template validation,
-  the phase-2 FlashFX converter.
+- Image upload (the `image` slot renders a placeholder), template validation, the phase-2
+  FlashFX converter.
+- Size-aware `compositions.ts`. `W`/`H`/`M` are module constants, so generation only ever targets
+  1080×1350. `reflow.ts` re-lays existing layers onto another artboard, which is a different job.
 
-## Canvas elements
+## Export
 
-Beyond template-driven content, a slide carries `overlays: Overlay[]` — hand-placed text, icons
-and shapes. Position and size are **fractions of the slide**, never pixels, so an overlay survives
-a format change the way template content does. Overlays are emitted last and paint above the
-template layout; they never alter it. Per-block `style` overrides (font, size, weight, colour,
-align, case) sit on top of what the template chose for that one block.
+`server/render.ts` renders in a real Chromium via Playwright. The client serialises the markup
+`LayerView` already produced and posts it — there is no second renderer, which is the point: a
+canvas reimplementation would drift, and `background-clip: text` gradients and uploaded FontFace
+faces are exactly what such converters get wrong.
+
+Per platform (`platforms.ts`): LinkedIn takes a PDF built from **JPEG** pages — PNG pages have
+been seen converting to a PDF that renders blank — Instagram and TikTok take numbered images in a
+zip. `preflight.ts` checks the deck against the destination before any of it runs; blocking
+findings block, warnings do not.

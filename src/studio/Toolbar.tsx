@@ -1,8 +1,9 @@
-import { Circle, Minus, MousePointer2, Sparkle, Square, Triangle, Type } from "lucide-react";
+import { Circle, Minus, MousePointer2, ScanLine, Sparkle, Square, Triangle, Type } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 
 import { ICON_PATHS } from "../render/icons.js";
 import { makeLayer, type Tool } from "./model.js";
+import { PLATFORMS, type PlatformId } from "./platforms.js";
 import type { Studio } from "./useStudio.js";
 
 const TOOLS: { id: Tool; icon: typeof Type; label: string; key: string }[] = [
@@ -21,7 +22,9 @@ const TOOLS: { id: Tool; icon: typeof Type; label: string; key: string }[] = [
  */
 export function Toolbar({ studio }: { studio: Studio }) {
   const [iconOpen, setIconOpen] = useState(false);
+  const [safeOpen, setSafeOpen] = useState(false);
   const wrap = useRef<HTMLDivElement>(null);
+  const safeWrap = useRef<HTMLDivElement>(null);
   const glyphs = Object.keys(ICON_PATHS);
 
   useEffect(() => {
@@ -39,6 +42,15 @@ export function Toolbar({ studio }: { studio: Studio }) {
       window.removeEventListener("keydown", esc);
     };
   }, [iconOpen]);
+
+  useEffect(() => {
+    if (!safeOpen) return;
+    const close = (e: MouseEvent) => {
+      if (!safeWrap.current?.contains(e.target as Node)) setSafeOpen(false);
+    };
+    window.addEventListener("mousedown", close);
+    return () => window.removeEventListener("mousedown", close);
+  }, [safeOpen]);
 
   return (
     <div className="relative flex h-11 shrink-0 items-center justify-center gap-1 border-b border-hairline bg-surface-1">
@@ -120,6 +132,74 @@ export function Toolbar({ studio }: { studio: Studio }) {
                 </svg>
               </button>
             ))}
+          </div>
+        ) : null}
+      </div>
+
+      <span className="mx-1.5 h-5 w-px bg-hairline" />
+
+      {/* Show what the platform covers. A view setting, never part of the doc. */}
+      <div ref={safeWrap} className="relative flex items-center">
+        <button
+          type="button"
+          title="Safe areas"
+          aria-label="Safe areas"
+          aria-expanded={safeOpen}
+          onClick={() => setSafeOpen((v) => !v)}
+          className={[
+            "grid h-8 w-8 place-items-center rounded-lg",
+            studio.safePlatform !== null
+              ? "bg-accent-wash text-accent"
+              : "text-tertiary hover:bg-white/[0.06] hover:text-primary",
+          ].join(" ")}
+        >
+          <ScanLine size={15} strokeWidth={2} />
+        </button>
+
+        {safeOpen ? (
+          <div
+            className="absolute left-1/2 top-10 z-overlay w-[212px] -translate-x-1/2 rounded-2xl border border-hairline p-1.5 shadow-overlay"
+            style={{ background: "rgba(26,42,66,.92)", backdropFilter: "blur(24px) saturate(1.8)" }}
+          >
+            <button
+              type="button"
+              onClick={() => {
+                studio.setSafePlatform(null);
+                setSafeOpen(false);
+              }}
+              className={[
+                "flex h-8 w-full items-center rounded-lg px-2 text-caption",
+                studio.safePlatform === null
+                  ? "bg-accent-wash text-accent"
+                  : "text-secondary hover:bg-white/[0.06]",
+              ].join(" ")}
+            >
+              Off
+            </button>
+
+            {PLATFORMS.map((pf) => (
+              <button
+                key={pf.id}
+                type="button"
+                title={pf.note}
+                onClick={() => {
+                  studio.setSafePlatform(pf.id as PlatformId);
+                  setSafeOpen(false);
+                }}
+                className={[
+                  "flex h-8 w-full items-center rounded-lg px-2 text-caption",
+                  studio.safePlatform === pf.id
+                    ? "bg-accent-wash text-accent"
+                    : "text-secondary hover:bg-white/[0.06]",
+                ].join(" ")}
+              >
+                {pf.label}
+              </button>
+            ))}
+
+            <p className="px-2 pb-1 pt-1.5 text-caption leading-4 text-muted">
+              The shaded band is covered by the platform&rsquo;s own interface. It never exports.
+            </p>
           </div>
         ) : null}
       </div>

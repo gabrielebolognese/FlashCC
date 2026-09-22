@@ -15,6 +15,8 @@ import {
   type Rect,
 } from "./geometry.js";
 import { slidePaint } from "./paint.js";
+import { platformById } from "./platforms.js";
+import { SafeZones } from "./SafeZones.js";
 import { LayerView } from "./LayerView.js";
 import { MEDIA_DRAG_TYPE } from "./MediaPool.js";
 import { makeLayer, type Layer, type Tool } from "./model.js";
@@ -466,6 +468,17 @@ export function Canvas({ studio }: { studio: Studio }) {
                 }}
               />
             ))}
+
+            {/* What the platform covers. Above the artwork so it is legible, and
+                confined to this component so it cannot reach the export. */}
+            {studio.safePlatform ? (
+              <SafeZones
+                platform={platformById(studio.safePlatform)}
+                width={doc.width}
+                height={doc.height}
+                zoom={zoom}
+              />
+            ) : null}
 
             {/* snap guides */}
             {guides.map((g, i) =>

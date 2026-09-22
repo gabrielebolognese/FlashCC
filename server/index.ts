@@ -11,6 +11,7 @@ import { createServer, type IncomingMessage, type ServerResponse } from "node:ht
 
 import { billingConfigured, checkout, portal, status, webhook } from "./billing.js";
 import { draft, draftConfigured, draftStatus } from "./draft.js";
+import { exportDeck } from "./export.js";
 import { HttpError, json } from "./http.js";
 import { hasServiceRole } from "./supabase.js";
 
@@ -28,6 +29,7 @@ type Handler = (req: IncomingMessage, res: ServerResponse) => Promise<void>;
 const ROUTES: Record<string, Record<string, Handler>> = {
   POST: {
     "/api/draft": draft,
+    "/api/export": exportDeck,
     "/api/billing/checkout": checkout,
     "/api/billing/portal": portal,
     "/api/billing/webhook": webhook,
@@ -44,6 +46,7 @@ const server = createServer((req, res) => {
   if (req.method === "GET" && path === "/api/health") {
     return json(res, 200, {
       ok: true,
+      export: true,
       draft: draftConfigured(),
       billing: billingConfigured(),
       serviceRole: hasServiceRole(),

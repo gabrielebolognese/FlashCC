@@ -11,6 +11,8 @@ import {
   type Tool,
 } from "./model.js";
 import type { Gradient } from "./gradient.js";
+import type { PlatformId } from "./platforms.js";
+import { reflowDoc } from "./reflow.js";
 import { saveDoc } from "./storage.js";
 
 const LIMIT = 120;
@@ -25,6 +27,11 @@ export function useStudio(initial: Doc) {
   const [selection, setSelection] = useState<string[]>([]);
   const [tool, setTool] = useState<Tool>("select");
   const [editingId, setEditingId] = useState<string | null>(null);
+  // Which platform's covered areas to draw over the canvas. Null is off. It lives
+  // here rather than in Canvas so the toolbar can drive it, and it is deliberately
+  // NOT part of Doc — it is a view setting, not something about the artwork, and
+  // it must never reach the export path.
+  const [safePlatform, setSafePlatform] = useState<PlatformId | null>(null);
 
   const past = useRef<Doc[]>([]);
   const future = useRef<Doc[]>([]);
@@ -231,8 +238,12 @@ export function useStudio(initial: Doc) {
     [index, patchSlide],
   );
 
+  // Re-lays the layers that are there rather than just changing the numbers.
+  // The old version kept every pixel position, so going taller stranded the
+  // content in the top two-thirds — see reflow.ts for why it is not a scale
+  // either, and why it does not regenerate from the source text.
   const setFormat = useCallback(
-    (w: number, h: number) => commit({ ...doc, width: w, height: h }),
+    (w: number, h: number) => commit(reflowDoc(doc, w, h)),
     [commit, doc],
   );
 
@@ -308,6 +319,8 @@ export function useStudio(initial: Doc) {
     setTool,
     editingId,
     setEditingId,
+    safePlatform,
+    setSafePlatform,
     undo,
     redo,
     canUndo: past.current.length > 0,

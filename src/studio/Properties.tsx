@@ -16,7 +16,7 @@ import type { ReactNode } from "react";
 import { IconButton } from "../ui/IconButton.js";
 import { GradientEditor } from "./GradientEditor.js";
 import { averageColour, makeGradient, type Gradient } from "./gradient.js";
-import { allFonts, type Layer } from "./model.js";
+import { FORMATS, allFonts, type Layer } from "./model.js";
 import type { Studio } from "./useStudio.js";
 
 /** Properties for the current selection. Nothing selected → the slide itself. */
@@ -41,13 +41,9 @@ export function Properties({ studio }: { studio: Studio }) {
         </Field>
         <Field label="Canvas">
           <div className="flex gap-1">
-            {[
-              { label: "4:5", w: 1080, h: 1350 },
-              { label: "1:1", w: 1080, h: 1080 },
-              { label: "9:16", w: 1080, h: 1920 },
-            ].map((f) => (
+            {FORMATS.map((f) => (
               <button
-                key={f.label}
+                key={f.id}
                 type="button"
                 onClick={() => studio.setFormat(f.w, f.h)}
                 className={[
