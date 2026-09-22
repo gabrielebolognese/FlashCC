@@ -9,12 +9,18 @@
  * approximation from a second renderer that drifted.
  *
  * Uploaded faces travel with the markup as @font-face rules carrying their data
- * URLs. They live in this browser's localStorage and the server has never heard
- * of them, so anything not sent is silently substituted with Arial.
+ * URLs. They live in this browser's library and the server has never heard of
+ * them, so anything not sent is silently substituted with Arial.
+ *
+ * Since the asset library, pictures and faces are no longer data URLs in the
+ * editor — they are signed URLs into a bucket. So the payload is INLINED first,
+ * by `inline.ts`, and the server goes on receiving a page that needs nothing
+ * from the network. See the note there for why that matters more than it looks.
  */
 import { renderToStaticMarkup } from "react-dom/server";
 
 import { listCustomFonts } from "./fonts.js";
+import { inlineDoc, inlineSources } from "./inline.js";
 import { LayerView } from "./LayerView.js";
 import type { Doc, Slide } from "./model.js";
 import { slidePaint } from "./paint.js";
@@ -39,10 +45,43 @@ function slideHtml(slide: Slide): string {
 }
 
 /** Every uploaded face, inlined, so the server can use fonts it does not have. */
-function fontCss(): string {
-  return listCustomFonts()
+async function fontCss(): Promise<string> {
+  const faces = await inlineSources(listCustomFonts());
+  return faces
     .map((f) => `@font-face { font-family: "${f.family}"; src: url(${f.src}); font-display: block; }`)
     .join("\n");
+}
+
+export type RenderPayload = {
+  name: string;
+  output: "pdf" | "images";
+  format: "jpg" | "png";
+  quality: number;
+  width: number;
+  height: number;
+  css: string;
+  slides: { html: string }[];
+};
+
+/**
+ * Everything the render route needs, with nothing left pointing outward.
+ *
+ * Shared by the download path and the publish path so there is one serialiser,
+ * for the same reason there is one painter: two would drift, and the difference
+ * would only ever show up in whichever one is used less.
+ */
+export async function renderPayload(doc: Doc, platform: Platform): Promise<RenderPayload> {
+  const [carried, css] = await Promise.all([inlineDoc(doc), fontCss()]);
+  return {
+    name: doc.name,
+    output: platform.output,
+    format: platform.imageFormat,
+    quality: platform.quality,
+    width: doc.width,
+    height: doc.height,
+    css,
+    slides: carried.slides.map((s) => ({ html: slideHtml(s) })),
+  };
 }
 
 export type ExportResult =
@@ -58,16 +97,7 @@ export type ExportResult =
  * exist.
  */
 export async function exportDeck(doc: Doc, platform: Platform): Promise<ExportResult> {
-  const body = {
-    name: doc.name,
-    output: platform.output,
-    format: platform.imageFormat,
-    quality: platform.quality,
-    width: doc.width,
-    height: doc.height,
-    css: fontCss(),
-    slides: doc.slides.map((s) => ({ html: slideHtml(s) })),
-  };
+  const body = await renderPayload(doc, platform);
 
   let response: Response;
   try {

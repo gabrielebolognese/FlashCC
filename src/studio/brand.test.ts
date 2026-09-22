@@ -8,9 +8,13 @@ import {
   brandToStyle,
   canAddBrand,
   isBrandStyle,
+  logoAssetId,
+  logoRoleFor,
   makeBrand,
+  stampLogo,
   themeMap,
   themeOf,
+  type Brand,
 } from "./brand.js";
 import { buildSlides } from "./compositions.js";
 import { makeDoc, makeLayer, makeSlide, type Doc, type Layer } from "./model.js";
@@ -244,5 +248,99 @@ describe("reconstructing the old theme", () => {
     const doc = { ...deckIn("ink"), styleId: `brand:${b.id}` };
     expect(themeOf(doc, [b]).accent).toBe(PAPER.accent);
     expect(themeOf(doc, []).accent).not.toBe(PAPER.accent);
+  });
+});
+
+/* ── logos ────────────────────────────────────────────────────────────────── */
+
+const withLogos = (logos: Brand["logos"]): Brand => ({ ...brandOf(INK), logos });
+
+/** A resolver, standing in for the library. */
+const resolves = (src = "https://cdn/mark.png", w = 200, h = 100) => () => ({ src, w, h });
+
+describe("choosing a logo variant", () => {
+  it("prefers the mark, which is the version drawn to work anywhere", () => {
+    const brand = withLogos({ light: "a_l", dark: "a_d", mark: "a_m" });
+    expect(logoRoleFor(brand, "#ffffff")).toBe("mark");
+    expect(logoRoleFor(brand, "#000000")).toBe("mark");
+  });
+
+  /** The entire reason for keeping two: a black mark on a black slide. */
+  it("picks by the ground it is landing on", () => {
+    const brand = withLogos({ light: "a_l", dark: "a_d" });
+    expect(logoRoleFor(brand, "#ffffff")).toBe("light");
+    expect(logoRoleFor(brand, "#0b0d10")).toBe("dark");
+  });
+
+  it("uses the wrong-ground version rather than nothing when only one exists", () => {
+    expect(logoRoleFor(withLogos({ light: "a_l" }), "#000000")).toBe("light");
+  });
+
+  it("is undefined for a brand with no logo, which is the common case", () => {
+    expect(logoRoleFor(withLogos({}), "#ffffff")).toBeUndefined();
+    expect(logoAssetId(withLogos({}), "#ffffff")).toBeUndefined();
+  });
+});
+
+describe("stamping a logo onto a deck", () => {
+  const brand = withLogos({ mark: "a_m" });
+
+  it("puts one on the first and last slide, and nowhere else", () => {
+    const out = stampLogo(deckIn("ink"), brand, resolves());
+    expect(out.placed).toBe(2);
+    const named = out.doc.slides.map((s) => s.layers.filter((l) => l.name === "Logo").length);
+    expect(named).toEqual([1, 0, 1]);
+  });
+
+  /** It runs ONCE and leaves plain layers, exactly as a preset does. */
+  it("leaves an ordinary image layer behind", () => {
+    const layer = stampLogo(deckIn("ink"), brand, resolves()).doc.slides[0]?.layers.at(-1);
+    expect(layer?.kind).toBe("image");
+    expect(layer?.src).toBe("https://cdn/mark.png");
+    expect(layer?.assetId).toBe("a_m");
+  });
+
+  it("does not add a second one when run again", () => {
+    const once = stampLogo(deckIn("ink"), brand, resolves()).doc;
+    expect(stampLogo(once, brand, resolves()).placed).toBe(0);
+  });
+
+  /** A re-lay must not take it away again — the user asked for it. */
+  it("marks it as the user's, so regeneration keeps it", () => {
+    const layer = stampLogo(deckIn("ink"), brand, resolves()).doc.slides[0]?.layers.at(-1);
+    expect(layer?.handEdited).toBe(true);
+  });
+
+  it("keeps the file's aspect rather than squashing a wordmark into a square", () => {
+    const layer = stampLogo(deckIn("ink"), brand, resolves("x", 300, 100)).doc.slides[0]?.layers.at(-1);
+    expect((layer?.w ?? 0) / (layer?.h ?? 1)).toBeCloseTo(3, 1);
+  });
+
+  it("sits inside the artboard, clear of the bottom edge", () => {
+    const doc = deckIn("ink");
+    const layer = stampLogo(doc, brand, resolves()).doc.slides[0]?.layers.at(-1);
+    expect(layer?.x ?? 0).toBeGreaterThan(0);
+    expect((layer?.x ?? 0) + (layer?.w ?? 0)).toBeLessThan(doc.width);
+    expect((layer?.y ?? 0) + (layer?.h ?? 0)).toBeLessThan(doc.height);
+  });
+
+  it("does nothing for a brand with no logo", () => {
+    expect(stampLogo(deckIn("ink"), withLogos({}), resolves()).placed).toBe(0);
+  });
+
+  /** An unresolvable asset is skipped, not painted as a broken image. */
+  it("does nothing when the file cannot be resolved", () => {
+    expect(stampLogo(deckIn("ink"), brand, () => undefined).placed).toBe(0);
+  });
+
+  it("can be told which slides instead", () => {
+    const out = stampLogo(deckIn("ink"), brand, resolves(), [1]);
+    expect(out.placed).toBe(1);
+    expect(out.doc.slides[1]?.layers.some((l) => l.name === "Logo")).toBe(true);
+  });
+
+  it("places one on a single-slide deck without placing two", () => {
+    const one = { ...makeDoc("One"), slides: buildSlides(["Just the one."], INK) };
+    expect(stampLogo(one, brand, resolves()).placed).toBe(1);
   });
 });

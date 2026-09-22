@@ -64,16 +64,34 @@ export type Layer = {
   /** image */
   src?: string | undefined;
   fit?: "cover" | "contain" | undefined;
+  /**
+   * The library asset this picture came from, when it came from one.
+   *
+   * `src` is the URL currently being painted and goes stale — a signed URL
+   * expires, and a document reopened next week would show a broken image. This
+   * is the durable half: `assets.resolveDoc` puts a live URL back into `src`
+   * from it. Absent means the bytes are inline in `src`, which is still how a
+   * project with no account works.
+   */
+  assetId?: string | undefined;
 };
 
-/** One item in the media pool. Data URL so a project stays self-contained. */
+/**
+ * One item in the media pool.
+ *
+ * `src` is whatever an `<img>` should point at right now: a data URL for a
+ * project with no account, a signed URL once the file lives in a bucket.
+ * `assetId` is the durable reference — see the note on `Layer.assetId`.
+ */
 export type MediaItem = {
   id: string;
   name: string;
   src: string;
   w: number;
   h: number;
+  /** Decoded file size, not the length of a base64 string. */
   bytes: number;
+  assetId?: string | undefined;
 };
 
 export type Slide = {

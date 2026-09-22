@@ -13,7 +13,8 @@ import { LayerView } from "./LayerView.js";
 import type { Doc } from "./model.js";
 import { Properties } from "./Properties.js";
 import { buildSlides } from "./compositions.js";
-import { applyBrand, listBrands, themeOf } from "./brand.js";
+import { applyBrand, listBrands, stampLogo, themeOf } from "./brand.js";
+import { logoResolver } from "./library.js";
 import { BrandMenu } from "./BrandMenu.js";
 import { ExportDialog } from "./ExportDialog.js";
 import { regenerate } from "./regenerate.js";
@@ -91,8 +92,12 @@ export function Studio({ initial, onHome }: { initial: Doc; onHome: () => void }
           brands={listBrands()}
           onApply={(brand) => {
             const result = applyBrand(doc, brand, undefined);
-            studio.replaceDoc(result.doc);
-            return result;
+            // The logo goes on in the same commit, so applying a brand is one
+            // undo rather than two — and so "it used my brand assets
+            // automatically" is true without a second button to find.
+            const stamped = stampLogo(result.doc, brand, logoResolver());
+            studio.replaceDoc(stamped.doc);
+            return { ...result, doc: stamped.doc };
           }}
         />
         <button

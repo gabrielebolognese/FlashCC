@@ -11,9 +11,10 @@
  * database is what actually holds, and a paywall that only refuses after a round
  * trip, with an error, is a worse experience than one that explains itself first.
  */
-import { Check, Palette, Plus, Trash2, Type } from "lucide-react";
-import { useMemo, useState } from "react";
+import { Check, ImagePlus, Palette, Plus, Trash2, Type, X } from "lucide-react";
+import { useMemo, useRef, useState } from "react";
 
+import { listAssets, LOGO_ROLE_LABEL, LOGO_ROLES, type Asset, type LogoRole } from "./assets.js";
 import {
   brandLimit,
   canAddBrand,
@@ -23,6 +24,8 @@ import {
   upsertBrand,
   type Brand,
 } from "./brand.js";
+import { importImages, urlFor } from "./library.js";
+import { ACCEPT } from "./media.js";
 import type { Plan } from "./cloud.js";
 import { Empty } from "./Dash.js";
 import { allFonts } from "./model.js";
@@ -56,6 +59,127 @@ function Swatches({ theme }: { theme: Theme }) {
           style={{ background: theme[r.key] }}
         />
       ))}
+    </div>
+  );
+}
+
+/* ── logos ────────────────────────────────────────────────────────────────── */
+
+/**
+ * Three slots, because a logo that only works on white is half a logo.
+ *
+ * Each one is an ordinary library upload with `brandId` and `role` set, so a
+ * mark is a file in the library that a brand happens to point at — never a copy
+ * living inside the brand. Five brands in an agency account can share one file,
+ * which is the whole reason 5.2 waited for 5.1.
+ */
+function LogoSlot({
+  brand,
+  role,
+  asset,
+  onPick,
+  onClear,
+}: {
+  brand: Brand;
+  role: LogoRole;
+  asset: Asset | undefined;
+  onPick: (assetId: string) => void;
+  onClear: () => void;
+}) {
+  const input = useRef<HTMLInputElement>(null);
+  const [busy, setBusy] = useState(false);
+  const url = asset ? urlFor(asset) : undefined;
+
+  // "On light" is previewed on light. Showing a white wordmark on the app's own
+  // dark chrome is how a broken logo gets shipped.
+  const ground = role === "light" ? "#f5f5f4" : role === "dark" ? "#111418" : brand.theme.bg;
+
+  return (
+    <div className="flex-1">
+      <input
+        ref={input}
+        type="file"
+        accept={ACCEPT}
+        hidden
+        onChange={(e) => {
+          const file = e.target.files?.[0];
+          e.target.value = "";
+          if (!file) return;
+          setBusy(true);
+          void importImages([file], { brandId: brand.id, role, folder: "Logos" })
+            .then((result) => {
+              const first = result.assets[0];
+              if (first) onPick(first.id);
+            })
+            .finally(() => setBusy(false));
+        }}
+      />
+
+      <button
+        type="button"
+        onClick={() => input.current?.click()}
+        title={`Upload the ${LOGO_ROLE_LABEL[role].toLowerCase()} version`}
+        style={{ background: ground }}
+        className="relative grid h-[72px] w-full place-items-center overflow-hidden rounded-xl border border-hairline hover:border-accent-dim"
+      >
+        {busy ? (
+          <span className="text-caption text-muted">Uploading…</span>
+        ) : url ? (
+          <img src={url} alt={LOGO_ROLE_LABEL[role]} className="max-h-[52px] max-w-[85%] object-contain" />
+        ) : (
+          <ImagePlus size={16} strokeWidth={2} className="text-muted" />
+        )}
+      </button>
+
+      <div className="mt-1 flex items-center gap-1">
+        <span className="flex-1 truncate text-caption text-tertiary">{LOGO_ROLE_LABEL[role]}</span>
+        {asset ? (
+          <button
+            type="button"
+            aria-label={`Remove the ${LOGO_ROLE_LABEL[role]} logo`}
+            onClick={onClear}
+            className="text-muted hover:text-danger"
+          >
+            <X size={11} strokeWidth={2.4} />
+          </button>
+        ) : null}
+      </div>
+    </div>
+  );
+}
+
+function Logos({ brand, onChange }: { brand: Brand; onChange: (b: Brand) => void }) {
+  // Re-read on every render rather than held in state: an upload from a sibling
+  // slot has to show here, and the list is a handful of records.
+  const assets = listAssets();
+
+  const set = (role: LogoRole, assetId: string | undefined) =>
+    onChange({
+      ...brand,
+      logos: { ...brand.logos, [role]: assetId },
+      updatedAt: new Date().toISOString(),
+    });
+
+  return (
+    <div>
+      <span className="text-overline uppercase text-tertiary">Logo</span>
+      <div className="mt-2 flex gap-2">
+        {LOGO_ROLES.map((role) => (
+          <LogoSlot
+            key={role}
+            brand={brand}
+            role={role}
+            asset={assets.find((a) => a.id === brand.logos?.[role])}
+            onPick={(id) => set(role, id)}
+            onClear={() => set(role, undefined)}
+          />
+        ))}
+      </div>
+      <p className="mt-2 text-caption leading-4 text-muted">
+        A mark is used everywhere when there is one. Otherwise the light or dark version is picked
+        from the slide it lands on — which is the only thing an automatic placement has to get
+        right.
+      </p>
     </div>
   );
 }
@@ -119,6 +243,8 @@ function Editor({
             ))}
           </div>
         </div>
+
+        <Logos brand={brand} onChange={onChange} />
 
         <div className="grid grid-cols-2 gap-3">
           <label className="block">

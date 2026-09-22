@@ -6,12 +6,14 @@ import {
   FONT_ACCEPT,
   FONT_FORMATS,
   FONT_SOURCES,
+  fontLimit,
   listCustomFonts,
+  MAX_CLOUD_FONT_BYTES,
   MAX_FONT_BYTES,
-  MAX_FONTS,
   removeCustomFont,
   type CustomFont,
 } from "./fonts.js";
+import { hasCloudSession, sessionPlan } from "./session.js";
 
 /**
  * Upload a font, and — as importantly — say what a usable font file looks like and
@@ -24,6 +26,9 @@ export function FontUpload({ onAdded }: { onAdded: (id: string) => void }) {
   const [fonts, setFonts] = useState<CustomFont[]>(() => listCustomFonts());
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+
+  const cloud = hasCloudSession();
+  const limit = fontLimit(sessionPlan(), cloud);
 
   async function take(file: File | undefined) {
     if (!file) return;
@@ -63,8 +68,7 @@ export function FontUpload({ onAdded }: { onAdded: (id: string) => void }) {
                 type="button"
                 aria-label={`Remove ${f.label}`}
                 onClick={() => {
-                  removeCustomFont(f.id);
-                  setFonts(listCustomFonts());
+                  void removeCustomFont(f.id).then(() => setFonts(listCustomFonts()));
                 }}
                 className="text-muted hover:text-danger"
               >
@@ -91,8 +95,9 @@ export function FontUpload({ onAdded }: { onAdded: (id: string) => void }) {
                   Upload a font
                 </div>
                 <p className="mt-1 text-body leading-[20px] text-tertiary">
-                  Up to {MAX_FONTS} fonts, {MAX_FONT_BYTES / 1024}KB each. It stays on this
-                  machine and works offline.
+                  {cloud
+                    ? `Up to ${limit === Infinity ? "as many as you like" : limit} fonts, ${Math.round(MAX_CLOUD_FONT_BYTES / 1024)}KB each, kept in your library on every device.`
+                    : `Up to ${limit} fonts, ${MAX_FONT_BYTES / 1024}KB each. It stays on this machine and works offline.`}
                 </p>
               </div>
               <button

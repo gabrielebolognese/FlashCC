@@ -525,7 +525,7 @@ Canva already names files from a chosen column. Shipping without it is a visible
 
 ## Batch 5 — The asset library
 
-**Status:** next
+**Status:** done
 **Size:** large. The biggest engineering cost in this document — budget for it properly.
 **Why here:** it blocks brand logos, and the current model is actively wrong at scale.
 
@@ -593,11 +593,64 @@ per-image captions *"achieve significantly greater reach and engagement rates."*
 **Done when:** exporting a batch produces hosted slides plus a Metricool-shaped CSV that imports
 without a single manual edit.
 
+### Built as
+
+All five, plus two things the batch turned out to require that the plan did not
+mention.
+
+**The roadmap said "signed URL" for 5.1 and "public URLs" for 5.5, and those are
+not the same bucket.** A signed URL expires; the scheduler fetches the picture
+days later with no credentials, so it cannot host a published slide. So there are
+two buckets with opposite postures — `media` private and signed per session,
+`slides` public and written only by pressing Publish. Anything else either breaks
+the CSV or makes every private upload world-readable.
+
+**Moving pictures out of the document broke the export, silently.** The payload
+posted to `server/render.ts` used to be self-contained: every image and every
+uploaded face travelled as a data URL, so the headless Chromium needed nothing
+from the network. Remote URLs would have made it fetch a customer's bucket
+mid-screenshot with credentials it does not have, and a slow fetch is a slide
+that ships with a hole in it. `inline.ts` fetches and re-inlines in the browser —
+which already holds a session that can read those files — just before serialising,
+so the server's contract is unchanged.
+
+**`media.ts` was reporting every file a third too large.** `bytes: src.length`
+measures a base64 STRING, not the bytes it encodes. Every size shown and every
+quota decision made from it was wrong; `dataUrlBytes` decodes properly.
+
+**The migration is a pure function, on purpose.** Losing somebody's pictures is
+the one failure here that cannot be apologised for, so `hoistInlineAssets` ADDS a
+reference and leaves `src` alone; the bytes only stop being inline once an upload
+has come back ok and `putDoc` dehydrates. A run that dies halfway leaves the
+document exactly as it was, and the next run finds the same pictures again.
+Content-fingerprinted, so one logo across twenty carousels becomes one object.
+
+**Fonts became assets rather than getting a bigger cap.** `MAX_FONTS = 6` was
+never a design decision — it was localStorage arithmetic wearing a product's
+clothes. A font is now an `Asset` with `kind: "font"`, the ceiling is the plan,
+and the old localStorage key migrates itself on first run.
+
+**5.2 delivers the unclaimed line.** No competitor has review evidence of "I
+scheduled a post and it used my brand assets automatically", and `stampLogo`
+makes it true: applying a brand places the mark in the same commit, picking the
+light or dark variant from the luminance of the slide it lands on. It runs once
+and leaves an ordinary image layer, so it does not touch "nothing is derived".
+
+**Batch publishing is scoped to the project filters** rather than to a new
+selection mode. The filtered set already means "this week's batch", so
+`Publish the 12 shown` needed no new concept.
+
+Not done: `Alt Text N` for Metricool and the exact Publer/ContentStudio header
+spellings are gathered in one table in `schedulers.ts` and should be checked
+against each tool's current template before launch. These importers ignore
+unknown columns rather than rejecting the file, so a stale name costs one empty
+field, not a failed import.
+
 ---
 
 ## Batch 6 — One asset becomes many
 
-**Status:** queued
+**Status:** next
 **Size:** medium
 **Why here:** the stated gap in every repurposing tool is that they are *"one-and-done"* when
 *"the whole point is volume."*

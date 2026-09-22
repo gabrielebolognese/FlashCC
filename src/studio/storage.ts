@@ -1,3 +1,4 @@
+import { dehydrateDoc } from "./assets.js";
 import { averageColour } from "./gradient.js";
 import type { Doc } from "./model.js";
 import { searchBlob } from "./search.js";
@@ -134,7 +135,11 @@ export function saveDoc(doc: Doc): boolean {
  * and win. The two sides would then take turns overwriting each other forever.
  */
 export function putDoc(doc: Doc): boolean {
-  const stamped = doc;
+  // Dehydrated on the way to disk, always. Anything that came from the library
+  // has its bytes in the library, and a second copy inside every document is
+  // what filled this quota in the first place. `resolveDoc` puts a live URL back
+  // when the document is opened, so nothing the painter sees is ever missing.
+  const stamped = dehydrateDoc(doc);
   const ok = write(KEY(doc.id), stamped);
   const summary = summaryOf(stamped);
   const idx = read<DocSummary[]>(INDEX) ?? [];

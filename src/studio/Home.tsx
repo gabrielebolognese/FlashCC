@@ -10,6 +10,7 @@ import {
   BarChart3,
   CalendarClock,
   Flame,
+  Images,
   KanbanSquare,
   LayoutGrid,
   Palette,
@@ -22,7 +23,9 @@ import { useMemo, useState } from "react";
 import { AccountCard } from "./AccountCard.js";
 import { Analytics } from "./Analytics.js";
 import { Brands } from "./Brands.js";
+import { listAssets } from "./assets.js";
 import { listBrands } from "./brand.js";
+import { AssetLibrary } from "./AssetLibrary.js";
 import { Board } from "./Board.js";
 import { demoPosts } from "./demo.js";
 import { Empty } from "./Dash.js";
@@ -45,7 +48,15 @@ import { listDocs } from "./storage.js";
 import { useAccount } from "./useAccount.js";
 import { Upgrade } from "./Upgrade.js";
 
-type View = "projects" | "brands" | "board" | "scheduled" | "posted" | "analytics" | "outliers";
+type View =
+  | "projects"
+  | "brands"
+  | "library"
+  | "board"
+  | "scheduled"
+  | "posted"
+  | "analytics"
+  | "outliers";
 
 type NavItem = {
   id: View;
@@ -60,6 +71,7 @@ const NAV: { section: string; items: NavItem[] }[] = [
     items: [
       { id: "projects", label: "Projects", icon: LayoutGrid, count: (c) => c.docs },
       { id: "brands", label: "Brands", icon: Palette, count: () => listBrands().length },
+      { id: "library", label: "Library", icon: Images, count: () => listAssets().length },
     ],
   },
   {
@@ -91,7 +103,11 @@ const NAV: { section: string; items: NavItem[] }[] = [
 
 const TITLES: Record<View, { title: string; sub: string }> = {
   projects: { title: "Projects", sub: "Every carousel you have made, and two ways to start another." },
-  brands: { title: "Brands", sub: "Your colours and typefaces, saved. Applied once, never live." },
+  brands: { title: "Brands", sub: "Your colours, typefaces and logo, saved. Applied once, never live." },
+  library: {
+    title: "Library",
+    sub: "Every image and face you have uploaded, kept. Stored once, used anywhere.",
+  },
   board: { title: "Pipeline", sub: "Idea to posted. Drag a card to move it along." },
   scheduled: { title: "Scheduled", sub: "What is going out, and what has slipped past its slot." },
   posted: { title: "Posted", sub: "What went live. Add the numbers and the insight screens wake up." },
@@ -240,6 +256,8 @@ export function Home({
             ) : null}
 
             {view === "brands" ? <Brands plan={account.profile?.plan} /> : null}
+
+            {view === "library" ? <AssetLibrary /> : null}
 
             {view === "board" ? (
               <Board posts={posts} onChange={commit} onOpen={setEditing} />

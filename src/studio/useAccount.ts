@@ -16,6 +16,10 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { currentSession, ensureProfile, loadProfile, onAuthChange, signOut as endSession } from "./auth.js";
 import { checkoutOutcome, clearCheckoutFlag } from "./billing.js";
 import { isCloudConfigured, type Profile } from "./cloud.js";
+import { listAssets } from "./assets.js";
+import { forgetFonts } from "./fonts.js";
+import { ensureUrls, migrateInlineDocs, syncPendingUploads } from "./library.js";
+import { setSession } from "./session.js";
 import { forgetLocal, hasLocalWork, lastSyncedAt, syncAll } from "./sync.js";
 
 export type SyncState =
@@ -64,6 +68,8 @@ export function useAccount(changeSignal: number): Account {
   const userRef = useRef<User | null>(null);
   const running = useRef(false);
   const lastRun = useRef(0);
+  /** The asset migration is once per session, not once per sync. */
+  const lifted = useRef(false);
 
   const run = useCallback(async () => {
     const id = userRef.current?.id;
@@ -73,7 +79,29 @@ export function useAccount(changeSignal: number): Account {
     lastRun.current = Date.now();
     setSync({ status: "syncing" });
 
+    // Assets first, and only once. Both of these CREATE records that the sync
+    // then pushes, so running them after it would leave everything a round
+    // behind — the pictures would reach the bucket and the rows describing them
+    // would not go up until the next sync fired.
+    if (!lifted.current) {
+      lifted.current = true;
+      try {
+        await syncPendingUploads(id);
+        await migrateInlineDocs(id);
+      } catch {
+        // A migration that cannot finish leaves the documents exactly as they
+        // were — inline and working — so it must never fail a sync.
+      }
+    }
+
     const result = await syncAll(id);
+
+    // One signing pass for the whole library once the records have landed.
+    // Everything that paints an asset — the pool, the library grid, a brand's
+    // logo — reads the same cache, so this is one round trip for all of it
+    // rather than one per picture per screen.
+    if (result.ok) await ensureUrls(listAssets());
+
     running.current = false;
 
     setSync(
@@ -93,6 +121,9 @@ export function useAccount(changeSignal: number): Account {
       const next = session?.user ?? null;
       userRef.current = next;
       setUser(next);
+      // Told before anything else runs: the library reads this to decide whether
+      // an upload has anywhere to go. See session.ts.
+      setSession({ userId: next?.id ?? null });
 
       if (!next) {
         setProfile(null);
@@ -103,6 +134,7 @@ export function useAccount(changeSignal: number): Account {
       setStatus("signedIn");
       // First sign-in creates the row; afterwards this is just a read.
       const p = await ensureProfile(next);
+      if (p) setSession({ plan: p.plan });
       if (alive) setProfile(p);
       void run();
     };
@@ -184,7 +216,12 @@ export function useAccount(changeSignal: number): Account {
     // Push first, or anything edited since the last sync dies with the local copy.
     if (userRef.current) await run();
     await endSession();
+    // Unregisters the FontFaces as well as dropping the records, or the next
+    // person at this machine sees families with nothing behind them.
+    forgetFonts();
     forgetLocal();
+    setSession({ userId: null, plan: "free" });
+    lifted.current = false;
     userRef.current = null;
     setUser(null);
     setProfile(null);

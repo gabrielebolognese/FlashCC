@@ -1,11 +1,15 @@
 /**
- * The media pool.
+ * The media pool — preparing a file for use, and nothing else.
  *
- * Images are stored as data URLs inside the document so a project stays
- * self-contained and works offline. That puts them in localStorage, which is a few
- * megabytes total — so every import is downscaled hard before it is kept. Storing
- * originals would fill the quota after three photos and the save would fail silently.
+ * Every import is downscaled hard before it is kept. That began as a localStorage
+ * quota problem and survives the move to a bucket for a better reason: a 12
+ * megapixel phone photo behind a 400px slot is bandwidth nobody gets anything
+ * for, and it has to be re-fetched on every device.
+ *
+ * WHERE the prepared bytes go is `library.ts`'s decision, not this file's. This
+ * one only knows how to read a picture, shrink it, and say how big it is.
  */
+import { dataUrlBytes } from "./assets.js";
 import { uid, type MediaItem } from "./model.js";
 
 /** Long edge, in pixels. Comfortably past 1080 artboard width at 2x. */
@@ -31,8 +35,10 @@ const loadImage = (src: string): Promise<HTMLImageElement> =>
     img.src = src;
   });
 
+export type Prepared = { src: string; w: number; h: number };
+
 /** Downscale to the long edge and re-encode. Returns the original if already small. */
-async function shrink(file: File): Promise<{ src: string; w: number; h: number }> {
+export async function prepareImage(file: File): Promise<Prepared> {
   const original = await readAsDataUrl(file);
   const img = await loadImage(original);
   const { naturalWidth: w, naturalHeight: h } = img;
@@ -61,14 +67,17 @@ export async function importFiles(files: readonly File[]): Promise<MediaItem[]> 
   for (const file of files) {
     if (!file.type.startsWith("image/")) continue;
     try {
-      const { src, w, h } = await shrink(file);
+      const { src, w, h } = await prepareImage(file);
       out.push({
         id: uid("m"),
         name: file.name.replace(/\.[^.]+$/, "").slice(0, 40) || "Image",
         src,
         w,
         h,
-        bytes: src.length,
+        // The decoded size, not the length of the base64 string it arrived as.
+        // `src.length` over-reported every picture by a third, which meant every
+        // size shown to the user and every quota decision made from it was wrong.
+        bytes: dataUrlBytes(src),
       });
     } catch {
       // One bad file should not abandon the rest of the drop.

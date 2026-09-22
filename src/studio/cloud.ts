@@ -14,6 +14,7 @@
  */
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 
+import type { Asset, AssetKind, LogoRole } from "./assets.js";
 import type { Brand } from "./brand.js";
 import type { Doc } from "./model.js";
 import type { Metrics, Platform, Post, Stage } from "./pipeline.js";
@@ -107,6 +108,8 @@ export type BrandRow = {
   name: string;
   /** The whole Theme. Nothing queries inside it, so flat columns would only drift. */
   theme: Brand["theme"];
+  /** Asset ids, by variant. See 04-storage.sql for why this is not three columns. */
+  logos: Record<string, string>;
   width: number;
   height: number;
   created_at: string;
@@ -126,6 +129,7 @@ export const brandToRow = (
   id: brand.id,
   name: brand.name,
   theme: brand.theme,
+  logos: brand.logos ?? {},
   width: brand.width,
   height: brand.height,
   created_at: brand.createdAt,
@@ -138,6 +142,9 @@ export const rowToBrand = (row: BrandRow): Brand => ({
   id: row.id,
   name: row.name,
   theme: row.theme,
+  // The column arrives with 04-storage.sql; a project that has not run it yet
+  // simply has no logos, which is the same as a brand that never had one.
+  logos: row.logos ?? {},
   width: row.width,
   height: row.height,
   createdAt: row.created_at,
@@ -245,3 +252,166 @@ export const forWrite = <T extends object>(row: T): Omit<T, "impressions" | "ser
   };
   return rest;
 };
+
+/* ── assets ───────────────────────────────────────────────────────────────── */
+
+export type AssetRow = {
+  user_id: string;
+  id: string;
+  kind: AssetKind;
+  name: string;
+  path: string;
+  mime: string;
+  content_key: string | null;
+  width: number | null;
+  height: number | null;
+  bytes: number;
+  family: string | null;
+  brand_id: string | null;
+  role: LogoRole | null;
+  folder: string | null;
+  created_at: string;
+  updated_at: string;
+  server_updated_at: string;
+  deleted_at: string | null;
+};
+
+export const assetToRow = (
+  asset: Asset,
+  userId: string,
+  deletedAt: string | null = null,
+): AssetRow => ({
+  user_id: userId,
+  id: asset.id,
+  kind: asset.kind,
+  name: asset.name,
+  path: asset.path,
+  mime: asset.mime,
+  content_key: asset.key ?? null,
+  width: asset.w ?? null,
+  height: asset.h ?? null,
+  bytes: asset.bytes,
+  family: asset.family ?? null,
+  brand_id: asset.brandId ?? null,
+  role: asset.role ?? null,
+  folder: asset.folder ?? null,
+  created_at: asset.createdAt,
+  updated_at: asset.updatedAt,
+  server_updated_at: asset.updatedAt,
+  deleted_at: deletedAt,
+});
+
+/**
+ * `data` is deliberately not restored on the way back.
+ *
+ * A row that came from the server has its bytes in the bucket by definition, and
+ * carrying an inline copy as well would put the megabytes this whole batch
+ * removes straight back into localStorage.
+ */
+export const rowToAsset = (row: AssetRow): Asset => ({
+  id: row.id,
+  kind: row.kind,
+  name: row.name,
+  path: row.path,
+  mime: row.mime,
+  bytes: row.bytes,
+  ...(row.content_key === null ? {} : { key: row.content_key }),
+  ...(row.width === null ? {} : { w: row.width }),
+  ...(row.height === null ? {} : { h: row.height }),
+  ...(row.family === null ? {} : { family: row.family }),
+  ...(row.brand_id === null ? {} : { brandId: row.brand_id }),
+  ...(row.role === null ? {} : { role: row.role }),
+  ...(row.folder === null ? {} : { folder: row.folder }),
+  createdAt: row.created_at,
+  updatedAt: row.updated_at,
+});
+
+/* ── storage ──────────────────────────────────────────────────────────────── */
+
+export const MEDIA_BUCKET = "media";
+export const SLIDES_BUCKET = "slides";
+
+/**
+ * A week.
+ *
+ * Long enough that a document opened, edited and reopened over a working week
+ * never blinks, short enough that a URL pasted into a chat does not become a
+ * permanent public handle on a private file. Every open re-signs anyway, so this
+ * is a grace period rather than a lifetime.
+ */
+export const SIGNED_TTL_SECONDS = 7 * 24 * 60 * 60;
+
+export type UploadResult = { ok: true; path: string } | { ok: false; error: string };
+
+/** Storage is only there when both the project and the session are. */
+export const storageReady = (): boolean => isCloudConfigured();
+
+export async function uploadObject(
+  bucket: string,
+  path: string,
+  bytes: Uint8Array,
+  mime: string,
+): Promise<UploadResult> {
+  const db = cloud();
+  if (!db) return { ok: false, error: "Cloud is not configured" };
+
+  // `upsert` so re-uploading the same asset id replaces it rather than failing.
+  // A bucket that has not been created yet answers "Bucket not found", which is
+  // the one error worth naming: it means 04-storage.sql has not been run.
+  const { error } = await db.storage.from(bucket).upload(path, bytes as BlobPart, {
+    contentType: mime,
+    upsert: true,
+  });
+
+  if (error) {
+    const missing = /bucket not found/i.test(error.message);
+    return {
+      ok: false,
+      error: missing
+        ? "The media bucket does not exist yet. Run supabase/04-storage.sql."
+        : error.message,
+    };
+  }
+  return { ok: true, path };
+}
+
+/**
+ * Signed URLs for a whole document's worth of assets, in one round trip.
+ *
+ * One call rather than one per image is the difference between opening a
+ * ten-picture carousel in a tick and opening it in ten. Paths that fail to sign
+ * are simply absent from the map, and the caller keeps whatever `src` it had.
+ */
+export async function signPaths(paths: readonly string[]): Promise<Map<string, string>> {
+  const out = new Map<string, string>();
+  const db = cloud();
+  if (!db || paths.length === 0) return out;
+
+  const { data, error } = await db.storage
+    .from(MEDIA_BUCKET)
+    .createSignedUrls([...paths], SIGNED_TTL_SECONDS);
+  if (error || !data) return out;
+
+  for (const entry of data) {
+    if (entry.signedUrl && entry.path) out.set(entry.path, entry.signedUrl);
+  }
+  return out;
+}
+
+export async function removeObjects(bucket: string, paths: readonly string[]): Promise<void> {
+  const db = cloud();
+  if (!db || paths.length === 0) return;
+  await db.storage.from(bucket).remove([...paths]);
+}
+
+/**
+ * The public address of a published slide.
+ *
+ * Built by the client rather than fetched, because `getPublicUrl` is a pure
+ * string join over the project URL and a round trip for one would be silly.
+ */
+export function publicUrl(bucket: string, path: string): string {
+  const db = cloud();
+  if (!db) return "";
+  return db.storage.from(bucket).getPublicUrl(path).data.publicUrl;
+}

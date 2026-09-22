@@ -5,13 +5,15 @@
  * the pipeline bridge on each card — "Add to pipeline" is where a document stops
  * being a file and becomes something with a date and, eventually, numbers.
  */
-import { Archive, ArchiveRestore, CalendarPlus, Copy, Folder, Layers, PenLine, Plus, Send, Trash2 } from "lucide-react";
+import { Archive, ArchiveRestore, CalendarPlus, Copy, Folder, Layers, PenLine, Plus, Send, Table, Trash2 } from "lucide-react";
 import { useMemo, useState } from "react";
 
 import { LayerView } from "./LayerView.js";
 import type { Doc } from "./model.js";
 import { slidePaint } from "./paint.js";
-import { applyBrand, listBrands, themeOf } from "./brand.js";
+import { applyBrand, listBrands, stampLogo, themeOf } from "./brand.js";
+import { logoResolver } from "./library.js";
+import { PublishBatch } from "./PublishBatch.js";
 import { BrandMenu } from "./BrandMenu.js";
 import { detachDoc, listPosts, postFromDoc, type Post } from "./pipeline.js";
 import { ProjectFilters } from "./ProjectFilters.js";
@@ -48,6 +50,7 @@ export function Projects({
   const [moving, setMoving] = useState<string | null>(null);
   const [filters, setFilters] = useState<Filters>(NO_FILTERS);
   const [renaming, setRenaming] = useState<string | null>(null);
+  const [publishing, setPublishing] = useState(false);
 
   const refresh = () => setDocs(listDocs());
 
@@ -194,21 +197,28 @@ export function Projects({
               carousels is thirty manual edits there. Scoped to the filtered set
               rather than the whole library, because "all of them" is rarely
               what anyone means and is the hardest thing to undo. */}
-          {listBrands().length > 0 && visible.length > 0 ? (
+          {visible.length > 0 ? (
             <div className="mb-3 flex items-center gap-2">
-              <span className="text-caption text-tertiary">
-                Restyle the {visible.length} shown
-              </span>
+              {listBrands().length > 0 ? (
+                <span className="text-caption text-tertiary">
+                  Restyle the {visible.length} shown
+                </span>
+              ) : null}
+              {listBrands().length === 0 ? null : (
               <BrandMenu
                 brands={listBrands()}
                 onApply={(brand) => {
                   let changed = 0;
                   let skipped = 0;
+                  // Resolved once for the whole run rather than per document: a
+                  // rebrand across fifty carousels is fifty writes, and there is
+                  // no reason for it to be fifty library reads as well.
+                  const logo = logoResolver();
                   for (const summary of visible) {
                     const full = loadDoc(summary.id);
                     if (!full) continue;
                     const out = applyBrand(full, brand, themeOf(full, listBrands()));
-                    saveDoc(out.doc);
+                    saveDoc(stampLogo(out.doc, brand, logo).doc);
                     changed += out.changed;
                     skipped += out.skipped;
                   }
@@ -216,6 +226,21 @@ export function Projects({
                   return { doc: loadDoc(visible[0]?.id ?? "") ?? ({} as never), changed, skipped };
                 }}
               />
+              )}
+
+              <div className="flex-1" />
+
+              {/* The other half of the same idea: the filtered set is already
+                  "this week's batch", so publishing it is one press rather than
+                  a selection mode nobody asked for. */}
+              <button
+                type="button"
+                onClick={() => setPublishing(true)}
+                className="flex h-8 items-center gap-1.5 rounded-xl border border-hairline px-3 text-caption text-tertiary hover:border-accent-dim hover:text-accent"
+              >
+                <Table size={13} strokeWidth={2} />
+                Publish the {visible.length} shown
+              </button>
             </div>
           ) : null}
 
@@ -384,6 +409,10 @@ export function Projects({
         <Plus size={14} strokeWidth={2} />
         Blank canvas
       </button>
+
+      {publishing ? (
+        <PublishBatch ids={visible.map((d) => d.id)} onClose={() => setPublishing(false)} />
+      ) : null}
     </>
   );
 }

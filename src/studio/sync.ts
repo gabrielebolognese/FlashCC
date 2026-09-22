@@ -19,19 +19,24 @@
  */
 
 import {
+  assetToRow,
   brandToRow,
   cloud,
   docToRow,
   forWrite,
   postToRow,
+  rowToAsset,
   rowToBrand,
   rowToDoc,
   rowToPost,
+  type AssetRow,
   type BrandRow,
   type DocRow,
   type PostRow,
 } from "./cloud.js";
+import { listAssets, saveAssets, type Asset } from "./assets.js";
 import { listBrands, saveBrands, type Brand } from "./brand.js";
+import { forgetLibrary } from "./library.js";
 import type { Doc } from "./model.js";
 import { listPosts, savePosts, type Post } from "./pipeline.js";
 import { dropDoc, listDocs, loadDoc, putDoc } from "./storage.js";
@@ -123,6 +128,26 @@ function localBrandEntries(): Entry<Brand>[] {
   return [...alive, ...gone];
 }
 
+/**
+ * Only assets that have reached the bucket are pushed.
+ *
+ * An asset still carrying its bytes inline has no `path`, and the table's check
+ * constraint refuses a row without one — correctly, because a library entry that
+ * points at nothing is worse than an entry that is not there yet. `library.ts`
+ * uploads it on the next sign-in and it joins the sync then.
+ */
+function localAssetEntries(): Entry<Asset>[] {
+  const alive: Entry<Asset>[] = listAssets()
+    .filter((a) => a.path !== "")
+    .map((a) => ({ id: a.id, updatedAt: a.updatedAt, value: a }));
+  const gone: Entry<Asset>[] = listTombstones("asset").map((t) => ({
+    id: t.id,
+    updatedAt: t.deletedAt,
+    value: null,
+  }));
+  return [...alive, ...gone];
+}
+
 function localPostEntries(): Entry<Post>[] {
   const alive: Entry<Post>[] = listPosts().map((p) => ({
     id: p.id,
@@ -151,6 +176,11 @@ const brandRowToEntry = (row: BrandRow): Entry<Brand> =>
   row.deleted_at
     ? { id: row.id, updatedAt: row.deleted_at, value: null }
     : { id: row.id, updatedAt: row.updated_at, value: rowToBrand(row) };
+
+const assetRowToEntry = (row: AssetRow): Entry<Asset> =>
+  row.deleted_at
+    ? { id: row.id, updatedAt: row.deleted_at, value: null }
+    : { id: row.id, updatedAt: row.updated_at, value: rowToAsset(row) };
 
 const postRowToEntry = (row: PostRow): Entry<Post> =>
   row.deleted_at
@@ -207,10 +237,11 @@ export async function syncAll(userId: string): Promise<SyncResult> {
   if (!db) return { ok: false, pushed: 0, applied: 0, error: "Cloud is not configured" };
 
   try {
-    const [docsRes, postsRes, brandsRes] = await Promise.all([
+    const [docsRes, postsRes, brandsRes, assetsRes] = await Promise.all([
       db.from("docs").select("*").eq("user_id", userId),
       db.from("posts").select("*").eq("user_id", userId),
       db.from("brands").select("*").eq("user_id", userId),
+      db.from("assets").select("*").eq("user_id", userId),
     ]);
 
     if (docsRes.error) throw new Error(docsRes.error.message);
@@ -221,6 +252,12 @@ export async function syncAll(userId: string): Promise<SyncResult> {
     // missing table degrades brands to local-only rather than failing the sync.
     const brandsTableMissing = brandsRes.error?.code === "PGRST205";
     if (brandsRes.error && !brandsTableMissing) throw new Error(brandsRes.error.message);
+
+    // Same bargain for assets: the table arrives with 04-storage.sql, and until
+    // it does the library is a local one. Nothing else in the sync may fail
+    // because of it.
+    const assetsTableMissing = assetsRes.error?.code === "PGRST205";
+    if (assetsRes.error && !assetsTableMissing) throw new Error(assetsRes.error.message);
 
     const docMerge = mergeEntries(
       localDocEntries(),
@@ -235,6 +272,13 @@ export async function syncAll(userId: string): Promise<SyncResult> {
       : mergeEntries(
           localBrandEntries(),
           ((brandsRes.data ?? []) as BrandRow[]).map(brandRowToEntry),
+        );
+
+    const assetMerge = assetsTableMissing
+      ? { merged: [], toPush: [], toApply: [] }
+      : mergeEntries(
+          localAssetEntries(),
+          ((assetsRes.data ?? []) as AssetRow[]).map(assetRowToEntry),
         );
 
     /* ── push ── */
@@ -261,6 +305,32 @@ export async function syncAll(userId: string): Promise<SyncResult> {
           : brandToRow(emptyBrand(e.id, e.updatedAt), userId, e.updatedAt),
       ),
     );
+
+    const assetRows = assetMerge.toPush.flatMap((e) =>
+      e.value
+        ? [forWrite(assetToRow(e.value, userId))]
+        : // A deleted asset has no row to rebuild from — the record is gone
+          // locally and only the tombstone remains — so the deletion is sent as
+          // an UPDATE of the existing row rather than as an upsert of a
+          // placeholder. A path is required by the table and a placeholder has
+          // none to offer.
+          [],
+    );
+
+    if (assetRows.length > 0) {
+      const { error } = await db.from("assets").upsert(assetRows, { onConflict: "user_id,id" });
+      if (error) throw new Error(error.message);
+    }
+
+    const assetTombstones = assetMerge.toPush.filter((e) => e.value === null);
+    for (const gone of assetTombstones) {
+      const { error } = await db
+        .from("assets")
+        .update({ deleted_at: gone.updatedAt, updated_at: gone.updatedAt })
+        .eq("user_id", userId)
+        .eq("id", gone.id);
+      if (error) throw new Error(error.message);
+    }
 
     if (docRows.length > 0) {
       const { error } = await db.from("docs").upsert(docRows, { onConflict: "user_id,id" });
@@ -293,17 +363,30 @@ export async function syncAll(userId: string): Promise<SyncResult> {
       saveBrands(live(brandMerge.merged));
     }
 
+    if (assetMerge.toApply.length > 0) {
+      // Locally-pending uploads are kept: they are the ones still carrying their
+      // bytes, they are invisible to the server, and a merge that only saw the
+      // server's view would drop them on the floor.
+      const pending = listAssets().filter((a) => a.path === "");
+      saveAssets([...pending, ...live(assetMerge.merged)]);
+    }
+
     // Only now is it safe to forget what was deleted: the server has it.
     clearTombstones("doc", docMerge.toPush.filter((e) => e.value === null).map((e) => e.id));
     clearTombstones("post", postMerge.toPush.filter((e) => e.value === null).map((e) => e.id));
     clearTombstones("brand", brandMerge.toPush.filter((e) => e.value === null).map((e) => e.id));
+    clearTombstones("asset", assetTombstones.map((e) => e.id));
 
     writeCursor(new Date().toISOString());
 
     return {
       ok: true,
-      pushed: docRows.length + postRows.length + brandRows.length,
-      applied: docMerge.toApply.length + postMerge.toApply.length + brandMerge.toApply.length,
+      pushed: docRows.length + postRows.length + brandRows.length + assetRows.length,
+      applied:
+        docMerge.toApply.length +
+        postMerge.toApply.length +
+        brandMerge.toApply.length +
+        assetMerge.toApply.length,
     };
   } catch (err) {
     return {
@@ -318,6 +401,7 @@ export async function syncAll(userId: string): Promise<SyncResult> {
 const emptyBrand = (id: string, at: string): Brand => ({
   id,
   name: "Deleted",
+  logos: {},
   theme: { bg: "#000000", fg: "#ffffff", accent: "#ffffff", muted: "#888888" },
   width: 1080,
   height: 1350,
@@ -366,7 +450,12 @@ const emptyPost = (id: string, at: string): Post => ({
  * persuasive, because the work is right there.
  */
 export function hasLocalWork(): boolean {
-  return listDocs().length > 0 || listPosts().length > 0 || listBrands().length > 0;
+  return (
+    listDocs().length > 0 ||
+    listPosts().length > 0 ||
+    listBrands().length > 0 ||
+    listAssets().length > 0
+  );
 }
 
 /** Signing out leaves the machine clean, so the next person sees their own work. */
@@ -374,6 +463,7 @@ export function forgetLocal(): void {
   for (const d of listDocs()) dropDoc(d.id);
   savePosts([]);
   saveBrands([]);
+  forgetLibrary();
   clearAllTombstones();
   clearCursor();
 }

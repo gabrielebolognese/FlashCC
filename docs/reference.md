@@ -18,7 +18,7 @@ is still current.
 | --- | --- |
 | **Orientation** | [1 What it is](#1-what-it-is) · [2 Running it](#2-running-it) · [3 The invariants](#3-the-invariants) |
 | **The canvas** | [4 Data model](#4-the-data-model) · [5 Canvas](#5-the-canvas) · [6 Text](#6-text-measurement-and-fitting) · [7 Colour](#7-colour-and-contrast) · [8 Gradients](#8-gradients) · [9 Format change](#9-changing-format-reflow) |
-| **Making a deck** | [10 Frameworks](#10-the-four-frameworks) · [11 Generation](#11-generation) · [12 Styles](#12-styles-and-themes) · [13 Onboarding](#13-onboarding) · [14 AI drafting](#14-ai-drafting) · [15 Bulk](#15-bulk-create) · [16 Media and fonts](#16-media-and-fonts) · [17 Screen flow](#17-screen-flow) |
+| **Making a deck** | [10 Frameworks](#10-the-four-frameworks) · [11 Generation](#11-generation) · [12 Styles](#12-styles-and-themes) · [13 Onboarding](#13-onboarding) · [14 AI drafting](#14-ai-drafting) · [15 Bulk](#15-bulk-create) · [16 Media, fonts and assets](#16-media-and-fonts) · [17 Screen flow](#17-screen-flow) |
 | **The product** | [18 Pipeline](#18-the-pipeline) · [19 Analytics](#19-analytics) · [20 Library](#20-the-library) · [21 Export](#21-export) |
 | **Infrastructure** | [22 Persistence](#22-persistence) · [23 Sync](#23-sync) · [24 Auth](#24-auth) · [25 Billing](#25-billing) · [26 Database](#26-database) · [27 Design tokens](#27-design-tokens) · [28 Testing](#28-testing) |
 | **Reality check** | [29 Known defects](#29-known-defects) |
@@ -604,20 +604,84 @@ blocks are dropped.
 
 ## 16. Media and fonts
 
-**Media** (`media.ts`): pool of 24, downscaled to 1600px max edge at quality 0.82. PNG and WebP
-re-encode to WebP, everything else to JPEG, and the re-encode is discarded if it came out bigger.
-Small files under 400KB skip re-encoding entirely — **deliberately, so small GIFs keep their
-animation**, which a canvas round-trip would kill. One unreadable file is swallowed so the rest of
-a drop survives.
+### Preparing a file
 
-Drag from the pool onto an image placeholder fills it at the slot's size; drop on bare canvas
-places it where you dropped it.
+**`media.ts`** downscales to a 1600px long edge at quality 0.82. PNG and WebP re-encode to WebP,
+everything else to JPEG, and the re-encode is discarded if it came out bigger. Small files under
+400KB skip re-encoding entirely — **deliberately, so small GIFs keep their animation**, which a
+canvas round-trip would kill. One unreadable file is swallowed so the rest of a drop survives.
 
-**Fonts** (`fonts.ts`): 8 built-in stacks chosen so nothing has to be downloaded. Uploads are capped
-at **6 fonts, 400KB each**, stored as data URLs in localStorage and registered through the FontFace
-API. Families are namespaced `FCC <label> <timestamp>` so an uploaded "Inter" cannot shadow a system
-face. `FontUpload` teaches what a usable font file is, because most people have never downloaded a
-`.woff2` and will otherwise drop in a 3MB `.ttf` and hit the cap with no idea why.
+It no longer decides where the bytes GO. That is `library.ts`.
+
+`bytes` is now `dataUrlBytes(src)`, the decoded size. It used to be `src.length`, the length of a
+base64 string — about a third larger than the file — so every size shown and every quota decision
+made from it was wrong.
+
+### The library (`assets.ts`, `library.ts`)
+
+An asset is a record belonging to the **account**, not to a document:
+
+```
+Asset { id, kind: "image" | "font", name, path, mime, bytes,
+        w?, h?, family?, brandId?, role?, folder?, key?, data? }
+```
+
+`path` is the object in the `media` bucket. `key` is a content fingerprint, which is what makes
+the same logo across twenty carousels one object. `data` holds the bytes inline and exists only
+for an asset that has never reached a bucket — signed out, or a failed upload waiting for the next
+sign-in.
+
+**A document refers to an asset by id.** `Layer.assetId` and `MediaItem.assetId` are the durable
+half; `src` is whatever should be painted right now and is expected to go stale, because a signed
+URL expires.
+
+| Function | Does |
+| --- | --- |
+| `hoistInlineAssets(doc, known)` | Pure. Lifts every inlined data URL into an asset, deduplicated by fingerprint, and ADDS an `assetId` without touching `src` |
+| `dehydrateDoc(doc)` | Pure. Blanks `src` wherever there is an `assetId`. Called by `putDoc`, so every write drops the redundant bytes |
+| `resolveDoc(doc, urlOf)` | Pure. Puts a live URL back into `src`. Returns the same object when nothing changed |
+| `ensureUrls(assets)` | Signs everything missing in ONE `createSignedUrls` call, into a module-level cache |
+| `migrateInlineDocs(userId)` | The 5.1 migration. Rewrites references, stores the new assets, then writes the document — in that order |
+
+The migration order is the whole safety argument: if it dies between steps the document on disk is
+the untouched original with its pictures still inline, and the next run finds them again. It uses
+`putDoc`, not `saveDoc` — a migration is not an edit, and restamping would make every local
+document win the next merge.
+
+**Nothing is derived still holds.** The layer owns its box, fit, radius and z-position. What moved
+out is the file, which is what `<img src>` has always meant.
+
+### Fonts
+
+8 built-in stacks chosen so nothing has to be downloaded. **A font is an asset** with
+`kind: "font"` and a `family`, which is what lifted the old `MAX_FONTS = 6`: that cap was
+localStorage arithmetic, not a decision. Signed out it still applies (`LOCAL_FONT_LIMIT`, 400KB
+each); signed in the ceiling is the plan (`FONT_LIMIT`: 12 / 50 / unlimited) at 4MB each.
+
+Families are namespaced `FCC <label> <timestamp>` so an uploaded "Inter" cannot shadow a system
+face. `migrateLegacyFonts()` moves anything under the old `flashcc:v3:fonts` key into the library
+on first run, keeping ids so a document already naming a face still resolves to it. `FontUpload`
+teaches what a usable font file is, because most people have never downloaded a `.woff2` and will
+otherwise drop in a 3MB `.ttf` and hit the cap with no idea why.
+
+### Brand logos
+
+`Brand.logos` is `{ light?, dark?, mark? }` — **asset ids**, not files, so five brands can share
+one object. `logoRoleFor(brand, background)` prefers the mark and otherwise picks from the
+background's luminance, which is the only thing an automatic placement has to get right.
+
+`stampLogo(doc, brand, resolve, slides?)` places it on the first and last slide as an **ordinary
+image layer**, marked `handEdited` so a re-lay keeps it. Idempotent per slide. It runs once and
+leaves plain layers, exactly as a preset does. Applying a brand calls it in the same commit, so
+"it used my brand assets automatically" is true without a second button — the one line in the whole
+research corpus that no competitor has review evidence of.
+
+### The session shim
+
+`session.ts` holds the current user id and plan, written only by `useAccount`. Uploading happens in
+the media pool, the font dialog, the brand editor and the library grid; threading a user id through
+four component trees to reach one `upload` call is a lot of prop for one globally true fact. It is
+deliberately not reactive — anything that should re-render already has the account as a prop.
 
 ---
 
@@ -799,8 +863,16 @@ the FontFace API for uploads, and the html-to-canvas converters are unreliable o
 
 One browser is kept warm across requests; launching Chromium is most of the time budget for a
 ten-slide deck. Uploaded faces travel with the markup as `@font-face` rules carrying their data
-URLs — they live in that browser's localStorage and the server has never heard of them, so anything
-not sent is silently substituted with Arial.
+URLs — they live in that browser's library and the server has never heard of them, so anything not
+sent is silently substituted with Arial.
+
+**The payload is inlined before it is sent** (`inline.ts`). Since the asset library, pictures and
+faces are signed URLs into a bucket, and a payload carrying those would make the renderer fetch a
+customer's storage mid-screenshot, with credentials it does not have and no network isolation
+(§29 D18). The browser already holds a session that can read them, so it fetches and re-inlines
+just before serialising. The server's contract is unchanged: a page that needs nothing from the
+network. Fetched payloads are cached for the session, so exporting for LinkedIn and then for
+Instagram does not download the same photo twice.
 
 **LinkedIn PDFs are built from JPEG pages**, not PNG: PNG pages have been observed converting into a
 PDF that renders blank, and the failure is silent until the post is live.
@@ -809,6 +881,45 @@ Filenames are zero-padded (`01.jpg`), because every upload dialog sorts by filen
 out of order is worse than no carousel. The zip uses `STORE` — JPEG is already compressed, so
 deflating costs time and saves nothing.
 
+### Publishing for a scheduler
+
+The other way out, and a different job. `POST /api/slides` returns the same `renderSlides` output as
+base64 JSON rather than as a zip; `publish.ts` uploads each slide to the **public** `slides` bucket
+at `<user>/<doc>/NN.<ext>` and hands back a `PublishedCarousel`.
+
+Paths are deterministic, so republishing REPLACES a deck's slides rather than accumulating a second
+set — a URL already pasted into a scheduler keeps working and shows the newer artwork.
+
+Public is the requirement, not an oversight: **eight of nine bulk schedulers require publicly-hosted
+image URLs for CSV import and none of them provides the hosting.** A signed URL cannot do it, because
+the scheduler fetches days later with no credentials.
+
+`publishDecks` runs sequentially with a progress callback. Each deck is a full headless render of up
+to ten pages plus an upload each; firing twenty at once at one warm browser is how a render server
+falls over. A deck that fails does not stop the rest.
+
+### The CSV dialects (`schedulers.ts`)
+
+There is no lingua franca, and two of the three are exact opposites:
+
+| Destination | URLs | Platform | Alt text |
+| --- | --- | --- | --- |
+| **Metricool** | One per column, `Picture Url 1`..`10` | A boolean per network, plus `LinkedIn Images as Carousel` — which **builds the LinkedIn PDF from the image URLs for you** | `Alt Text 1`..`10` |
+| **Publer** | All in one cell, **comma** separated | `Type`, which takes `pdf` so a finished document can go instead | One cell, `||` separated |
+| **ContentStudio** | All in one cell, **newline** separated | A literal enum: `LinkedIn Carousel` / `Instagram Carousel` | None — `buildSheet` warns rather than dropping it silently |
+
+`toCsv` quotes **every** field rather than deciding per field: ContentStudio's own format puts
+newlines inside a cell, captions routinely contain commas and quotes, and a writer that has to
+decide is a writer with an edge case in it. Lines end CRLF.
+
+Alt text is generated from the words already on each slide (`altFromTexts`) rather than asked for.
+An alt field nobody fills is an accessibility feature that does not exist, and a headline IS the
+slide's description.
+
+**The column names are a claim about somebody else's product.** They are gathered in `SCHEDULERS`
+and nowhere else so that a renamed column is one line. These importers ignore unknown columns
+rather than rejecting the file, so a stale name costs one empty field.
+
 ---
 
 ## 22. Persistence
@@ -816,12 +927,13 @@ deflating costs time and saves nothing.
 | Key | Holds |
 | --- | --- |
 | `flashcc:v3:index` | `DocSummary[]` — the grid and the search blob |
-| `flashcc:v3:doc:<id>` | One full `Doc`, media included as base64 |
+| `flashcc:v3:doc:<id>` | One full `Doc`, **dehydrated** — see §16 |
 | `flashcc:v3:index-version` | Retires the one-shot summary backfill |
-| `flashcc:v3:fonts` | Uploaded faces as data URLs |
+| `flashcc:v3:fonts` | **Retired.** Migrated into `flashcc:v1:assets` on first run |
 | `flashcc:v3:onboarded` / `:prefs` | Onboarding state and answers |
 | `flashcc:v1:posts` | The entire pipeline in one key |
 | `flashcc:v1:brands` | Saved brands, also read as a set |
+| `flashcc:v1:assets` | The asset library. `data` present only for what has not uploaded |
 | `flashcc:v1:tombstones` | Deletions, both kinds |
 | `flashcc:v1:sync-cursor` | Last successful sync — read only for the "Synced 3m ago" label |
 
@@ -912,7 +1024,7 @@ paid.
 
 ## 26. Database
 
-Four tables, all with `(user_id, id)` composite primary keys.
+Five tables, all with `(user_id, id)` composite primary keys.
 
 **Identity is the client's.** The app mints ids offline and creates records before anyone signs in,
 so there is no id remapping on sync and ids only need to be unique per person.
@@ -929,6 +1041,31 @@ be indexed usefully for that.
 
 `doc_id` has **no foreign key**, deliberately: a composite FK would need `ON DELETE SET NULL
 (doc_id)`, which is Postgres 15+ only, and it makes account deletion order-sensitive.
+
+### Storage (`04-storage.sql`)
+
+**Two buckets with opposite postures.**
+
+| Bucket | Holds | Access |
+| --- | --- | --- |
+| `media` | Uploads, logos, font files | Private. Signed per session, owner only |
+| `slides` | Rendered, published slides | **Public read**, owner-only write |
+
+Paths are `<user id>/…` and the first segment IS the access rule — every policy compares
+`storage.foldername(name)[1]` against `auth.uid()`. Change the layout in `assets.ts` and the
+policies stop matching.
+
+**`assets`** is the library index. A bucket can be listed, so this looks redundant; it is not. A
+name, a folder, the brand a logo belongs to and the family a font registered under have nowhere to
+live in a bucket, and listing a bucket to find out what you own is a round trip per screen. One
+table for images and fonts, discriminated by `kind` — they differ in three nullable columns and
+agree on owner, path, size, folder, soft delete and sync clock.
+
+`brands.logos` is jsonb holding asset ids. Pointing at the library rather than embedding is what
+makes "a shared logo is stored once" true.
+
+Asset deletions sync as an **UPDATE** rather than as a tombstone upsert: the table requires a
+non-empty `path` and a placeholder row has none to offer.
 
 ### The paywall is a GRANT, not a policy
 
@@ -1158,9 +1295,35 @@ Vite proxy and localhost. All of that needs revisiting before this is public.
 PNG export, AI drafting and the pipeline are advertised as Pro. No screen reads `plan`, no platform
 emits PNG, and `02-pro-gate.sql` is unrun. The tier list is currently aspirational copy.
 
+### D21 — Scheduler column names are unverified against live templates
+
+Every header in `SCHEDULERS` is a claim about somebody else's product, taken from research rather
+than from importing a file into each tool. `Alt Text 1..10` for Metricool and the exact Publer and
+ContentStudio spellings are the least certain.
+
+The cost is bounded: all three importers map by header name and **ignore** columns they do not
+recognise rather than rejecting the file, so a stale name loses one field, not the import. They are
+gathered in one table so that correcting one is one line.
+
+**Fix:** import a generated CSV into each of the three and correct the names against what actually
+lands. That is a fifteen-minute job with three trial accounts and it should happen before launch,
+because "imports without a single manual edit" is the promise being made.
+
+### D22 — A deleted library asset leaves published slides behind
+
+`removeLibraryAsset` deletes the object in the `media` bucket. Slides already published to the
+public `slides` bucket are rendered pixels and keep their own copy, so deleting the source picture
+does not unpublish anything that used it.
+
+That is arguably correct — a URL handed to a scheduler should not rot — but it is not stated
+anywhere in the interface, and "delete" reads as stronger than it is.
+
+**Fix:** either an "unpublish" action that clears `<user>/<doc>/` from the `slides` bucket, or
+wording on the publish confirmation that says plainly the slides stay up until the deck is
+republished or removed.
+
 ### D20 — Smaller things
 
-- `CLAUDE.md` still lists image upload as not built; `media.ts` and `MediaPool.tsx` shipped long ago
 - `paint.ts#layerPaint` is dead **and** disagrees with `LayerView` about whether a fill sits under a
   gradient
 - `FAMILY_SCALE.mono` is unreachable — the mono branch substitutes `MONO_ADVANCE` first

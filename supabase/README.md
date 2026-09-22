@@ -69,11 +69,31 @@ it should stay deleted. That second half is the one that catches real bugs.
 | --- | --- |
 | `01-schema.sql` | Now. Tables, RLS, triggers, indexes. |
 | `02-pro-gate.sql` | After Stripe. Makes the cloud pipeline Pro-only, enforced by Postgres. |
+| `03-brands.sql` | Now. The brands table, and the tier limit as an INSERT policy. |
+| `04-storage.sql` | Now. Two buckets, the `assets` library table, and `brands.logos`. |
+
+## 6. The asset library (`04-storage.sql`)
+
+Same drill: **SQL Editor → New query**, paste the whole file, run it.
+
+It creates **two** buckets and they are deliberately different:
+
+- **`media`** is private. Uploads, logos and font files, readable only through a signed URL that
+  the owner's own session mints.
+- **`slides`** is public. Rendered carousel slides, published so a scheduler can fetch them —
+  which every bulk CSV importer requires and none of them provides. A signed URL cannot do that
+  job, because the scheduler fetches days later with no credentials. Nothing lands in that bucket
+  unless somebody presses Publish.
+
+Check it landed: **Storage** should list both buckets, `slides` with the **Public** badge and
+`media` without it. **Table Editor** should show `assets` with RLS enabled.
+
+If the policy statements fail with a permissions error, create the two buckets by hand in
+**Storage → New bucket** (`media` private, `slides` public) and then add the policies through
+**Storage → Policies**, using the same conditions as the file. The app works without any of it —
+the library just stays on one machine.
 
 ## Still to do
 
 - **Stripe webhook** writes `profiles.plan`. It must use the service role key, because the browser
   deliberately cannot write that column.
-- **Media in Storage.** Uploaded images currently live as base64 inside `docs.data`, so a carousel
-  with photos is a multi-megabyte row that moves in full on every sync. Fine at one user,
-  unpleasant at a hundred.

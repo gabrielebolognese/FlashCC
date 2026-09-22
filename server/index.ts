@@ -5,13 +5,13 @@
  * the Stripe secret, and the Supabase service role key that can write which plan
  * someone is on. Vite proxies /api here in dev.
  *
- * No framework. Four routes do not need one.
+ * No framework. A handful of routes do not need one.
  */
 import { createServer, type IncomingMessage, type ServerResponse } from "node:http";
 
 import { billingConfigured, checkout, portal, status, webhook } from "./billing.js";
 import { draft, draftConfigured, draftStatus } from "./draft.js";
-import { exportDeck } from "./export.js";
+import { exportDeck, renderDocument, renderImages } from "./export.js";
 import { HttpError, json } from "./http.js";
 import { hasServiceRole } from "./supabase.js";
 
@@ -30,6 +30,8 @@ const ROUTES: Record<string, Record<string, Handler>> = {
   POST: {
     "/api/draft": draft,
     "/api/export": exportDeck,
+    "/api/slides": renderImages,
+    "/api/document": renderDocument,
     "/api/billing/checkout": checkout,
     "/api/billing/portal": portal,
     "/api/billing/webhook": webhook,

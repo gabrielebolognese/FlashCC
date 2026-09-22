@@ -4,6 +4,7 @@ import { AiChat } from "./studio/AiChat.js";
 import { BulkCreate } from "./studio/BulkCreate.js";
 import { brandToStyle, listBrands } from "./studio/brand.js";
 import { buildSlides } from "./studio/compositions.js";
+import { resolveDocAssets } from "./studio/library.js";
 import { nameFromHook } from "./studio/search.js";
 import { Compose } from "./studio/Compose.js";
 import { FirstRun } from "./studio/FirstRun.js";
@@ -199,7 +200,12 @@ export function App() {
 
   return (
     <Home
-      onOpen={(doc) => setScreen({ view: "studio", doc })}
+      // Resolved before the editor sees it. A stored document carries asset
+      // REFERENCES, not files; this is where they become URLs the painter can
+      // use. Nothing here waits on a network when there are none to resolve.
+      onOpen={(doc) => {
+        void resolveDocAssets(doc).then((ready) => setScreen({ view: "studio", doc: ready }));
+      }}
       onCompose={(theme, framework) => {
         // "Make another like this" arrives with a framework already chosen, so it skips
         // the picker rather than asking a question it has the answer to.

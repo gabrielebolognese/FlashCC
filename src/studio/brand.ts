@@ -15,17 +15,29 @@
  * meant so it can be given the equivalent colour from somewhere else.
  */
 
+import type { Asset, LogoRole } from "./assets.js";
 import type { Plan } from "./cloud.js";
+import { luminance } from "./colour.js";
 import { markDeleted } from "./tombstones.js";
-import { uid, type Doc, type Layer, type Slide } from "./model.js";
+import { makeLayer, uid, type Doc, type Layer, type Slide } from "./model.js";
 import type { Theme } from "./presets.js";
 import { DEFAULT_STYLE, styleById, type Style } from "./styles.js";
+
+/**
+ * Asset ids by variant — pointers into the library, never copies of a file.
+ *
+ * Three, because a logo that only works on white is half a logo, and the one
+ * thing an automatic placement has to get right is not putting a black mark on
+ * a black slide.
+ */
+export type BrandLogos = Partial<Record<LogoRole, string>>;
 
 export type Brand = {
   id: string;
   name: string;
   /** Colours and typefaces. The same shape the generator already consumes. */
   theme: Theme;
+  logos: BrandLogos;
   /** The artboard new carousels start at. */
   width: number;
   height: number;
@@ -56,6 +68,7 @@ export function makeBrand(name: string, theme: Theme, width = 1080, height = 135
     id: uid("b"),
     name: name.trim() || "Untitled brand",
     theme: { ...theme },
+    logos: {},
     width,
     height,
     createdAt: now,
@@ -281,6 +294,119 @@ function paletteFor(theme: Theme, existing: string[]): string[] {
   return [...head, ...tail].slice(0, 10);
 }
 
+/* ── logos ────────────────────────────────────────────────────────────────── */
+
+/**
+ * The variant to wear on a given ground.
+ *
+ * A mark — the square, standalone one — wins when there is one, because it is
+ * the version drawn to work anywhere. Otherwise the choice is made from the
+ * background's luminance, which is the entire reason for keeping two.
+ * `undefined` when the brand has no logo at all, which is the common case and
+ * must not be an error.
+ */
+export function logoRoleFor(brand: Brand, background: string): LogoRole | undefined {
+  const logos = brand.logos ?? {};
+  if (logos.mark) return "mark";
+  const wantsDark = luminance(background) < 0.5;
+  const preferred: LogoRole = wantsDark ? "dark" : "light";
+  if (logos[preferred]) return preferred;
+  const other: LogoRole = wantsDark ? "light" : "dark";
+  return logos[other] ? other : undefined;
+}
+
+export const logoAssetId = (brand: Brand, background: string): string | undefined => {
+  const role = logoRoleFor(brand, background);
+  return role ? brand.logos?.[role] : undefined;
+};
+
+/** Long edge of the mark, as a share of the artboard width. Small enough to sign, not shout. */
+const LOGO_SHARE = 0.11;
+/** Inset from the artboard edge. Clear of every platform's bottom furniture. */
+const LOGO_MARGIN = 0.055;
+
+export type LogoPlacement = { doc: Doc; placed: number };
+
+/**
+ * Put the brand's mark on the slides that carry it.
+ *
+ * This is the one thing in the corpus that no competitor has review evidence of
+ * — "I scheduled a post and it used my brand assets automatically" — and it is
+ * cheap here precisely because a placed logo is an ORDINARY IMAGE LAYER. It runs
+ * once and leaves plain layers behind, exactly as a preset does. Nothing is
+ * derived, nothing re-runs when the brand changes, and the layer has the same
+ * handles as one you drew.
+ *
+ * First and last slide by default: the opener is where a brand is recognised and
+ * the closer is where it is acted on, and a mark on all ten reads as a watermark
+ * rather than as a signature.
+ *
+ * Idempotent per slide — a slide already carrying this asset is left exactly as
+ * it is, including wherever the user dragged it to.
+ */
+export function stampLogo(
+  doc: Doc,
+  brand: Brand,
+  resolve: (assetId: string) => { src: string; w?: number | undefined; h?: number | undefined } | undefined,
+  slideIndexes?: readonly number[],
+): LogoPlacement {
+  let placed = 0;
+
+  const targets = new Set(
+    slideIndexes ?? [0, doc.slides.length - 1].filter((i) => i >= 0),
+  );
+
+  const slides = doc.slides.map((slide, i) => {
+    if (!targets.has(i)) return slide;
+
+    const assetId = logoAssetId(brand, slide.background);
+    if (!assetId) return slide;
+    if (slide.layers.some((l) => l.assetId === assetId)) return slide;
+
+    const file = resolve(assetId);
+    if (!file) return slide;
+
+    // Aspect comes from the file, so a wide wordmark is not squashed into a
+    // square. An unknown aspect is treated as square, which is what a mark
+    // usually is and what a placeholder box should look like anyway.
+    const aspect = file.w && file.h ? file.w / file.h : 1;
+    const w = Math.round(doc.width * LOGO_SHARE * Math.max(1, aspect));
+    const h = Math.round(w / Math.max(0.01, aspect));
+    const margin = Math.round(doc.width * LOGO_MARGIN);
+
+    const layer: Layer = {
+      ...makeLayer(
+        "image",
+        { x: doc.width - w - margin, y: doc.height - h - margin, w, h },
+        "#00000000",
+      ),
+      name: "Logo",
+      src: file.src,
+      assetId,
+      fit: "contain",
+      radius: 0,
+      // Placed by the brand, not by the generator: a re-lay must not take it
+      // away again, and the user did ask for it by adding a logo to the brand.
+      handEdited: true,
+    };
+
+    placed += 1;
+    return { ...slide, layers: [...slide.layers, layer] };
+  });
+
+  return { doc: { ...doc, slides }, placed };
+}
+
+/** Every asset a brand points at, for the library's "in use" mark. */
+export function logosOf(brand: Brand, assets: readonly Asset[]): Partial<Record<LogoRole, Asset>> {
+  const out: Partial<Record<LogoRole, Asset>> = {};
+  for (const [role, id] of Object.entries(brand.logos ?? {})) {
+    const found = assets.find((a) => a.id === id);
+    if (found) out[role as LogoRole] = found;
+  }
+  return out;
+}
+
 /* ── storage ──────────────────────────────────────────────────────────────── */
 
 /**
@@ -294,7 +420,10 @@ export function listBrands(): Brand[] {
   try {
     const raw = localStorage.getItem(KEY);
     const parsed: unknown = raw ? JSON.parse(raw) : null;
-    return Array.isArray(parsed) ? (parsed as Brand[]) : [];
+    if (!Array.isArray(parsed)) return [];
+    // Brands saved before logos existed have no object. Normalised on the way
+    // out so nothing downstream has to test for it.
+    return (parsed as Brand[]).map((b) => ({ ...b, logos: b.logos ?? {} }));
   } catch {
     return [];
   }

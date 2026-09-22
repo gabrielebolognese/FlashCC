@@ -288,7 +288,19 @@ export function useStudio(initial: Doc) {
       patchSlide(index, (s) => ({
         ...s,
         layers: s.layers.map((l) =>
-          l.id === layerId ? { ...l, kind: "image", src: media.src, name: media.name, fit: l.fit ?? "cover" } : l,
+          l.id === layerId
+            ? {
+                ...l,
+                kind: "image",
+                src: media.src,
+                // Carried, not just the URL: a signed URL expires and the
+                // document has to be able to ask for a fresh one. See
+                // assets.resolveDoc.
+                ...(media.assetId ? { assetId: media.assetId } : {}),
+                name: media.name,
+                fit: l.fit ?? "cover",
+              }
+            : l,
         ),
       }));
       setSelection([layerId]);
@@ -306,6 +318,7 @@ export function useStudio(initial: Doc) {
       const layer: Layer = {
         ...makeLayer("image", { x: Math.round(at.x - w / 2), y: Math.round(at.y - h / 2), w, h }, "#000000"),
         src: media.src,
+        ...(media.assetId ? { assetId: media.assetId } : {}),
         name: media.name,
         radius: 12,
       };

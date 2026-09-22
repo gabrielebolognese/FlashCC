@@ -10,7 +10,7 @@ import type { IncomingMessage, ServerResponse } from "node:http";
 
 import JSZip from "jszip";
 
-import { HttpError, readJson } from "./http.js";
+import { HttpError, json, readJson } from "./http.js";
 import { renderPdf, renderSlides, type RenderRequest } from "./render.js";
 
 type ExportBody = RenderRequest & {
@@ -36,6 +36,38 @@ const send = (res: ServerResponse, type: string, filename: string, body: Buffer)
   });
   res.end(body);
 };
+
+/**
+ * The same render, handed back as data rather than as a download.
+ *
+ * Publishing needs the slides INDIVIDUALLY so each one can be uploaded to its
+ * own public URL, and a zip would mean unzipping in the browser to undo work
+ * this just did. Base64 rather than a multipart response because the client has
+ * to turn each one into bytes for the upload anyway, and one JSON body is one
+ * thing to get wrong instead of two.
+ *
+ * It is the same `renderSlides` underneath, so a published slide and a
+ * downloaded one are the same pixels.
+ */
+export async function renderImages(req: IncomingMessage, res: ServerResponse): Promise<void> {
+  const body = await readJson<RenderRequest>(req, 60_000_000);
+  const slides = await renderSlides(body);
+
+  json(res, 200, {
+    format: body.format === "jpg" ? "jpg" : "png",
+    slides: slides.map((s) => ({ index: s.index, base64: s.bytes.toString("base64") })),
+  });
+}
+
+/**
+ * A PDF, handed back as data. LinkedIn wants a document, and Publer's importer
+ * takes one at a URL, so a published deck needs the file as well as the pages.
+ */
+export async function renderDocument(req: IncomingMessage, res: ServerResponse): Promise<void> {
+  const body = await readJson<RenderRequest>(req, 60_000_000);
+  const pdf = await renderPdf(body);
+  json(res, 200, { base64: pdf.toString("base64") });
+}
 
 export async function exportDeck(req: IncomingMessage, res: ServerResponse): Promise<void> {
   const body = await readJson<ExportBody>(req, 60_000_000);
