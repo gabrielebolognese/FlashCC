@@ -13,11 +13,11 @@ import {
   KanbanSquare,
   LayoutGrid,
   Send,
-  Sparkles,
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import { useMemo, useState } from "react";
 
+import { AccountCard } from "./AccountCard.js";
 import { Analytics } from "./Analytics.js";
 import { Board } from "./Board.js";
 import { demoPosts } from "./demo.js";
@@ -36,7 +36,9 @@ import {
 import { PostSheet } from "./PostSheet.js";
 import type { THEMES } from "./presets.js";
 import { Projects } from "./Projects.js";
+import { SignIn } from "./SignIn.js";
 import { listDocs } from "./storage.js";
+import { useAccount } from "./useAccount.js";
 import { Upgrade } from "./Upgrade.js";
 
 type View = "projects" | "board" | "scheduled" | "posted" | "analytics" | "outliers";
@@ -102,6 +104,12 @@ export function Home({
   const [posts, setPosts] = useState<Post[]>(() => listPosts());
   const [editing, setEditing] = useState<Post | null>(null);
   const [pricing, setPricing] = useState(false);
+  const [signingIn, setSigningIn] = useState(false);
+
+  // Bumped on every local write. useAccount debounces a push off it, so a burst of
+  // edits becomes one sync rather than one per keystroke.
+  const [changes, setChanges] = useState(0);
+  const account = useAccount(changes);
 
   // Re-read on navigation: a project created in the studio must not leave a stale badge.
   const docCount = useMemo(() => listDocs().length, [view]);
@@ -110,6 +118,7 @@ export function Home({
   const commit = (next: Post[]) => {
     setPosts(next);
     savePosts(next);
+    setChanges((n) => n + 1);
   };
 
   const queue = (post: Post) => {
@@ -165,26 +174,13 @@ export function Home({
           ))}
         </nav>
 
-        {/* The sales surface. Honest about what the free tier is. */}
+        {/* Account, sync and the sales surface. */}
         <div className="shrink-0 border-t border-hairline p-3">
-          <div className="rounded-2xl border border-hairline bg-surface-2 p-3">
-            <div className="flex items-center gap-1.5">
-              <Sparkles size={12} strokeWidth={2} className="text-accent" />
-              <span className="text-overline uppercase text-tertiary">Free plan</span>
-            </div>
-            <p className="mt-1.5 text-caption leading-4 text-tertiary">
-              Saved in this browser only. Pro syncs your work and keeps the history the insight
-              screens run on.
-            </p>
-            <button
-              type="button"
-              onClick={() => setPricing(true)}
-              style={{ background: "var(--brand-gold)", color: "var(--on-brand-gold)" }}
-              className="mt-2.5 flex h-8 w-full items-center justify-center rounded-xl text-body-strong hover:brightness-110"
-            >
-              See Pro
-            </button>
-          </div>
+          <AccountCard
+            account={account}
+            onSignIn={() => setSigningIn(true)}
+            onSeePro={() => setPricing(true)}
+          />
         </div>
       </aside>
 
@@ -271,6 +267,10 @@ export function Home({
       ) : null}
 
       {pricing ? <Upgrade onClose={() => setPricing(false)} /> : null}
+
+      {signingIn ? (
+        <SignIn hasLocalWork={account.hasUnsyncedWork} onClose={() => setSigningIn(false)} />
+      ) : null}
     </div>
   );
 }
