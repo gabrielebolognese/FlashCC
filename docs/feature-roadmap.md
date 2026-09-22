@@ -41,6 +41,33 @@ to do it *by hand*. But nobody asks a carousel tool for analytics either. So it 
 sale — it wins the renewal. It stays, and it sits behind the table-stakes work rather than in
 front of it.
 
+**Batching is smaller and far more perishable than the marketing implies, and designing for the
+marketing number would be a mistake.** The real batch breaks at post three or four — *"you've
+tried batching before, and it actually fell apart somewhere around the third post"*, *"they sit
+down to make 12 reels and end up making 4"*, *"cap at 12-15. after that, energy drops and quality
+follows."* Honest self-reported time is 3–4 hours per content day and 10–12 hours weekly; the
+"30 posts in 30 minutes" figures are marketing, and even the creator who filmed one says on camera
+*"cleanup is super important. And I'm not going to be one of those creators that goes online and
+tells you you can just generate and it's 2 minutes and bye."*
+
+Content also goes stale in about a week. *"We used to plan a month out, batch it all... and it
+went nowhere."* *"Plan formats and lanes ahead, not finished posts."* A creator whose entire
+business is teaching batching, on the record: *"I used to sort of teach and preach like, oh, batch
+30 days ahead — I'm not batching 30 days ahead anymore... I am batching two to three posts, but
+just the week before."*
+
+**So: optimise for 8–15, design for the wall at post three or four, and treat a batch as a
+re-orderable queue rather than a locked calendar.** Anything that advertises 30 must also make 8
+feel finished.
+
+**The bottleneck has a name, and it is the design step.** A r/smallbusiness poll literally offered
+*"the actual design process (the 'Canva black hole')"* as an option. Two creators whose businesses
+are content systems confess the same thing — *"I procrastinate a lot on creating the content. I
+can create the plans... That's the piece that I find myself pushing down the to-do list."* And the
+fix is stated twice, independently: *"the batching only works once the format is locked, cause
+then you're just swapping the content into a template, not inventing a new thing weekly"* and
+*"Locking 1 template and batching killed 80% of my decision fatigue."*
+
 **Churn in this category is about billing, not features.** Loomly raised one customer's price 996%
 with 30 days' notice. Sprout charges $499/month per external approver and caps it at three. Later
 charged someone $180 four months after they cancelled. Contentdrips revokes access the instant you
@@ -199,6 +226,32 @@ currently the only option, and it is irreversible across devices by design.
 
 **What:** rename from the project card without opening the editor.
 
+### 2.6 Show me everything unnamed or unfiled
+
+**What:** a view that surfaces exactly the documents with no real name and no group.
+
+**Why:** a direct inversion of the single worst thing about the incumbent. *"Is there an easy way
+to see everything not given a clear name? An option to show designs NOT associated with any
+folder?"* *"I have copies on copies... Because of my copies I get overwhelmed when I see my
+homepage."* *"I had like 40 different designs over the last 10 years, and I can't find any of
+them."* And on filing being actively broken there: moving an asset to a folder leaves it in Recent
+and Uploads too — *"now they live in three different places in my UI... there's no way to select
+multiple items at once."*
+
+### 2.7 A used / published state on each carousel
+
+**What:** mark a carousel as published, and filter on it.
+
+**Why:** accidental repeat posting is real and the current fix is manual. A thread titled
+*"Organizational strategy to avoid posting same images"* — *"there's no way to know if they've been
+used unless I go look"*, solved by *"moving the images to a completed file once I post."* Also
+*"Every once in a while we will accidentally deliver too many pieces of content because we lost
+track in the mess"*, and *"the one thing worth keeping in a doc is which post went where and what
+it did, because after a week you genuinely cannot remember and you end up either repeating
+yourself or missing the one that popped."*
+
+Cheap here, because `posts` already carries the stage.
+
 ---
 
 ## Batch 3 — Brands
@@ -289,8 +342,15 @@ Related bug worth not repeating: a numbered list broken across a slide break res
 
 ### 4.3 One row per slide, grouped by post
 
-**What:** long-format import — `post_id, slide_index, headline, body, …` — instead of Canva's wide
-format.
+**What:** long-format *internally* — `post_id, slide_index, headline, body, …` — but **accept a
+wide paste too, and normalise it.**
+
+**Why accept wide:** the wide shape is what everybody has been trained on, and it is taught
+verbatim — *"Each row in your table is going to become an entire carousel, and each column is one
+text or image placeholder in your design"*, *"please put all the carousels in a table with one
+column per slide."* It is a learned workaround rather than a preference, but assuming long format
+is self-evidently right would be wrong: it is not what anyone has been shown. Meet people where
+they are on input, keep the good model inside.
 
 **Why:** Canva's model forces one row to be one whole carousel, which forces **fixed slide count
 per batch** (a 6-slide idea in a 10-slide template leaves blanks to delete by hand in every
@@ -308,6 +368,11 @@ over the platform ceiling, duplicate hooks.
 
 **Why:** Canva's only signal for an unbound field is a small coloured dot, and the documented
 consequence is *"47 of 50 designs retain placeholder text"* discovered at review.
+
+**The mis-mapping failure is documented on camera**, which is what this check exists for: *"the
+episode title landed on the guest name, the guest name landed on the title of the podcast and the
+notes landed as the title."* And a fresh hole in Canva's version, verbatim: *"I tried Canva bulk
+create but that only gives you one image. I want a different image for each post."*
 
 **Also check the destination tool, not just the platform.** Row caps across schedulers run from 10
 to 1,000 with no discernible logic, and export format matters per destination (see 1.1).
@@ -462,12 +527,21 @@ operation.
 
 ### 6.2 Series as an object
 
-**What:** a series owns N posts, auto-numbers them ("3/10"), shares a cover treatment, tracks what
-is drafted, exported and published.
+**Upgraded from inference to evidenced — and the pain is not what I assumed.** I had this as a
+numbering-consistency feature. The actual problem is **discovery**: *"My Part 4 has 1M views but
+Part 1 has only 5K — because viewers can't find it."* *"It's tiresome for the audience to look for
+other parts in the profile section... So they just scroll to the next video."*
 
-**Caveat, stated honestly:** this is the **least-evidenced item in the document.** It follows
-logically from 6.1 and from consistency complaints, but the research reached no first-hand
-accounts of people running numbered series. Build it small, or cut it.
+The second problem is **momentum**: *"the last thing you want is for a piece of content to finally
+go viral, but then by the time you make the part two in the series, it's like a month later and
+there's just no momentum anymore."*
+
+The third is that numbering lives in a doc and design lives elsewhere, and nothing reconciles them
+— *"scripts go into a single document, numbered 1-12."* People also ask out loud how to even
+schedule one: *"Drop them all at once? One per day? Spread them out more?"*
+
+**So a series should:** auto-number, generate a **cross-reference slide or caption pointing at the
+other parts**, and prompt that "part 2 is due" while the momentum is still there.
 
 ### 6.3 Hook variants
 
@@ -575,10 +649,19 @@ already uses "no credit limits" as its wedge. **Costs nothing. Nobody has taken 
 **What:** auto-snapshot on approve, export and brand-apply. Slide-level restore. A filmstrip diff,
 not a general undo history.
 
-**Negative evidence, respected:** **nobody complains about version history** and nobody names it as
-a buying reason. Complaints route instead through "can't find my old design." Build the small
-version, do not lead marketing with it. Tier by retention — none free, 30 days Pro, unlimited
-Agency — which is Planable's proven ladder.
+**This call partially reverses.** The earlier passes found no complaints about version history and
+I treated that as a reason to deprioritise. The community layer does have the pain — it is just
+never called "version history". It is called file chaos: *"my desktop used to be a graveyard of
+Canva exports, CapCut drafts, random PNGs and 'final_final' files."* On the incumbent
+specifically: *"I wanted to keep proper versioning but it seems I have to make copies of the file
+to keep older versions."* And from an agency, which is the version that matters most: *"I'd also
+like some safeties to ensure that approved images aren't confused with modified ones."*
+
+That last one pairs directly with 7.4 — approval stamped to a version — and is the strongest
+argument for building this at all.
+
+**Still true:** nobody names it as a buying reason, so build it and do not lead marketing with it.
+Tier by retention — none free, 30 days Pro, unlimited Agency — which is Planable's proven ladder.
 
 ### 8.4 Pipeline fields the market converges on
 
@@ -640,6 +723,22 @@ than user-demanded.
 
 **Canva brand-kit counts conflict between sources** (Free 1 / Pro 5 / Business 100 from direct
 fetch, versus Pro 100 / Teams 1,000 from a search summary). Verify before using in positioning.
+
+**All three research sweeps are now in.** The last one reached Reddit through the Arctic Shift
+archive API (~865 verbatim rows) and Wayback CDX for older threads, plus 19 workflow video
+transcripts. **Its own authenticity warning is worth honouring:** many 2026-dated Reddit comments
+read as AI-assisted or softly promotional, so the Wayback-sourced older threads, the long
+first-person process posts and the on-camera transcripts carry the most weight.
+
+**It also struck one claimed pain point.** "Running out of ideas mid-session" came from a vendor
+marketing blog and the primary evidence says the opposite, emphatically: *"the idea was never the
+bottleneck. every small biz owner has 50 posts worth of material in their head... the wall is
+everything AFTER the idea... it's not a motivation problem, it's a production-friction problem."*
+Nothing in this document rests on it.
+
+**Thinnest remaining theme:** brand drift across a large batch. It shows up as a generic
+"everything looks same-y" rather than specific accounts, and scheduler feature-request boards are
+where those probably live. Twitter/X was inaccessible throughout.
 
 **One research pass corrected itself twice after filing**, and both sets of corrections are folded
 in above. The second addendum closed the per-tool bulk question by going at vendor help centres,
