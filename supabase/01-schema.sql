@@ -34,7 +34,8 @@
 -- ─────────────────────────────────────────────────────────────────────────────
 
 -- ── profiles ────────────────────────────────────────────────────────────────
--- One row per auth user. Created automatically on signup by the trigger below.
+-- One row per auth user, created by the client on first sign-in. See the note
+-- further down about why this is not a trigger on auth.users.
 
 create table if not exists public.profiles (
   id                     uuid primary key references auth.users (id) on delete cascade,
@@ -121,13 +122,6 @@ create table if not exists public.posts (
   constraint posts_platform_known check (platform in ('linkedin', 'instagram', 'tiktok', 'x'))
 );
 
--- Reach is the denominator of every ratio the insight screens compute, so it is
--- lifted out of the blob as a real column that can be indexed and summed in SQL.
-alter table public.posts
-  drop column if exists impressions;
-alter table public.posts
-  add column impressions int generated always as (nullif(metrics ->> 'impressions', '')::int) stored;
-
 -- ── indexes ─────────────────────────────────────────────────────────────────
 
 create index if not exists docs_sync_idx  on public.docs  (user_id, server_updated_at desc);
@@ -135,7 +129,7 @@ create index if not exists posts_sync_idx on public.posts (user_id, server_updat
 create index if not exists posts_stage_idx on public.posts (user_id, stage) where deleted_at is null;
 create index if not exists posts_doc_idx on public.posts (user_id, doc_id) where doc_id is not null;
 create index if not exists posts_measured_idx on public.posts (user_id, posted_at desc)
-  where deleted_at is null and posted_at is not null and impressions > 0;
+  where deleted_at is null and posted_at is not null;
 
 -- ── server clock ────────────────────────────────────────────────────────────
 -- Stamped by the database, never by the client, because client clocks are wrong
