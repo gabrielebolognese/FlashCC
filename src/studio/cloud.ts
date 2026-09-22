@@ -53,7 +53,10 @@ export type Profile = {
   email: string | null;
   displayName: string | null;
   plan: Plan;
+  /** When the current period ends. What happens then depends on the next field. */
   planRenewsAt: string | null;
+  /** True when that date is the END rather than the next charge. */
+  planEndsAtPeriodEnd: boolean;
   /** Stripe has a customer for them, so the billing portal has something to show. */
   hasBilling: boolean;
 };
@@ -100,6 +103,11 @@ export type PostRow = {
   url: string | null;
   caption: string;
   notes: string;
+  pillar: string;
+  campaign: string;
+  objective: string | null;
+  reviewer: string;
+  approval_notes: string;
   metrics: Metrics | null;
   created_at: string;
   updated_at: string;
@@ -231,6 +239,11 @@ export function postToRow(post: Post, userId: string, deletedAt: string | null =
     url: post.url,
     caption: post.caption,
     notes: post.notes,
+    pillar: post.pillar,
+    campaign: post.campaign,
+    objective: post.objective,
+    reviewer: post.reviewer,
+    approval_notes: post.approvalNotes,
     metrics: post.metrics,
     created_at: post.createdAt,
     updated_at: post.updatedAt,
@@ -256,6 +269,13 @@ export const rowToPost = (row: PostRow): Post => ({
   url: row.url,
   caption: row.caption,
   notes: row.notes,
+  // The columns arrive with 08-pipeline-fields.sql; until then they read as
+  // empty, which is what they are.
+  pillar: row.pillar ?? "",
+  campaign: row.campaign ?? "",
+  objective: (row.objective as Post["objective"]) ?? null,
+  reviewer: row.reviewer ?? "",
+  approvalNotes: row.approval_notes ?? "",
   metrics: row.metrics,
   createdAt: row.created_at,
   updatedAt: row.updated_at,

@@ -21,6 +21,27 @@ import { markDeleted } from "./tombstones.js";
 
 export type Stage = "idea" | "drafting" | "ready" | "scheduled" | "posted";
 
+/**
+ * What a post is FOR.
+ *
+ * Closed, because this is the one of the five new fields that analytics groups
+ * by and an open set turns every typo into its own bucket. Four values, which is
+ * the set every content calendar in the research converges on under different
+ * names — deliberately not five, because "brand" and "authority" are the same
+ * answer and offering both means the data splits across them.
+ */
+export type Objective = "awareness" | "engagement" | "authority" | "conversion";
+
+export const OBJECTIVES: { id: Objective; label: string; hint: string }[] = [
+  { id: "awareness", label: "Awareness", hint: "Reach people who do not know you" },
+  { id: "engagement", label: "Engagement", hint: "Get a conversation going" },
+  { id: "authority", label: "Authority", hint: "Be the one who explains it properly" },
+  { id: "conversion", label: "Conversion", hint: "Ask for the click, the reply, the booking" },
+];
+
+export const objectiveLabel = (o: Objective | null): string | null =>
+  o ? (OBJECTIVES.find((x) => x.id === o)?.label ?? null) : null;
+
 export const STAGES: { id: Stage; label: string; hint: string }[] = [
   { id: "idea", label: "Idea", hint: "A thought, not a carousel yet" },
   { id: "drafting", label: "Drafting", hint: "Being written or designed" },
@@ -120,6 +141,29 @@ export type Post = {
   url: string | null;
   caption: string;
   notes: string;
+
+  /* ── the five fields every content calendar has ──────────────────────────
+   *
+   * Every Notion and Airtable content calendar in the research carries these,
+   * and `posts` did not. Free text rather than enums for four of the five,
+   * because a pillar is somebody's own vocabulary and an enum would either be
+   * wrong for most people or grow until it is a text field with extra steps.
+   *
+   * `objective` IS an enum, and that is the exception on purpose: it is the one
+   * of the five that analytics groups by, and grouping needs a closed set or
+   * every typo becomes its own bucket.
+   */
+
+  /** "Education", "Behind the scenes" — the recurring theme. Attributable. */
+  pillar: string;
+  /** A launch, a season, a campaign name. Free text; it is a proper noun. */
+  campaign: string;
+  objective: Objective | null;
+  /** Who signed it off. Free text: most of the time it is a first name. */
+  reviewer: string;
+  /** What they said when they did. Kept beside the decision, not inside it. */
+  approvalNotes: string;
+
   metrics: Metrics | null;
 
   createdAt: string;
@@ -146,6 +190,11 @@ export function makePost(patch: Partial<Post> = {}): Post {
     url: null,
     caption: "",
     notes: "",
+    pillar: "",
+    campaign: "",
+    objective: null,
+    reviewer: "",
+    approvalNotes: "",
     metrics: null,
     createdAt: now,
     updatedAt: now,

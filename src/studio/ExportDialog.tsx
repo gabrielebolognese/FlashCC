@@ -25,7 +25,8 @@ import { PLATFORMS, platformForSize, type Platform } from "./platforms.js";
 import { blockers, canExport, preflight, sizeFinding, type Finding } from "./preflight.js";
 import { downloadText, publishDeck } from "./publish.js";
 import { buildSheet, SCHEDULERS, type PublishedCarousel, type Scheduler } from "./schedulers.js";
-import { hasCloudSession, sessionUserId } from "./session.js";
+import { hasCloudSession, sessionPlan, sessionUserId } from "./session.js";
+import { snapshot } from "./versions.js";
 
 type Phase =
   | { at: "idle" }
@@ -87,6 +88,11 @@ export function ExportDialog({ doc, onClose }: { doc: Doc; onClose: () => void }
   };
 
   const run = async () => {
+    // Taken before the render rather than after it: the point of an export
+    // snapshot is "this is what I sent out", and the deck cannot change during
+    // a render anyway — so the earlier call is the one that cannot be missed by
+    // a failure halfway through.
+    snapshot(doc, "export", sessionPlan(), `Exported for ${platform.label}`);
     setPhase({ at: "working" });
     const result = await exportDeck(doc, platform);
     setPhase(

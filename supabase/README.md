@@ -74,6 +74,7 @@ it should stay deleted. That second half is the one that catches real bugs.
 | `05-series.sql` | Now. Two nullable columns on `docs` and `posts`, so a series can be queried. |
 | `06-clients.sql` | Now. The `clients` table, the tier limit, and `client_id` on four tables. |
 | `07-review.sql` | Now. Review links and comments. **Required** — review has no offline half. |
+| `08-pipeline-fields.sql` | Now. Five planning fields on `posts`, and one billing boolean. |
 
 ## 6. The asset library (`04-storage.sql`)
 

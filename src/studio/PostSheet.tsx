@@ -10,12 +10,14 @@ import { Check, Copy, ExternalLink, Sparkles, Trash2, X } from "lucide-react";
 import { useMemo, useState } from "react";
 
 import { Chip } from "./Dash.js";
+import { listPosts } from "./pipeline.js";
 import { collectSeries, seriesCaption, seriesTitle } from "./series.js";
 import { listDocs, loadDoc } from "./storage.js";
 import { captionFit, captionOf, firstCommentOf } from "./transcript.js";
 import {
   EMPTY_METRICS,
   METRIC_FIELDS,
+  OBJECTIVES,
   PLATFORMS,
   STAGES,
   engagementRate,
@@ -23,6 +25,7 @@ import {
   fromLocalInput,
   toLocalInput,
   type Metrics,
+  type Objective,
   type Platform,
   type Post,
   type Stage,
@@ -100,6 +103,23 @@ export function PostSheet({
   }, [draft]);
 
   const fit = captionFit(draft.caption, draft.platform);
+
+  /**
+   * Suggestions, not a controlled list.
+   *
+   * A pillar is somebody's own vocabulary, so the field stays free text — but
+   * offering what they have already used is what stops "Education", "education"
+   * and "Educational" becoming three buckets in the attribution table.
+   */
+  const known = useMemo(() => {
+    const pillars = new Set<string>();
+    const campaigns = new Set<string>();
+    for (const post of listPosts()) {
+      if (post.pillar.trim()) pillars.add(post.pillar.trim());
+      if (post.campaign.trim()) campaigns.add(post.campaign.trim());
+    }
+    return { pillars: [...pillars].sort(), campaigns: [...campaigns].sort() };
+  }, []);
 
   const copy = (what: string, text: string) => {
     void navigator.clipboard?.writeText(text);
@@ -346,6 +366,93 @@ export function PostSheet({
               </p>
             </div>
           ) : null}
+
+          {/*
+            The five fields every Notion and Airtable content calendar has and
+            `posts` did not. Grouped under one heading rather than scattered
+            through the sheet: they are planning metadata, and somebody filling
+            them in is doing one job, not five.
+          */}
+          <div className="rounded-2xl border border-hairline bg-surface-1 p-3">
+            <span className="text-overline uppercase text-tertiary">Planning</span>
+
+            <div className="mt-2 grid grid-cols-2 gap-2.5">
+              <label className="block">
+                <span className="text-caption text-tertiary">Pillar</span>
+                <input
+                  list="fcc-pillars"
+                  value={draft.pillar}
+                  onChange={(e) => set({ pillar: e.target.value })}
+                  placeholder="Education, Behind the scenes…"
+                  className={`${field} mt-1`}
+                />
+                <datalist id="fcc-pillars">
+                  {known.pillars.map((x) => (
+                    <option key={x} value={x} />
+                  ))}
+                </datalist>
+              </label>
+
+              <label className="block">
+                <span className="text-caption text-tertiary">Campaign</span>
+                <input
+                  list="fcc-campaigns"
+                  value={draft.campaign}
+                  onChange={(e) => set({ campaign: e.target.value })}
+                  placeholder="A launch, a season"
+                  className={`${field} mt-1`}
+                />
+                <datalist id="fcc-campaigns">
+                  {known.campaigns.map((x) => (
+                    <option key={x} value={x} />
+                  ))}
+                </datalist>
+              </label>
+
+              <label className="block">
+                <span className="text-caption text-tertiary">Objective</span>
+                <select
+                  value={draft.objective ?? ""}
+                  onChange={(e) => set({ objective: (e.target.value || null) as Objective | null })}
+                  className={`${field} mt-1`}
+                >
+                  <option value="">Not set</option>
+                  {OBJECTIVES.map((o) => (
+                    <option key={o.id} value={o.id}>
+                      {o.label}
+                    </option>
+                  ))}
+                </select>
+              </label>
+
+              <label className="block">
+                <span className="text-caption text-tertiary">Reviewer</span>
+                <input
+                  value={draft.reviewer}
+                  onChange={(e) => set({ reviewer: e.target.value })}
+                  placeholder="Who signs it off"
+                  className={`${field} mt-1`}
+                />
+              </label>
+            </div>
+
+            <label className="mt-2.5 block">
+              <span className="text-caption text-tertiary">Approval notes</span>
+              <textarea
+                value={draft.approvalNotes}
+                onChange={(e) => set({ approvalNotes: e.target.value })}
+                rows={2}
+                className={`${field} mt-1 h-auto resize-y py-2 leading-4`}
+                placeholder="What they said when they signed it off."
+              />
+            </label>
+
+            <p className="mt-2 text-caption leading-4 text-muted">
+              Pillar and objective are grouped by the insight screens. Campaign and reviewer are
+              proper nouns, so they are recorded but never attributed — one bucket per post is a
+              list, not a finding.
+            </p>
+          </div>
 
           <Row label="Notes">
             <textarea

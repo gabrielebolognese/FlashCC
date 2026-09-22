@@ -20,6 +20,10 @@ function ago(iso: string | null): string {
   return `${Math.floor(secs / 86_400)}d ago`;
 }
 
+/** A date somebody can read at a glance, in their own locale. */
+const renewalDate = (iso: string): string =>
+  new Date(iso).toLocaleDateString(undefined, { day: "numeric", month: "short", year: "numeric" });
+
 export function AccountCard({
   account,
   onSignIn,
@@ -110,6 +114,24 @@ export function AccountCard({
       <div className="mt-1.5 truncate text-caption text-secondary" title={user?.email ?? ""}>
         {user?.email ?? "Signed in"}
       </div>
+
+      {/*
+        The renewal date, always, on a paid plan — and whether that date is a
+        charge or an ending, which are not the same and cannot be told apart from
+        the date alone. "No surprise renewals" is a promise on the pricing screen;
+        this is the thing that makes it true rather than aspirational.
+      */}
+      {paid && profile?.planRenewsAt ? (
+        <div className="mt-1.5 text-caption text-muted">
+          {profile.planEndsAtPeriodEnd ? (
+            <span className="text-tertiary">
+              Ends {renewalDate(profile.planRenewsAt)} — everything stays unlocked until then
+            </span>
+          ) : (
+            <>Renews {renewalDate(profile.planRenewsAt)}</>
+          )}
+        </div>
+      ) : null}
 
       {sync.status === "error" ? (
         <div className="mt-2 rounded-xl border border-danger-dim bg-danger-wash px-2.5 py-2">

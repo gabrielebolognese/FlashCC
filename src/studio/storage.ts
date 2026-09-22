@@ -1,6 +1,7 @@
 import { dehydrateDoc } from "./assets.js";
 import { averageColour } from "./gradient.js";
 import { makeSeries, renumber, type Series, type SeriesMember } from "./series.js";
+import { forgetVersions } from "./versions.js";
 import type { Doc } from "./model.js";
 import { searchBlob } from "./search.js";
 import { markDeleted } from "./tombstones.js";
@@ -252,6 +253,9 @@ export function deleteDoc(id: string): void {
   dropDoc(id);
   // Recorded even with no account: signing in later has to carry the deletion up.
   markDeleted("doc", id);
+  // Nothing else references a version, so leaving them would be dead weight in a
+  // quota that documents need.
+  forgetVersions(id);
   if (seriesId) resealSeries(seriesId);
 }
 

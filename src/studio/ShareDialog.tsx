@@ -46,7 +46,8 @@ import {
   type Comment,
   type Share,
 } from "./review.js";
-import { sessionUserId } from "./session.js";
+import { sessionPlan, sessionUserId } from "./session.js";
+import { snapshot } from "./versions.js";
 import {
   addInternalNote,
   createShare,
@@ -116,6 +117,10 @@ export function ShareDialog({ doc, onClose }: { doc: Doc; onClose: () => void })
 
   const create = async () => {
     if (!userId) return;
+    // The version somebody is about to be asked to approve. This is the snapshot
+    // that pairs with 7.4 — an approval points at a fingerprint, and this is
+    // what makes that fingerprint recoverable rather than merely comparable.
+    snapshot(doc, "approve", sessionPlan(), "Sent for review");
     setPhase({ at: "working", what: "Rendering the slides and hosting them…" });
 
     const result = await createShare(doc, {

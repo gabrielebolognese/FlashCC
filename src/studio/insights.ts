@@ -22,7 +22,14 @@
  * every finding carries its own n so the UI can never quote it without the caveat.
  */
 
-import { engagementRate, engagements, isMeasured, type Metrics, type Post } from "./pipeline.js";
+import {
+  engagementRate,
+  engagements,
+  isMeasured,
+  objectiveLabel,
+  type Metrics,
+  type Post,
+} from "./pipeline.js";
 import { STRUCTURES } from "./structures.js";
 import { styleById } from "./styles.js";
 
@@ -191,6 +198,11 @@ export const DIMENSIONS: Dimension[] = [
   { id: "length", label: "Length", of: (p) => (p.slideCount > 0 ? lengthBand(p.slideCount) : null) },
   { id: "style", label: "Style", of: (p) => (p.styleId ? styleById(p.styleId).name : null) },
   { id: "platform", label: "Platform", of: (p) => p.platform },
+  // The two of the five new pipeline fields worth attributing. Campaign and
+  // reviewer are proper nouns — grouping by them would produce one bucket per
+  // post, which is a list rather than a finding.
+  { id: "pillar", label: "Pillar", of: (p) => (p.pillar.trim() ? p.pillar.trim() : null) },
+  { id: "objective", label: "Objective", of: (p) => objectiveLabel(p.objective) },
   { id: "weekday", label: "Day posted", of: (p) => weekdayOf(p.postedAt) },
 ];
 

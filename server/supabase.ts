@@ -69,6 +69,15 @@ export type PlanUpdate = {
   stripeCustomerId?: string | undefined;
   stripeSubscriptionId?: string | null | undefined;
   renewsAt?: string | null | undefined;
+  /**
+   * Stripe's `cancel_at_period_end`.
+   *
+   * Stored rather than inferred, because it is the difference between "renews on
+   * the 3rd" and "ends on the 3rd" and there is no way to tell those apart from
+   * the plan and the date alone. Showing the wrong one is exactly the surprise
+   * this feature exists to prevent.
+   */
+  endsAtPeriodEnd?: boolean | undefined;
 };
 
 /** The one write that decides who has paid. */
@@ -79,6 +88,9 @@ export async function setPlan(userId: string, update: PlanUpdate): Promise<void>
     patch.stripe_subscription_id = update.stripeSubscriptionId;
   }
   if (update.renewsAt !== undefined) patch.plan_renews_at = update.renewsAt;
+  if (update.endsAtPeriodEnd !== undefined) {
+    patch.plan_ends_at_period_end = update.endsAtPeriodEnd;
+  }
 
   const { error } = await serviceClient().from("profiles").update(patch).eq("id", userId);
   if (error) throw new HttpError(500, `Could not update the plan: ${error.message}`);

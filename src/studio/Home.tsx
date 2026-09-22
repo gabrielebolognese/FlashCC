@@ -17,6 +17,7 @@ import {
   Palette,
   RefreshCw,
   Send,
+  Upload,
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import { useMemo, useState } from "react";
@@ -39,6 +40,7 @@ import { AssetLibrary } from "./AssetLibrary.js";
 import { Board } from "./Board.js";
 import { demoPosts } from "./demo.js";
 import { Chip, Empty } from "./Dash.js";
+import { LinkedInImport } from "./LinkedInImport.js";
 import { Posted, Scheduled } from "./Lists.js";
 import type { Doc } from "./model.js";
 import { Outliers } from "./Outliers.js";
@@ -148,6 +150,7 @@ export function Home({
   const [editing, setEditing] = useState<Post | null>(null);
   const [pricing, setPricing] = useState(false);
   const [signingIn, setSigningIn] = useState(false);
+  const [importing, setImporting] = useState(false);
   const [client, setClient] = useState<string>(() => loadSelectedClient());
   const clients = useMemo(() => listClients(), [view]);
 
@@ -276,6 +279,22 @@ export function Home({
             </button>
           ) : null}
 
+          {/*
+            On the screens that run on numbers, beside the count of how many
+            there are. Manual entry is what makes these honest; this is what
+            stops it becoming the reason somebody leaves.
+          */}
+          {view === "posted" || view === "analytics" || view === "outliers" ? (
+            <button
+              type="button"
+              onClick={() => setImporting(true)}
+              className="flex h-8 shrink-0 items-center gap-1.5 rounded-xl border border-hairline px-3 text-caption text-secondary hover:border-accent-dim hover:text-accent"
+            >
+              <Upload size={13} strokeWidth={2} />
+              Import from LinkedIn
+            </button>
+          ) : null}
+
           {view === "analytics" || view === "outliers" ? (
             <span className="shrink-0 text-caption text-muted">
               {measuredCount} measured post{measuredCount === 1 ? "" : "s"}
@@ -384,6 +403,14 @@ export function Home({
           manageable={account.manageable}
           onSignIn={() => setSigningIn(true)}
           onClose={() => setPricing(false)}
+        />
+      ) : null}
+
+      {importing ? (
+        <LinkedInImport
+          posts={posts}
+          onApply={(next) => commit(next)}
+          onClose={() => setImporting(false)}
         />
       ) : null}
 

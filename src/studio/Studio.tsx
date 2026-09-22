@@ -1,4 +1,4 @@
-import { ChevronLeft, ClipboardPaste, Download, Redo2, Send, Shuffle, Sparkles, Undo2, X } from "lucide-react";
+import { ChevronLeft, ClipboardPaste, Download, History, Redo2, Send, Shuffle, Sparkles, Undo2, X } from "lucide-react";
 import { useState } from "react";
 import { createPortal } from "react-dom";
 
@@ -18,7 +18,10 @@ import { logoResolver } from "./library.js";
 import { BrandMenu } from "./BrandMenu.js";
 import { ExportDialog } from "./ExportDialog.js";
 import { HookPicker } from "./HookPicker.js";
+import { HistoryPanel } from "./HistoryPanel.js";
+import { sessionPlan } from "./session.js";
 import { ShareDialog } from "./ShareDialog.js";
+import { snapshot } from "./versions.js";
 import { regenerate, restateSlide } from "./regenerate.js";
 import { STRUCTURES } from "./structures.js";
 import { THEMES } from "./presets.js";
@@ -34,6 +37,7 @@ export function Studio({ initial, onHome }: { initial: Doc; onHome: () => void }
   const [relaid, setRelaid] = useState<number | null>(null);
   const [hooking, setHooking] = useState(false);
   const [sharing, setSharing] = useState(false);
+  const [history, setHistory] = useState(false);
   const [pasted, setPasted] = useState("");
 
   const printRoot = document.getElementById("print-root");
@@ -116,6 +120,9 @@ export function Studio({ initial, onHome }: { initial: Doc; onHome: () => void }
             // The logo goes on in the same commit, so applying a brand is one
             // undo rather than two — and so "it used my brand assets
             // automatically" is true without a second button to find.
+            // Snapshot BEFORE the brand lands, not after: the version worth
+            // keeping is the one that is about to stop existing.
+            snapshot(doc, "brand", sessionPlan(), `Before ${brand.name}`);
             const stamped = stampLogo(result.doc, brand, logoResolver());
             studio.replaceDoc(stamped.doc);
             return { ...result, doc: stamped.doc };
@@ -128,6 +135,15 @@ export function Studio({ initial, onHome }: { initial: Doc; onHome: () => void }
         >
           <ClipboardPaste size={14} strokeWidth={2} />
           Paste post
+        </button>
+        <button
+          type="button"
+          title="What this looked like when you exported it, sent it, or rebranded it."
+          onClick={() => setHistory(true)}
+          className="flex h-7 items-center gap-1.5 rounded-md border border-hairline bg-surface-1 px-2.5 text-body text-secondary hover:bg-surface-3 hover:text-primary"
+        >
+          <History size={14} strokeWidth={2} />
+          History
         </button>
         <button
           type="button"
@@ -208,6 +224,14 @@ export function Studio({ initial, onHome }: { initial: Doc; onHome: () => void }
       {exporting ? <ExportDialog doc={doc} onClose={() => setExporting(false)} /> : null}
 
       {sharing ? <ShareDialog doc={doc} onClose={() => setSharing(false)} /> : null}
+
+      {history ? (
+        <HistoryPanel
+          doc={doc}
+          onRestore={(next) => studio.replaceDoc(next)}
+          onClose={() => setHistory(false)}
+        />
+      ) : null}
 
       {hooking ? (
         <HookPicker

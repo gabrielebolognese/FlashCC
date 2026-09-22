@@ -887,7 +887,7 @@ so the convention is written into `CLAUDE.md` with the four existing pairs named
 
 ## Batch 8 — Trust, and the long tail
 
-**Status:** next
+**Status:** done
 **Size:** small to medium
 
 ### 8.1 LinkedIn analytics CSV import
@@ -937,6 +937,58 @@ calendar has these; `posts` does not.
 
 No credit rationing. *"A rationing system, not a content tool"* is how users describe the
 alternative.
+
+### Built as
+
+All five, and two of them were paragraphs.
+
+**8.2 was already true and nobody was being told.** `ENTITLED` in
+`server/billing.ts` treats `active` as entitled, and Stripe keeps a cancelled
+subscription active until the period it was paid for ends — so "you keep what
+you paid for" has held since billing shipped. What was missing was that
+`plan_renews_at` alone cannot distinguish "renews on the 3rd" from "ends on the
+3rd", and the account card showed a renewal date either way. One boolean carried
+through the webhook fixes it, and the four promises are now on the pricing screen
+in the words somebody would use if they were telling you honestly.
+
+**8.5 was nothing at all.** Grep found no credit, quota, usage or metering
+concept anywhere in `src/` or `server/`. There was nothing to remove, so it
+became invariant 7 and `UNMETERED_PROMISE` beside the reviewer one — because a
+commitment that lives only in a roadmap is one the next paywall quietly breaks.
+That is now the third time a roadmap item has turned out to be a rule rather than
+a feature, after 6.6 and 7.6, and the pattern is worth naming: the cheapest
+things in this document are the ones that cost nothing and nobody has taken.
+
+**8.1's matching is the feature, and the unmatched rows are the screen.** Three
+passes of descending confidence — URL, exact text, leading text within a date
+window — each consuming what it claims, so a weaker rule can never overwrite a
+stronger one. Anything unplaced is RETURNED and shown with a dropdown rather than
+dropped: an import that quietly places 40 of 60 is worse than one that places 40
+and tells you, because the first leaves somebody believing their history is
+complete.
+
+**Absent is not zero, and that took two guards.** `readNumber` returns null for a
+blank rather than 0, because a fabricated zero goes straight into the median
+every insight screen runs on. And `applyMatches` writes only the fields the file
+carried — LinkedIn's export has no saves column, and zeroing a hand-entered saves
+count because the file was silent would destroy exactly the data this feature
+exists to protect.
+
+**8.3 is local and does not sync, which is a scope call the roadmap did not
+make.** The stated pain is losing your own earlier state on the machine you are
+working on; syncing a snapshot of every export across devices would multiply the
+largest records in the product for a need nobody described. That also means it
+needed no migration and works today with no database — so this batch ships ONE
+migration rather than the two flagged in the plan.
+
+**The diff compares by position, not by slide id.** Re-laying a deck mints new
+ids for every generated layer while the slides keep their order and their
+content, so an id-based diff would report a whole deck as replaced every time
+somebody pressed Re-lay. It shares `docVersion`'s rules, so the filmstrip and the
+stale-approval warning can never disagree about whether anything happened.
+
+**Restoring is itself snapshotted.** Going back should never be the one move you
+cannot take back.
 
 ---
 
@@ -1039,3 +1091,33 @@ that endpoint is not.
 **Worth closing later:** a browser-driven Reddit session would reach the r/Design thread
 *"Designers, how do you deal with 'Can we go back to version 2?'"* and r/SocialMediaManagers
 *"How do you organize client content?"* — both located and confirmed live, neither readable.
+
+---
+
+## Every batch is done
+
+Eight batches, and the roadmap is finished. What the eight turned out to be, in
+one line each:
+
+| | Was | Turned out to be |
+| --- | --- | --- |
+| 1 | Export a file people can post | Also the pre-flight nobody else does |
+| 2 | Find anything | Auto-derived facets, because tags rot |
+| 3 | Brands | A named Theme, and the first thing genuinely Pro |
+| 4 | Batch creation | Plus two defects it exposed in generation |
+| 5 | The asset library | Two buckets with opposite postures, and an inlining step |
+| 6 | One asset becomes many | Candidates you choose from, never a ranking |
+| 7 | Clients and approval | A review link, and the only place RLS is not the boundary |
+| 8 | Trust, and the long tail | Two features and three promises |
+
+**Three roadmap items turned out to be rules rather than features** — 6.6, 7.6
+and 8.5 — and all three are now invariants in `CLAUDE.md` with the copy that
+states them. They were also three of the cheapest things in this document, which
+is worth remembering when the next one is written.
+
+**What is not built is listed below and was rejected on evidence**, not on
+effort. That list is the other half of the plan and should be re-read before
+anything is added to it.
+
+The open work is now `docs/reference.md` §29 — the defect list — and the five
+migrations that have never been run. Neither of those is a roadmap item.

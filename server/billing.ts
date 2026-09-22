@@ -213,6 +213,11 @@ async function applySubscription(userId: string, sub: Stripe.Subscription): Prom
             (sub as unknown as { current_period_end?: number }).current_period_end,
         )
       : null,
+    // A cancelled subscription stays `active` until Stripe ends the period — see
+    // ENTITLED above — which is how "you keep what you paid for" is already true.
+    // This is what lets the app SAY so instead of showing a renewal date for
+    // something that is about to stop.
+    endsAtPeriodEnd: entitled ? Boolean(sub.cancel_at_period_end) : false,
   });
 
   console.log(`[billing] ${userId} -> ${plan} (${sub.status})`);

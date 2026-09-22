@@ -19,7 +19,7 @@ is still current.
 | **Orientation** | [1 What it is](#1-what-it-is) · [2 Running it](#2-running-it) · [3 The invariants](#3-the-invariants) |
 | **The canvas** | [4 Data model](#4-the-data-model) · [5 Canvas](#5-the-canvas) · [6 Text](#6-text-measurement-and-fitting) · [7 Colour](#7-colour-and-contrast) · [8 Gradients](#8-gradients) · [9 Format change](#9-changing-format-reflow) |
 | **Making a deck** | [10 Frameworks](#10-the-four-frameworks) · [11 Generation](#11-generation) · [12 Styles](#12-styles-and-themes) · [13 Onboarding](#13-onboarding) · [14 AI drafting](#14-ai-drafting) · [15 Bulk and long form](#15-bulk-create-and-long-form-ingest) · [16 Media, fonts and assets](#16-media-and-fonts) · [17 Screen flow](#17-screen-flow) |
-| **The product** | [17b Clients and review](#17b-clients-and-review) · [18 Pipeline and series](#18-the-pipeline) · [19 Analytics](#19-analytics) · [20 Library](#20-the-library) · [21 Export](#21-export) |
+| **The product** | [17b Clients and review](#17b-clients-and-review) · [18 Pipeline and series](#18-the-pipeline) · [19 Analytics](#19-analytics) · [19b History](#19b-version-history) · [20 Library](#20-the-library) · [21 Export](#21-export) |
 | **Infrastructure** | [22 Persistence](#22-persistence) · [23 Sync](#23-sync) · [24 Auth](#24-auth) · [25 Billing](#25-billing) · [26 Database](#26-database) · [27 Design tokens](#27-design-tokens) · [28 Testing](#28-testing) |
 | **Reality check** | [29 Known defects](#29-known-defects) |
 
@@ -1028,6 +1028,86 @@ is a Question rather than a How-to.
 trait must be present in **at least half the outliers and at least 1.2× rarer among everything
 else** — a trait shared by every post you have ever made explains nothing about why five took off.
 
+### Backfilling from LinkedIn (`linkedin.ts`, `LinkedInImport.tsx`)
+
+Manual entry is what makes these screens honest and it is also what stops people
+using them after a month. AuthoredUp's LinkedIn-archive backfill is one of the most-praised
+features in the whole audit and the only comparable thing in the market.
+
+**The matching is the feature.** LinkedIn's export carries no FlashCC id, so every row is matched
+on what it does carry, in three passes of descending confidence:
+
+| Pass | On | Why it is in this order |
+| --- | --- | --- |
+| `url` | normalised post URL | the only key both sides agree on by construction |
+| `title` | exact normalised text, against `title` AND `hook` | an export carries the post's own first line, which is usually the hook |
+| `near` | leading text, within `NEAR_DAYS` (3) | narrow on purpose — a fuzzy title alone matches two parts of a series |
+
+Each pass CONSUMES what it claims, on both sides. Without that a weaker rule overwrites a stronger
+one and the numbers land on the wrong post with nothing to show it.
+
+**Unmatched rows are returned, never dropped**, and the screen is mostly about them: an import that
+quietly places 40 of 60 is worse than one that places 40 and says so, because the first leaves
+somebody believing their history is complete.
+
+Two guards on the numbers themselves. `readNumber` returns **null for a blank**, not 0 — a
+fabricated zero goes straight into the median every insight screen runs on. And `applyMatches`
+writes only the fields the file carried: a LinkedIn export has no saves column, and zeroing a
+hand-entered count because the file was silent would destroy the data the feature exists to
+protect. `postedAt` is filled when missing and never replaced.
+
+Column aliases live in `COLUMNS` and nowhere else, matched after stripping everything but letters
+and digits. An unrecognised column is **reported** — see §29 D21 for why that matters.
+
+---
+
+## 19b. Version history
+
+`versions.ts`, `HistoryPanel.tsx`. Nobody names version history as a buying reason, so it is built
+and not led with. The pain is real but is never called versioning — it is called file chaos: *"my
+desktop used to be a graveyard of Canva exports, CapCut drafts, random PNGs and 'final_final'
+files."* And from an agency, which is the version that matters: *"I'd also like some safeties to
+ensure that approved images aren't confused with modified ones."*
+
+**Not an undo history.** `useStudio` already has one and it covers keystrokes. This covers
+MOMENTS — three of them, hooked at the call sites that already existed:
+
+| Reason | Taken | Where |
+| --- | --- | --- |
+| `approve` | before the share is created | `ShareDialog` |
+| `export` | before the render starts | `ExportDialog` |
+| `brand` | **before** the brand lands | `Studio` |
+
+The brand one is before rather than after on purpose: the version worth keeping is the one about to
+stop existing.
+
+**Local, and it does not sync.** The stated pain is losing your own earlier state on the machine
+you are working on; syncing a snapshot of every export would multiply the largest records in the
+product for a need nobody described. That also means no migration — it works with no database.
+
+Stored per document (`flashcc:v1:versions:<id>`) rather than one key for the lot, because a
+snapshot is a whole carousel and one key would mean rewriting every version of every project to add
+one entry. Each is **dehydrated**, for the same reason `putDoc` dehydrates.
+
+Retention is Planable's ladder — **none free, 30 days Pro, unlimited Agency** — with `MAX_PER_DOC`
+(25) on top whatever the plan, because localStorage is a few megabytes. `prune` runs on **write as
+well as read**: a limit enforced only on display is a filter, and the records accumulate behind it
+until the quota dies. Free gets none rather than a token two, because a history going back to your
+last two saves looks like a safety net without being one.
+
+`capture` refuses an identical deck for the same reason twice — exporting three times is one
+version — or the three moments worth finding are buried under fifty that are not.
+
+**The diff compares by POSITION, not by slide id.** Re-laying a deck mints new ids for every
+generated layer while the slides keep their order and their content, so an id-based diff would call
+that a whole new deck. It shares `docVersion`'s rules exactly, so the filmstrip and the
+stale-approval warning in §17b can never disagree about whether anything changed.
+
+`restoreSlide` is the case that actually comes up — a client asked for slide four back and three
+other things have been fixed since. A slide past the end of the current deck is appended rather
+than refused. **Restoring is itself snapshotted first**: going back should never be the one move
+you cannot take back.
+
 ---
 
 ## 20. The library
@@ -1259,11 +1339,28 @@ Stripe returns the browser before the webhook necessarily lands, so the app poll
 about 20 seconds and says "turning your plan on" rather than showing Free to somebody who has just
 paid.
 
+### Honest billing, said out loud
+
+FlashCC already behaved correctly: `ENTITLED` treats `active` as entitled, and Stripe keeps a
+cancelled subscription active until the period it was paid for ends. What was missing was the app
+being able to SAY so — `plan_renews_at` alone cannot distinguish "renews on the 3rd" from "ends on
+the 3rd", and the account card showed a renewal date either way.
+
+`plan_ends_at_period_end` is written by the webhook through the service role and read by
+`AccountCard`, which now shows **"Renews 3 Oct"** or **"Ends 3 Oct — everything stays unlocked
+until then"**. The four promises are on the pricing screen as `BILLING_TERMS`, each one a verbatim
+failure from the research: Loomly's 996% yearly increase, Taplio charging after a trial with "no
+emails, no reminders", Contentdrips revoking access on cancel, Later charging $180 four months
+post-cancellation.
+
+`UNMETERED_PROMISE` sits beside `REVIEWER_PROMISE`. Neither is a footnote, and both are invariants
+(6 and 7) so a future paywall cannot quietly contradict them.
+
 ---
 
 ## 26. Database
 
-Eight tables, all with `(user_id, id)` composite primary keys.
+Eight tables, all with `(user_id, id)` composite primary keys. Version history is deliberately not among them — see §19b.
 
 **Identity is the client's.** The app mints ids offline and creates records before anyone signs in,
 so there is no id remapping on sync and ids only need to be unique per person.
@@ -1280,6 +1377,20 @@ be indexed usefully for that.
 
 `doc_id` has **no foreign key**, deliberately: a composite FK would need `ON DELETE SET NULL
 (doc_id)`, which is Postgres 15+ only, and it makes account deletion order-sensitive.
+
+### Planning fields and billing (`08-pipeline-fields.sql`)
+
+Five columns on `posts`. Four are free text, because a pillar is somebody's own vocabulary and an
+enum would either be wrong for most people or grow until it is a text field with extra steps.
+`objective` is **constrained**, and that is the exception on purpose: it is the one the insight
+screens group by, and an open set there turns every typo into its own bucket.
+
+Columns rather than a jsonb bag, unlike `docs.data`, for the same reason `posts` was columnar to
+begin with: these are exactly what somebody filters and groups on.
+
+`profiles.plan_ends_at_period_end` is added here too, and the column-level grant is **re-stated**
+rather than assumed — a column added after a `grant update (display_name)` is not in that grant,
+which is correct, but "it was already safe" is how a schema acquires a hole.
 
 ### Clients and review (`06-clients.sql`, `07-review.sql`)
 
@@ -1555,6 +1666,18 @@ Vite proxy and localhost. All of that needs revisiting before this is public.
 
 PNG export, AI drafting and the pipeline are advertised as Pro. No screen reads `plan`, no platform
 emits PNG, and `02-pro-gate.sql` is unrun. The tier list is currently aspirational copy.
+
+### D25 — LinkedIn's export columns are unverified against a real file
+
+`COLUMNS` in `linkedin.ts` is a claim about somebody else's product, exactly like the scheduler
+headers in D21, and LinkedIn's analytics export has changed shape at least twice.
+
+The cost is bounded and visible rather than silent: an unrecognised column is listed in the import
+dialog under "columns it did not recognise and ignored", so a missing number has a stated cause.
+Every alias lives in one table.
+
+**Fix:** download a real export and correct the aliases against it. Fifteen minutes, and it should
+happen before anybody relies on a backfill.
 
 ### D23 — A review link's slides outlive the link
 

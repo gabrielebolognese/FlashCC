@@ -89,6 +89,12 @@ Invariants worth keeping:
    nothing counting them — deliberately. A migration that adds a seat count, or a paywall that
    meters share links, undoes the reason the feature exists. The promise is stated on the pricing
    screen as `REVIEWER_PROMISE` in `Upgrade.tsx`.
+7. **Nothing is metered.** No credits, no generation limits, no per-export counter, no
+   rationing of any kind. Grep confirms there is not one today and there must not be one
+   tomorrow: *"a rationing system, not a content tool"* is how users describe the
+   alternative, and a rival already uses "no credit limits" as its wedge. Plans differ by
+   what they DO — the pipeline, clients, review links, version retention — never by how
+   many times you may do it. Stated as `UNMETERED_PROMISE` in `Upgrade.tsx`.
 
 ## Conventions
 
