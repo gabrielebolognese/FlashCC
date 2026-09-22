@@ -51,6 +51,8 @@ export type Profile = {
   displayName: string | null;
   plan: Plan;
   planRenewsAt: string | null;
+  /** Stripe has a customer for them, so the billing portal has something to show. */
+  hasBilling: boolean;
 };
 
 /* ── row shapes ───────────────────────────────────────────────────────────── */

@@ -12,6 +12,7 @@ import {
   Flame,
   KanbanSquare,
   LayoutGrid,
+  RefreshCw,
   Send,
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
@@ -210,6 +211,15 @@ export function Home({
           ) : null}
         </header>
 
+        {account.activating ? (
+          <div className="flex shrink-0 items-center gap-2 border-b border-accent-dim bg-accent-wash px-6 py-2.5">
+            <RefreshCw size={13} strokeWidth={2} className="fcc-spin shrink-0 text-accent" />
+            <span className="text-body text-primary">
+              Payment received. Turning your plan on — this takes a second.
+            </span>
+          </div>
+        ) : null}
+
         <main
           className={
             boardLike
@@ -266,7 +276,15 @@ export function Home({
         />
       ) : null}
 
-      {pricing ? <Upgrade onClose={() => setPricing(false)} /> : null}
+      {pricing ? (
+        <Upgrade
+          plan={account.profile?.plan ?? "free"}
+          signedIn={account.status === "signedIn"}
+          manageable={account.manageable}
+          onSignIn={() => setSigningIn(true)}
+          onClose={() => setPricing(false)}
+        />
+      ) : null}
 
       {signingIn ? (
         <SignIn hasLocalWork={account.hasUnsyncedWork} onClose={() => setSigningIn(false)} />

@@ -81,7 +81,7 @@ export async function loadProfile(userId: string): Promise<Profile | null> {
 
   const { data, error } = await db
     .from("profiles")
-    .select("id, email, display_name, plan, plan_renews_at")
+    .select("id, email, display_name, plan, plan_renews_at, stripe_customer_id")
     .eq("id", userId)
     .maybeSingle();
 
@@ -93,6 +93,7 @@ export async function loadProfile(userId: string): Promise<Profile | null> {
     display_name: string | null;
     plan: string;
     plan_renews_at: string | null;
+    stripe_customer_id: string | null;
   };
 
   return {
@@ -103,6 +104,7 @@ export async function loadProfile(userId: string): Promise<Profile | null> {
       ? (row.plan as Plan)
       : "free",
     planRenewsAt: row.plan_renews_at,
+    hasBilling: row.stripe_customer_id !== null,
   };
 }
 

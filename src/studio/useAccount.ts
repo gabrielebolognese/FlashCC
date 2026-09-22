@@ -13,7 +13,8 @@
 import type { Session, User } from "@supabase/supabase-js";
 import { useCallback, useEffect, useRef, useState } from "react";
 
-import { currentSession, ensureProfile, onAuthChange, signOut as endSession } from "./auth.js";
+import { currentSession, ensureProfile, loadProfile, onAuthChange, signOut as endSession } from "./auth.js";
+import { checkoutOutcome, clearCheckoutFlag } from "./billing.js";
 import { isCloudConfigured, type Profile } from "./cloud.js";
 import { forgetLocal, hasLocalWork, lastSyncedAt, syncAll } from "./sync.js";
 
@@ -33,12 +34,19 @@ export type Account = {
   signOut: () => Promise<void>;
   /** True when this machine has work that has never been near an account. */
   hasUnsyncedWork: boolean;
+  /** Stripe has a customer for them, so the billing portal has something to show. */
+  manageable: boolean;
+  /** Paid, came back from Stripe, and the webhook has not landed yet. */
+  activating: boolean;
 };
 
 /** Long enough that tabbing between windows does not hammer the database. */
 const REFOCUS_QUIET_MS = 30_000;
 /** Long enough to let a burst of edits settle into one push. */
 const DEBOUNCE_MS = 3_000;
+/** How long to keep asking whether the Stripe webhook has granted the plan. */
+const ACTIVATION_TRIES = 10;
+const ACTIVATION_GAP_MS = 2_000;
 
 export function useAccount(changeSignal: number): Account {
   const configured = isCloudConfigured();
@@ -49,6 +57,7 @@ export function useAccount(changeSignal: number): Account {
   const [sync, setSync] = useState<SyncState>(
     configured ? { status: "idle", at: lastSyncedAt() } : { status: "off" },
   );
+  const [activating, setActivating] = useState(() => checkoutOutcome() === "done");
 
   // Refs, not state: these are read inside callbacks that must not be rebuilt
   // every time they change, or the effects below would resubscribe constantly.
@@ -128,6 +137,49 @@ export function useAccount(changeSignal: number): Account {
     return () => clearTimeout(t);
   }, [changeSignal, configured, run]);
 
+  /**
+   * Stripe returns the browser the moment payment succeeds, but the plan is
+   * granted by a webhook arriving separately — usually within a second, sometimes
+   * not. Without this the person who just paid lands back on a page that says
+   * Free, which is the worst possible first impression of a subscription. So poll
+   * briefly, then give up quietly rather than claiming anything went wrong.
+   */
+  useEffect(() => {
+    if (!configured || !activating) return;
+    clearCheckoutFlag();
+
+    let alive = true;
+    let tries = 0;
+
+    const tick = async () => {
+      const id = userRef.current?.id;
+      if (!alive) return;
+
+      if (id) {
+        const fresh = await loadProfile(id);
+        if (!alive) return;
+        if (fresh) setProfile(fresh);
+        if (fresh && fresh.plan !== "free") {
+          setActivating(false);
+          return;
+        }
+      }
+
+      tries += 1;
+      if (tries >= ACTIVATION_TRIES) {
+        setActivating(false);
+        return;
+      }
+      timer = setTimeout(() => void tick(), ACTIVATION_GAP_MS);
+    };
+
+    let timer = setTimeout(() => void tick(), ACTIVATION_GAP_MS);
+    return () => {
+      alive = false;
+      clearTimeout(timer);
+    };
+  }, [configured, activating]);
+
   const signOut = useCallback(async () => {
     // Push first, or anything edited since the last sync dies with the local copy.
     if (userRef.current) await run();
@@ -148,5 +200,7 @@ export function useAccount(changeSignal: number): Account {
     syncNow: () => void run(),
     signOut,
     hasUnsyncedWork: status === "signedOut" && hasLocalWork(),
+    manageable: profile?.hasBilling ?? false,
+    activating,
   };
 }
