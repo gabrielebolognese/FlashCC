@@ -1,3 +1,8 @@
+> **Superseded.** This describes the design that the Photoshop-model rewrite replaced. It is kept
+> for history only — nothing in it matches the code. It states the role determines layout completely and the user never positions anything; the canvas is direct-manipulation.
+>
+> The current reference is [`docs/reference.md`](../reference.md).
+
 # Role → layout mapping
 
 Five roles, five layouts. The role determines the layout **completely** — the user never positions

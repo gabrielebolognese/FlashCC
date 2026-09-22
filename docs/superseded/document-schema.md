@@ -1,3 +1,8 @@
+> **Superseded.** This describes the design that the Photoshop-model rewrite replaced. It is kept
+> for history only — nothing in it matches the code. It states the document is semantic and stores no pixel positions; a `Doc` is now flat layers in artboard pixels.
+>
+> The current reference is [`docs/reference.md`](../reference.md).
+
 # FlashCC document schema
 
 Semantic and renderer-agnostic. The document stores what a slide **means**. It never stores a

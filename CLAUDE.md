@@ -23,11 +23,15 @@ React + Vite + Tailwind + lucide-react. Node >= 20, ESM, strict tsconfig, vitest
 
 | Doc | Covers |
 | --- | --- |
+| **`docs/reference.md`** | **Everything. How each subsystem works, every constant, and §29 known defects.** Start here. |
+| `docs/feature-roadmap.md` | The batched plan of record. Worked through with `/next-batch`. |
 | `DESIGN_SYSTEM.md` | FlashFX tokens: colour, type, radii, motion. Paints the **app**. |
 | `docs/interaction-principles.md` | Figma research + rules R1–R15 (timing, feedback, density, control budget) |
-| `docs/architecture.md` | The four load-bearing decisions, file plan, open questions |
-| `docs/document-schema.md` | Document model, split rules, role inference, persistence |
-| `docs/role-layouts.md` | The five role layouts, the shared grid, the type ladders |
+| `docs/billing.md` | Stripe setup, click by click |
+
+`docs/superseded/` holds four documents describing the design the Photoshop-model rewrite replaced
+(a semantic document, five roles, a template engine). None of them match the code. They are kept for
+history and should never be used to answer a question about how the app works.
 
 ## Commands
 
@@ -36,7 +40,7 @@ React + Vite + Tailwind + lucide-react. Node >= 20, ESM, strict tsconfig, vitest
 | `npm run dev` | Vite dev server (5173, falls forward if taken) |
 | `npm run build` | `tsc --noEmit` then `vite build` |
 | `npm run typecheck` | Type check only; run before considering a change done |
-| `npm test` | `vitest run` |
+| `npm test` | `vitest run --passWithNoTests` |
 | `npm run test:watch` | vitest watch |
 
 Single test file: `npx vitest run src/doc/split.test.ts`
@@ -83,8 +87,7 @@ Invariants worth keeping:
 
 ## Not built yet
 
-- Image upload (the `image` slot renders a placeholder), template validation, the phase-2
-  FlashFX converter.
+- Template validation, the phase-2 FlashFX converter.
 - Size-aware `compositions.ts`. `W`/`H`/`M` are module constants, so generation only ever targets
   1080×1350. `reflow.ts` re-lays existing layers onto another artboard, which is a different job.
 

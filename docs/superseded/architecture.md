@@ -1,3 +1,8 @@
+> **Superseded.** This describes the design that the Photoshop-model rewrite replaced. It is kept
+> for history only — nothing in it matches the code. It specifies `computeLayout(role, blocks, brandKit, format)`, `src/doc/**`, `roles.ts`, `typeScale.ts` and `SlideStage.tsx`, none of which exist.
+>
+> The current reference is [`docs/reference.md`](../reference.md).
+
 # FlashCC — architecture and file plan
 
 Standalone project. No FlashFX engine dependency: no WebGPU, no compositor, no keyframe system.

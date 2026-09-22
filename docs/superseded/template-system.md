@@ -1,3 +1,8 @@
+> **Superseded.** This describes the design that the Photoshop-model rewrite replaced. It is kept
+> for history only — nothing in it matches the code. It specifies a template engine that was never built, and argues from a no-AI position the product reversed.
+>
+> The current reference is [`docs/reference.md`](../reference.md).
+
 # FlashCC Template System — final specification
 
 **Status:** implementable. Every type in §2 was compiled against this repo's exact `tsconfig.json` (`strict`, `noUncheckedIndexedAccess`, `exactOptionalPropertyTypes`, `verbatimModuleSyntax`, `NodeNext`) together with a full `Template` literal; seven negative probes were confirmed **rejected** by the compiler (reflow without terminal `overflow`; a hex in a colour field; a `marker` patch on a text slot; an arrangement re-routing `content`; an arrangement changing region membership; a `roles` record missing roles; `radius: 99`). All arithmetic below was computed against the repo's own `countLines` and against `PALETTE_PRESETS`, not estimated.
