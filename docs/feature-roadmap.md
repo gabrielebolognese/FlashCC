@@ -18,6 +18,17 @@ That gives a clean test for every item below:
 
 > **Batches 1–5 remove reasons to choose PostNitro. Batches 6–8 are the reason to choose us.**
 
+**And the finding that defines the opening:** of nine schedulers audited for bulk import, **not one
+generates carousel slides.** Bulk universally means scheduling assets that already exist — every
+one of them assumes the pixels are already made. Six of the nine cannot bulk-ship a LinkedIn
+carousel at all, two of those denying it in writing (Buffer: *"Bulk upload currently supports text
+and single-image posts only. Video and carousel posts are not supported."* SocialBee: *"Carousel
+posts cannot be uploaded using CSV files."*).
+
+The one place the full shape exists is PostNitro bolted into Publer as a third-party integration —
+CSV bulk import plus AI topic-to-slides. **Treat Publer+PostNitro as the closest direct
+competitor**, and note that someone has already validated the shape from the other end.
+
 Three findings shape the order.
 
 **Writing the slides is the biggest time sink, not designing them.** 30–60 minutes of a 45–120
@@ -61,8 +72,14 @@ gradients and uploaded fonts correctly. Client-side avoids a server round trip b
 converters are unreliable on exactly those two features, which FlashCC uses heavily. **Recommend
 Playwright**, and note it also fixes PDF quality.
 
+**Landmine, worth knowing before writing the encoder:** emit **JPG, not PNG, for LinkedIn-bound
+slides.** A live bug report on another tool: *"LinkedIn carousel: PNG slides render blank — JPG
+works."* PNGs convert to PDF and lose their content downstream. Closed `not_planned`, still open.
+Instagram and TikTok are happy with either, so make the format part of the platform preset rather
+than a global choice.
+
 **Done when:** a 10-slide deck exports as `01.png … 10.png` at exact pixel dimensions, gradients
-and custom fonts intact, in a zip.
+and custom fonts intact, in a zip — and the LinkedIn preset emits JPG.
 
 ### 1.2 Platform export presets
 
@@ -83,8 +100,10 @@ under 2px, anything intruding on a platform safe zone, file size outside 800KB�
 over the platform ceiling.
 
 **Why:** this is currently solved by an entire genre of blog post. Slide-count ceilings are the
-sharpest hidden trap: **Instagram's API caps carousels at 10 while the app allows 20**, so a
-20-slide deck cannot be published by any scheduler, ever. LinkedIn takes 300. TikTok 35.
+sharpest hidden trap: **Instagram's Graph API caps carousels at 10 while the app allows 20**, so a
+20-slide deck cannot be published by any scheduler, ever — and the same API allows only **100
+published posts per rolling 24 hours per account**, which is a real constraint on "batch 30
+posts". LinkedIn takes 300 pages. TikTok 35.
 
 **Done when:** the guard catches a deliberately bad deck and names each problem against its slide.
 
@@ -226,11 +245,49 @@ ceiling for anyone with more than a couple of clients. Full fix needs Batch 5; s
 
 **Status:** queued
 **Size:** large
-**Why here:** this is the wedge. The data model that makes variable-length carousels possible
-exists in this market **only behind a developer API at $39+/mo** (Contentdrips). No UI tool
-exposes it.
+**Why here:** this is the wedge. No tool in the market offers a human-writable batch format.
+Contentdrips comes closest and its API turns out to be a **renderer, not a splitter** — the caller
+supplies every slide's content, and its own blog-to-carousel tutorial routes the splitting through
+ChatGPT in Make.com. Its CSV is one row per *field*, so a 10-slide carousel is 20+ rows. The hard
+part is explicitly not theirs.
 
-### 4.1 One row per slide, grouped by post
+**The design constraint for this whole batch:** the loudest 1-star complaint in the category is
+sameness — *"the carousel tools I tried all spit out the same 8-slide hook / 5 tips / CTA
+layout."* Note the shape of that: it is **precisely what four frameworks become if applied
+mechanically at batch scale.** Vary slide count and section rhythm *within* a framework, not just
+the words. This is the single biggest risk in the document to FlashCC specifically.
+
+### 4.1 The human writes the hook and the payoff; AI fills the middle
+
+**What:** make slide 1 and slide N the cheapest things to override, and never let a batch
+operation silently overwrite them.
+
+**Why:** this is an operator's measured fix, not a theory. Scaling 2 to 10 carousels a week:
+*"for the first few weeks engagement per post actually dropped. Reach was flat but saves and
+shares fell... the AI carousels were smooth and forgettable. Same structure every time, safe
+openers, no real point of view. What fixed it: I write slide one (the hook) and the final slide
+(the payoff) myself. AI fills the middle slides... AI is great for volume and the boring middle,
+weak at the two slides that decide whether anyone cares."*
+
+Corroborated: *"a bad first slide kills the whole thing no matter how good the rest is."*
+
+**Done when:** in a batch of 20, editing the hook and payoff of each is a first-class pass that
+survives regeneration.
+
+### 4.2 Same words, more slides
+
+**What:** split a slide, merge two slides, and move a break — **without rewording anything.**
+
+**Why:** explicitly unmet, from a paying API customer of a competitor: *"We use preserve, because
+our copy is client-approved and must not be reworded. That leaves us no way to express 'same
+words, spread across more slides.'... both require us to guess the right slide count up front."*
+That vendor's own engineer confirms there is *"no fully automatic card count determination."*
+
+Related bug worth not repeating: a numbered list broken across a slide break restarts at 1.
+
+**Done when:** a 6-slide deck becomes 9 with identical copy, and nothing re-wraps wrongly.
+
+### 4.3 One row per slide, grouped by post
 
 **What:** long-format import — `post_id, slide_index, headline, body, …` — instead of Canva's wide
 format.
@@ -244,7 +301,7 @@ Long format gives variable slide count for free, in a sheet people can actually 
 
 **Done when:** one CSV produces carousels of 6, 9 and 12 slides in a single batch.
 
-### 4.2 Batch pre-flight
+### 4.4 Batch pre-flight
 
 **What:** one screen before export — empty fields, overflowing text, missing images, slide count
 over the platform ceiling, duplicate hooks.
@@ -252,16 +309,39 @@ over the platform ceiling, duplicate hooks.
 **Why:** Canva's only signal for an unbound field is a small coloured dot, and the documented
 consequence is *"47 of 50 designs retain placeholder text"* discovered at review.
 
-### 4.3 Text fit guaranteed across the whole batch
+**Also check the destination tool, not just the platform.** Row caps across schedulers run from 10
+to 1,000 with no discernible logic, and export format matters per destination (see 1.1).
 
-**What:** check every text layer in the batch and surface "7 of 240 slides overflow — here they
-are" as a reviewable list.
+**And design against opaque atomic failure**, which is a whole bug class across every scheduler
+audited. Buffer, 2-star: *"Buffer will start posting, will glitch and fail to upload one of the
+nine photos, and then my 3X3 grid is messed up. I have to go in and delete the photos (and any
+interaction they have generated) and repost."* SocialBee: *"If a single post in a queue has a
+problem then the whole queue will stall"* with *"no indication which post within the category has
+the problem."* A batch that fails must say which item and leave the rest alone.
 
-**Why:** overflow is the **#1 documented Bulk Create failure**, and its only fix is editing the
-master and re-running the entire batch, which discards every manual edit. FlashCC can do better
-because `text.ts` already counts real wrapped lines and `geometry.ts` is pure and tested.
+### 4.5 Text that does not fit gets another slide
 
-### 4.4 Re-run without losing hand edits
+**What:** check every text layer in the batch, surface "7 of 240 slides overflow — here they are"
+as a reviewable list, and offer **reflow or an extra slide** as the remedy.
+
+**Why:** overflow is the #1 documented Bulk Create failure and its only fix there is re-running the
+whole batch. But the obvious remedy is the trap: **shrink-to-fit is itself the complaint.**
+*"Fixed card sizes shrink content instead of giving it more room... dense slides get scaled down
+to fit rather than spread out, so text ends up small and cramped. Our worst example is a 25-slide
+presentation... almost every slide is visibly squashed."* And bluntly, 1-star: *"it just crams
+everything into the top 5th of each page and then blanks the rest."*
+
+**This lands on code already shipped.** `fitToBox` in `text.ts` walks a 12-step ladder from
+largest to smallest and takes the first size that fits — the overflow guarantee *is*
+shrink-to-fit. It has a floor so it never goes microscopic, but the remedy is still smaller type
+rather than another slide. The measurement work stays and is good; the remedy changes.
+
+**Recommend:** shrink one or two steps at most, then split. Never squash to the floor silently.
+
+**Done when:** a slide with too much copy becomes two slides at readable size rather than one
+cramped slide, and a test pins the boundary.
+
+### 4.6 Re-run without losing hand edits
 
 **What:** stable ids per generated layer plus a `handEdited` flag; re-running replaces only
 untouched layers.
@@ -270,14 +350,14 @@ untouched layers.
 stays plain layers and a re-run is a new one-shot job that happens to skip dirty layers. Do not
 introduce live bindings.
 
-### 4.5 Batch restyle after generation
+### 4.7 Batch restyle after generation
 
 **What:** change palette, font or style across 30 already-generated carousels in one action.
 
 **Why:** Bulk Create varies content only, never design, and its outputs are 30 independent files
 with no shared handle. A brand tweak means 30 manual edits.
 
-### 4.6 Data-driven export naming
+### 4.8 Data-driven export naming
 
 Canva already names files from a chosen column. Shipping without it is a visible regression.
 
@@ -315,6 +395,44 @@ Lift `MAX_FONTS = 6` out of localStorage.
 to... add your own logo within the platform"* (ContentStudio). **No competitor has review evidence
 of "I scheduled a post and it used my brand assets automatically."** That connection is unclaimed.
 
+### 5.5 Host the rendered slides and emit a scheduler-shaped CSV
+
+**What:** after export, keep the rendered slides at public URLs and emit a CSV row per carousel
+with those URLs already filled in, shaped for the destination tool.
+
+**Why this is the cheapest real win in the document:** **eight of nine schedulers require
+publicly-hosted image URLs for CSV import, and not one of them provides the hosting.** That gap is
+the single most-cited friction in the whole corpus. A Publer 3-star review, titled *"Good for bulk
+scheduling but a lot of work needs to be done"*, describes the workaround in full: *"no ability to
+sort, and export data of media library - which would be super useful when you need hundreds of
+links to download pictures before uploading them via CSV. I needed to find a way around this issue
+and upload everything to WordPress and then use a plugin to export file names and links... I'd
+need to manually copy-paste all links."* The whole thesis in one line from r/socialmedia: *"copy
+paste the image url into csv and then reupload to scheduling tool for bulk scheduling."*
+
+FlashCC already renders the slides. Hosting them and emitting the row turns it from a design tool
+you then wrestle into a scheduler, into the missing first half of the bulk pipeline.
+
+**There is no lingua franca — build per-tool dialects, not one generic CSV.** The three that
+accept carousels disagree fundamentally, and two of them are exact opposites:
+
+| Destination | Shape | Notes |
+| --- | --- | --- |
+| **Metricool** | One column per image, `Picture Url 1`..`10` | Explicitly warns *"Don't put all URLs in a single cell"*. Has a boolean `LinkedIn Images as Carousel` that **builds the LinkedIn PDF from image URLs for you** — the most directly competitive capability found anywhere. ~70 columns. |
+| **Publer** | Comma-separated URLs in one cell | 12 columns, 500 rows. `Post subtype` accepts PDF, so it also ingests a finished document. Per-slide alt text separated by `\|\|`. $5/mo. |
+| **ContentStudio** | Newline-separated URLs in one cell | 9 columns, 500 rows. `Post Type` takes a literal `Instagram Carousel` / `LinkedIn Carousel` enum. |
+
+**Emit per-slide alt text too.** Only Metricool and Publer accept it, and it covers both
+accessibility and the two best integration targets in one field.
+
+**Worth noting for later:** per-slide *captions* on Instagram carousels are shipped by nobody.
+Later states plainly that *"Carousel posts scheduled through Later use a single caption for the
+entire post."* ContentStudio has it as an open upvoted request observing that native carousels with
+per-image captions *"achieve significantly greater reach and engagement rates."*
+
+**Done when:** exporting a batch produces hosted slides plus a Metricool-shaped CSV that imports
+without a single manual edit.
+
 ---
 
 ## Batch 6 — One asset becomes many
@@ -326,10 +444,21 @@ of "I scheduled a post and it used my brand assets automatically."** That connec
 
 ### 6.1 Long-form ingest
 
-**What:** paste a blog post, transcript or newsletter; get a proposed **series** of carousels.
+**What:** paste a blog post, transcript or newsletter; get **candidate moments to choose from**,
+then build carousels from the ones picked.
 
-**Why:** the mapping heuristic that recurs is each H2 section becoming one or two slides, hitting
-5–10 slides per carousel. Nothing found does one-asset-to-N-posts as a first-class operation.
+**Why the interaction is this way round:** across the whole corpus nobody complains that slides
+look bad — they complain the machine picked the wrong material. The most-upvoted articulation:
+*"its virality score and my audience disagree, constantly... I have stopped trusting the ranking
+and now I scrub the whole thing myself anyway, which defeats the point of paying... Looking
+specifically for: I choose the moment, it does the work."* Same failure in text: *"The Quotes,
+Hooks & Timestamps pick up in the middle of a sentence so it does not make any sense. My time
+would be better spent just writing the sentences myself."*
+
+So do not auto-segment and present a finished series. **Present candidates, let the human choose,
+then do the work.** The mapping heuristic still holds once chosen: each H2 becomes one or two
+slides, 5–10 slides per carousel. Nothing found does one-asset-to-N-posts as a first-class
+operation.
 
 ### 6.2 Series as an object
 
@@ -512,8 +641,36 @@ than user-demanded.
 **Canva brand-kit counts conflict between sources** (Free 1 / Pro 5 / Business 100 from direct
 fetch, versus Pro 100 / Teams 1,000 from a search summary). Verify before using in positioning.
 
+**One research pass corrected itself twice after filing**, and both sets of corrections are folded
+in above. The second addendum closed the per-tool bulk question by going at vendor help centres,
+changelogs, raw CSV template files, the GitHub REST API and a redlib Reddit mirror — roughly 250
+fetches — after the direct routes were blocked. It also skews Trustpilot/GetApp/AppSumo, because
+G2, Capterra-direct and TrustRadius were CAPTCHA-blocked throughout, and it flags its own
+unresolved items (Hypefury row limits, a Publer "50 images per cell" claim, a SocialBee 300-vs-1,000
+row conflict).
+
+**The first addendum corrected itself on two points.**
+It had overcredited a competitor's API by reading its marketing rather than its tutorial, and had
+recommended shrink-to-fit before the community layer showed shrink-to-fit is the complaint. Where
+the addendum conflicted with the first report, the addendum won — it had the Reddit evidence the
+first pass lacked.
+
+**Do not treat "presets run once, nothing is derived" as a differentiator.** A competitor shipped
+an AI design agent in March 2026 doing the same LLM-to-JSON-to-editable-layers thing. It is still
+the right architecture — it is the structural answer to fixed-box-then-squeeze — but it is table
+stakes. Differentiate on split quality and on control over slide count and break points.
+
+**Post-generation editing is the stated churn path**, verbatim from a $90/mo customer: *"The
+initial design you get is not bad, but it is impossible to make changes. The AI agent simply does
+not listen."* And: *"it blows my mind that every time the AI messes up it recommends using Canva
+instead. So I guess that is what I will do."*
+
 **Least-evidenced item in this document:** 6.2, series as an object. It follows logically from 6.1
 but rests on inference.
+
+**The unlock for any follow-up research:** `api.pullpush.io` returns raw Reddit JSON with full
+comment bodies and permalinks. Direct fetch, `r.jina.ai` and every search proxy are hard-blocked;
+that endpoint is not.
 
 **Worth closing later:** a browser-driven Reddit session would reach the r/Design thread
 *"Designers, how do you deal with 'Can we go back to version 2?'"* and r/SocialMediaManagers
