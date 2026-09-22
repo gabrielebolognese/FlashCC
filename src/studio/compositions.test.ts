@@ -91,11 +91,24 @@ describe("buildSlides", () => {
     }
   });
 
+  /**
+   * Asserted wherever the heading-body composition lands rather than at a fixed
+   * index: the cycle now starts at an offset derived from the deck's own words,
+   * so slide 2 is no longer always the same composition. A long enough deck
+   * contains every composition regardless of where the cycle starts.
+   */
   it("splits a lead sentence into a heading plus body", () => {
-    const s = buildSlides(["First slide.", "The point. And then the supporting detail follows here."], theme)[1]!;
-    const t = s.layers.filter((l) => l.kind === "text");
-    expect(t.length).toBe(2);
-    expect(t[0]?.fontSize ?? 0).toBeGreaterThan(t[1]?.fontSize ?? 0);
+    const lead = "The point. And then the supporting detail follows here.";
+    const slides = buildSlides(Array.from({ length: 8 }, () => lead), theme);
+
+    const pairs = slides
+      .map((s) => s.layers.filter((l) => l.kind === "text"))
+      .filter((t) => t.length === 2);
+
+    expect(pairs.length).toBeGreaterThan(0);
+    for (const t of pairs) {
+      expect(t[0]?.fontSize ?? 0).toBeGreaterThan(t[1]?.fontSize ?? 0);
+    }
   });
 
   it("is deterministic", () => {

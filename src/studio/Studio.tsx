@@ -1,4 +1,4 @@
-import { ChevronLeft, ClipboardPaste, Download, Redo2, Undo2, X } from "lucide-react";
+import { ChevronLeft, ClipboardPaste, Download, Redo2, Shuffle, Undo2, X } from "lucide-react";
 import { useState } from "react";
 import { createPortal } from "react-dom";
 
@@ -13,9 +13,10 @@ import { LayerView } from "./LayerView.js";
 import type { Doc } from "./model.js";
 import { Properties } from "./Properties.js";
 import { buildSlides } from "./compositions.js";
-import { applyBrand, listBrands } from "./brand.js";
+import { applyBrand, listBrands, themeOf } from "./brand.js";
 import { BrandMenu } from "./BrandMenu.js";
 import { ExportDialog } from "./ExportDialog.js";
+import { regenerate } from "./regenerate.js";
 import { THEMES } from "./presets.js";
 import { Toolbar } from "./Toolbar.js";
 import { useStudio } from "./useStudio.js";
@@ -26,6 +27,7 @@ export function Studio({ initial, onHome }: { initial: Doc; onHome: () => void }
   const [naming, setNaming] = useState(false);
   const [pasteOpen, setPasteOpen] = useState(false);
   const [exporting, setExporting] = useState(false);
+  const [relaid, setRelaid] = useState<number | null>(null);
   const [pasted, setPasted] = useState("");
 
   const printRoot = document.getElementById("print-root");
@@ -66,6 +68,25 @@ export function Studio({ initial, onHome }: { initial: Doc; onHome: () => void }
         <span className="text-caption text-muted">
           {doc.slides.length} slide{doc.slides.length === 1 ? "" : "s"} · {doc.width}×{doc.height}
         </span>
+        <button
+          type="button"
+          title="Lay the same words out again. Anything you changed by hand is kept."
+          onClick={() => {
+            const result = regenerate(doc, themeOf(doc, listBrands()));
+            studio.replaceDoc(result.doc);
+            setRelaid(result.kept);
+          }}
+          className="flex h-7 items-center gap-1.5 rounded-md border border-hairline bg-surface-1 px-2.5 text-body text-secondary hover:bg-surface-3 hover:text-primary"
+        >
+          <Shuffle size={14} strokeWidth={2} />
+          Re-lay
+        </button>
+        {relaid === null ? null : (
+          <span className="text-caption text-tertiary">
+            {relaid > 0 ? `kept ${relaid} of your edits` : "re-laid"}
+          </span>
+        )}
+
         <BrandMenu
           brands={listBrands()}
           onApply={(brand) => {

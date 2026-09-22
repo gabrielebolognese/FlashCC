@@ -19,7 +19,6 @@
  */
 
 import type { Doc, Layer } from "./model.js";
-import { fontStack } from "./model.js";
 import { safeBox, type Platform } from "./platforms.js";
 import { lineCount, type Measure } from "./text.js";
 
@@ -38,7 +37,8 @@ export type Finding = {
 const PLACEHOLDERS = ["type something", "your hook goes here", "the point", "say the thing."];
 
 const measureOf = (l: Layer): Measure => ({
-  family: fontStack(l.fontFamily),
+  // The id, not the stack — see the note on Measure.family.
+  family: l.fontFamily,
   letterSpacing: l.letterSpacing,
   uppercase: l.uppercase,
 });

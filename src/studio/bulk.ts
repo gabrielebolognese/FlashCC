@@ -9,6 +9,7 @@ import { buildSlides, type BuildOptions } from "./compositions.js";
 import { makeDoc, type Doc } from "./model.js";
 import type { Theme } from "./presets.js";
 import type { Structure } from "./structures.js";
+import { looksDelimited, parseSheet, type ParseResult } from "./csv.js";
 import { nameFromHook } from "./search.js";
 
 export const SEPARATOR = "---";
@@ -55,6 +56,7 @@ export function buildDocs(
   theme: Theme,
   options: BuildOptions = {},
   group?: string,
+  styleId?: string,
 ): Doc[] {
   const palette = [
     theme.bg, theme.fg, theme.accent, theme.muted,
@@ -67,6 +69,12 @@ export function buildDocs(
       ...makeDoc(block.title),
       palette,
       ...(group ? { group } : {}),
+      // Stamped here as well as on the single-carousel path. Without it a bulk
+      // deck is invisible to the framework and style attribution that is the
+      // whole reason the pipeline records structure — and bulk is precisely
+      // where enough posts to attribute anything come from.
+      framework: structure.id,
+      ...(styleId ? { styleId } : {}),
       slides: buildSlides(block.texts, theme, roles, options),
     };
   });
@@ -93,3 +101,57 @@ Attention resets every time the frame changes.
 Punch in 15% on the second sentence of every answer.
 
 Save this for your next edit.`;
+
+
+/* ── spreadsheets ─────────────────────────────────────────────────────────── */
+
+export type BulkSource = {
+  blocks: BulkBlock[];
+  /** How the input was read, so the UI can say what it understood. */
+  shape: "text" | "long" | "wide";
+  headers: string[];
+  warnings: string[];
+};
+
+/**
+ * Reads whichever shape the paste turns out to be.
+ *
+ * Three accepted, on purpose: a plain-text paste with `---` between carousels,
+ * a long sheet grouped by post id, and a wide sheet with a column per slide.
+ * The last is structurally the worst and the one everybody has been taught, so
+ * refusing it would mean refusing most real input.
+ */
+export function readBulk(source: string): BulkSource {
+  if (!looksDelimited(source)) {
+    const blocks = parseBulk(source);
+    return { blocks, shape: "text", headers: [], warnings: [] };
+  }
+
+  const sheet: ParseResult = parseSheet(source);
+  return {
+    blocks: sheet.carousels.map((c) => ({ texts: c.slides, title: c.name })),
+    shape: sheet.shape,
+    headers: sheet.headers,
+    warnings: sheet.warnings,
+  };
+}
+
+/** Slide 1 and slide N — the two the operator writes and AI does not. */
+export const hookOf = (block: BulkBlock): string => block.texts[0] ?? "";
+export const payoffOf = (block: BulkBlock): string =>
+  block.texts.length > 1 ? (block.texts[block.texts.length - 1] ?? "") : "";
+
+export function setHook(block: BulkBlock, text: string): BulkBlock {
+  const texts = [...block.texts];
+  texts[0] = text;
+  // The name followed the old hook, so it follows the new one — unless the name
+  // came from a column, which is a choice rather than a derivation.
+  return { texts, title: nameFromHook(text) || block.title };
+}
+
+export function setPayoff(block: BulkBlock, text: string): BulkBlock {
+  if (block.texts.length < 2) return block;
+  const texts = [...block.texts];
+  texts[texts.length - 1] = text;
+  return { ...block, texts };
+}

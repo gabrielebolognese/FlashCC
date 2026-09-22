@@ -2,7 +2,8 @@ import { FolderPlus, Layers, Sparkles, Wand2, X } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 
 import { buildSlides, type BuildOptions } from "./compositions.js";
-import { buildDocs, countSlides, parseBulk, SAMPLE_BULK, SEPARATOR } from "./bulk.js";
+import { buildDocs, countSlides, readBulk, SAMPLE_BULK, SEPARATOR, type BulkBlock } from "./bulk.js";
+import { BatchReview } from "./BatchReview.js";
 import type { Doc } from "./model.js";
 import { SlidePreview } from "./SlidePreview.js";
 import { DEFAULT_STRUCTURE, STRUCTURES, type Structure } from "./structures.js";
@@ -26,8 +27,13 @@ export function BulkCreate({
   const [structure, setStructure] = useState<Structure>(DEFAULT_STRUCTURE);
   const [style, setStyle] = useState<Style>(styles[0] ?? DEFAULT_STYLE);
   const [creating, setCreating] = useState<Doc[] | null>(null);
+  // The review pass holds its own copy, because the hook and payoff are edited
+  // there and must not be thrown away by a re-parse of the original paste.
+  const [reviewing, setReviewing] = useState<BulkBlock[] | null>(null);
 
-  const blocks = useMemo(() => parseBulk(source), [source]);
+  // Accepts a plain-text paste, a long sheet, or a wide one.
+  const read = useMemo(() => readBulk(source), [source]);
+  const blocks = read.blocks;
   const slides = countSlides(blocks);
 
   const preview = useMemo(() => {
@@ -44,8 +50,30 @@ export function BulkCreate({
 
   if (creating) return <Creating count={creating.length} accent={style.theme.accent} />;
 
-  const go = () =>
-    setCreating(buildDocs(blocks, structure, style.theme, build, group.trim() || undefined));
+  if (reviewing) {
+    return (
+      <BatchReview
+        source={read}
+        blocks={reviewing}
+        onChange={setReviewing}
+        onBack={() => setReviewing(null)}
+        onCreate={() =>
+          setCreating(
+            buildDocs(
+              reviewing,
+              structure,
+              style.theme,
+              build,
+              group.trim() || undefined,
+              style.id,
+            ),
+          )
+        }
+      />
+    );
+  }
+
+  const go = () => setReviewing(blocks);
 
   return (
     <div className="flex h-full flex-col overflow-hidden bg-base">

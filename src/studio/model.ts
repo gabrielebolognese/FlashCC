@@ -29,6 +29,15 @@ export type Layer = {
   visible: boolean;
   locked: boolean;
 
+  /**
+   * Set the moment the user changes this layer, and never cleared.
+   *
+   * Regeneration keeps these and replaces everything else. Nothing infers it
+   * from the content: a layer deliberately restored to its original colour
+   * would silently lose its protection if it did.
+   */
+  handEdited?: boolean | undefined;
+
   fill: string;
   /** Painted instead of `fill` when set. Works on text as well as shapes. */
   gradient?: Gradient | undefined;

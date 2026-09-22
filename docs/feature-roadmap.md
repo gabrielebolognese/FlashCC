@@ -354,7 +354,7 @@ typefaces and a default format. Per-brand fonts are scoped but still capped at s
 
 ## Batch 4 — Batch creation, done properly
 
-**Status:** next
+**Status:** done
 **Size:** large
 **Why here:** this is the wedge. No tool in the market offers a human-writable batch format.
 Contentdrips comes closest and its API turns out to be a **renderer, not a splitter** — the caller
@@ -480,6 +480,43 @@ introduce live bindings.
 **Why:** Bulk Create varies content only, never design, and its outputs are 30 independent files
 with no shared handle. A brand tweak means 30 manual edits.
 
+### Built as
+
+All eight, plus two defects the work exposed.
+
+**4.5 turned out to be unimplementable as written, twice over.** First, `fit()`
+measured with the default sans metric and `applyFonts` ran afterwards, so a mono
+or serif theme was sized for one typeface and rendered in another — that is D1
+in `reference.md`, and Terminal overflowed three slides in four. Second, and only
+visible once D1 was fixed: the split pass measured each layer against **its own
+box**, and when `fit` runs out of ladder the layer is built at the height it
+needed. The box grows to match the overflow, so "does this fit its box" is
+answered yes by a slide visibly hanging off the canvas. The artboard is the only
+reference that cannot move.
+
+**The shrink allowance needed a floor, not a step count.** "One or two steps"
+assumed a short ladder; the generation ladders span 104→40 across twelve steps,
+where two steps is 104→92 and would chop hooks constantly. It floors at 60% of
+each composition's own top size instead — below that a slide stops reading as
+designed and starts reading as crammed.
+
+**The sameness constraint became a mechanism, not a note.** The composition cycle
+now starts at an offset derived from the deck's own words, so two different
+carousels get different rhythms and the same carousel twice gets the same one.
+A test builds twenty decks from one framework and asserts they do not all come
+out identical — which the first version of that test proved they did.
+
+**4.6 was built as specified** despite the concern raised before starting. It is
+genuinely useful in the editor, where "Re-lay" re-runs generation and keeps
+anything you touched. `handEdited` is set in the two mutation funnels rather than
+at call sites, and is never inferred from content — a layer deliberately restored
+to its original colour would otherwise silently lose its protection.
+
+**Also fixed in passing:** F1 from the reference (`Measure.family` was handed a
+CSS stack where a FONTS id was expected, in two callers, so both measured as
+sans) and D10 (bulk and sample decks never stamped `framework`, making them
+invisible to the attribution this batch exists to feed).
+
 ### 4.8 Data-driven export naming
 
 Canva already names files from a chosen column. Shipping without it is a visible regression.
@@ -488,7 +525,7 @@ Canva already names files from a chosen column. Shipping without it is a visible
 
 ## Batch 5 — The asset library
 
-**Status:** queued
+**Status:** next
 **Size:** large. The biggest engineering cost in this document — budget for it properly.
 **Why here:** it blocks brand logos, and the current model is actively wrong at scale.
 

@@ -20,6 +20,8 @@ export function buildFrameworkSamples(theme: Theme, options: BuildOptions = {}):
 
   return STRUCTURES.map((structure) => ({
     ...makeDoc(structure.name),
+    // Examples count too: they are real carousels a person may post.
+    framework: structure.id,
     palette,
     group: EXAMPLES_GROUP,
     slides: buildSlides(

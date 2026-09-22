@@ -11,6 +11,8 @@ import { useMemo, useState } from "react";
 import { LayerView } from "./LayerView.js";
 import type { Doc } from "./model.js";
 import { slidePaint } from "./paint.js";
+import { applyBrand, listBrands, themeOf } from "./brand.js";
+import { BrandMenu } from "./BrandMenu.js";
 import { detachDoc, listPosts, postFromDoc, type Post } from "./pipeline.js";
 import { ProjectFilters } from "./ProjectFilters.js";
 import { applyFilters, facetsOf, NO_FILTERS, type Filters } from "./search.js";
@@ -187,6 +189,36 @@ export function Projects({
 
       {docs.length > 0 ? (
         <div className="mt-12">
+          {/* Restyle everything currently in view, in one action. Bulk Create
+              varies content and never design, so a brand tweak across thirty
+              carousels is thirty manual edits there. Scoped to the filtered set
+              rather than the whole library, because "all of them" is rarely
+              what anyone means and is the hardest thing to undo. */}
+          {listBrands().length > 0 && visible.length > 0 ? (
+            <div className="mb-3 flex items-center gap-2">
+              <span className="text-caption text-tertiary">
+                Restyle the {visible.length} shown
+              </span>
+              <BrandMenu
+                brands={listBrands()}
+                onApply={(brand) => {
+                  let changed = 0;
+                  let skipped = 0;
+                  for (const summary of visible) {
+                    const full = loadDoc(summary.id);
+                    if (!full) continue;
+                    const out = applyBrand(full, brand, themeOf(full, listBrands()));
+                    saveDoc(out.doc);
+                    changed += out.changed;
+                    skipped += out.skipped;
+                  }
+                  refresh();
+                  return { doc: loadDoc(visible[0]?.id ?? "") ?? ({} as never), changed, skipped };
+                }}
+              />
+            </div>
+          ) : null}
+
           <ProjectFilters
             filters={filters}
             facets={facets}

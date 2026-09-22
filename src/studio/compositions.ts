@@ -12,7 +12,13 @@
  */
 import { makeLayer, makeSlide, type Layer, type Slide } from "./model.js";
 import type { Theme } from "./presets.js";
-import { clampY, fitToBox, ladder, type Measure } from "./text.js";
+import { clampY, fitToBox, ladder, lineCount, type Measure } from "./text.js";
+
+/**
+ * How far type may shrink before splitting is the better answer, as a fraction
+ * of the composition's own top size.
+ */
+const SHRINK_FLOOR = 0.6;
 
 const W = 1080;
 const H = 1350;
@@ -28,6 +34,17 @@ export type ImagePlacement = "above" | "below";
 
 /** `decor` scales every accent rule: 0 removes them, 1 is normal, 1.8 is bold. */
 type Ctx = { text: string; index: number; total: number; theme: Theme; decor: number };
+
+/**
+ * The face a layer will actually be given, so it can be measured in that face.
+ *
+ * Fitting happened with the default (sans) metric and applyFonts ran afterwards,
+ * so a mono or serif theme was sized for one typeface and then rendered in
+ * another. Mono measures 15% wider against a 2% safety margin, which overflowed
+ * three slides out of four on the Terminal style.
+ */
+const display = (t: Theme): Measure => ({ family: t.displayFont ?? "sans" });
+const body = (t: Theme): Measure => ({ family: t.bodyFont ?? t.displayFont ?? "sans" });
 
 /**
  * Fit text to a box by actually wrapping it.
@@ -46,7 +63,12 @@ function fit(
   return fitToBox(t, {
     maxWidth: box.w,
     maxHeight: box.h,
-    sizes: ladder(range[0], range[1]),
+    // The ladder stops well short of its own floor. Below roughly 60% of the
+    // top size a slide stops reading as designed and starts reading as crammed
+    // — which is the single loudest complaint about every tool in this
+    // category. Copy that needs to go lower does not get a smaller font; it
+    // overflows here on purpose, and buildSlides gives it another slide.
+    sizes: ladder(range[0], Math.max(range[1], Math.round(range[0] * SHRINK_FLOOR))),
     lineHeight,
     ...m,
   });
@@ -92,7 +114,7 @@ const TITLE: Composition = {
   build: ({ text: t, theme, decor }, r) => {
     const LH = 1.06;
     const RULE = decor > 0 ? 56 : 0; // rule + the air under it
-    const f = fit(t, { w: r.w, h: r.h - RULE }, [104, 40], LH, { letterSpacing: -0.02 });
+    const f = fit(t, { w: r.w, h: r.h - RULE }, [104, 40], LH, { ...display(theme), letterSpacing: -0.02 });
     // Sits in the upper third of its free space rather than on the floor of the
     // region: pinned to the bottom, a short hook stranded itself at the very edge
     // with a wall of dead space above it. A long one still grows upward from here.
@@ -119,7 +141,7 @@ const UNDERLINE: Composition = {
   build: ({ text: t, theme, decor }, r) => {
     const LH = 1.15;
     const RULE = decor > 0 ? 32 : 0;
-    const f = fit(t, { w: r.w, h: r.h - RULE }, [70, 30], LH);
+    const f = fit(t, { w: r.w, h: r.h - RULE }, [70, 30], LH, display(theme));
     return [
       text(t, { x: r.x, y: r.y, w: r.w, h: f.height }, theme.fg, {
         fontSize: f.fontSize,
@@ -146,8 +168,8 @@ const HEADING_BODY: Composition = {
     const GAP = 32;
     // The heading gets at most 40% of the region; the body takes what is left, so a
     // long heading cannot squeeze the body off the slide.
-    const hf = fit(head, { w: r.w, h: r.h * 0.4 }, [58, 30], 1.15);
-    const bf = fit(rest, { w: r.w, h: r.h - hf.height - GAP }, [40, 22], 1.45);
+    const hf = fit(head, { w: r.w, h: r.h * 0.4 }, [58, 30], 1.15, display(theme));
+    const bf = fit(rest, { w: r.w, h: r.h - hf.height - GAP }, [40, 22], 1.45, body(theme));
     const total = hf.height + GAP + bf.height;
     const y = clampY(centred(r, total), total, r.y, r.h);
     return [
@@ -173,7 +195,7 @@ const STATEMENT: Composition = {
   image: "below",
   build: ({ text: t, theme }, r) => {
     const LH = 1.18;
-    const f = fit(t, { w: r.w, h: r.h }, [76, 30], LH);
+    const f = fit(t, { w: r.w, h: r.h }, [76, 30], LH, display(theme));
     return [
       text(t, { x: r.x, y: clampY(centred(r, f.height), f.height, r.y, r.h), w: r.w, h: f.height }, theme.fg, {
         fontSize: f.fontSize,
@@ -194,7 +216,7 @@ const NUMBERED: Composition = {
     const LH = 1.4;
     const numH = 110;
     const HEAD = numH + 24 + 6 + 36; // numeral, tick and the air around them
-    const f = fit(t, { w: r.w, h: r.h - HEAD }, [46, 22], LH);
+    const f = fit(t, { w: r.w, h: r.h - HEAD }, [46, 22], LH, display(theme));
     const total = HEAD + f.height;
     const y = clampY(centred(r, total), total, r.y, r.h);
     return [
@@ -226,7 +248,7 @@ const QUOTE: Composition = {
   build: ({ text: t, theme, decor }, r) => {
     const LH = 1.25;
     const INDENT = 44;
-    const f = fit(t, { w: r.w - INDENT, h: r.h }, [62, 26], LH);
+    const f = fit(t, { w: r.w - INDENT, h: r.h }, [62, 26], LH, display(theme));
     const y = clampY(centred(r, f.height), f.height, r.y, r.h);
     return [
       ...(decor > 0
@@ -250,7 +272,7 @@ const BLOCK: Composition = {
   build: ({ text: t, theme }, r) => {
     const LH = 1.2;
     const MIN_PAD = 28;
-    const f = fit(t, { w: r.w, h: r.h - MIN_PAD * 2 }, [68, 26], LH);
+    const f = fit(t, { w: r.w, h: r.h - MIN_PAD * 2 }, [68, 26], LH, display(theme));
     const padY = Math.min(64, Math.max(MIN_PAD, (r.h - f.height) / 2));
     const blockH = Math.min(r.h, f.height + padY * 2);
     const y = clampY(centred(r, blockH), blockH, r.y, r.h);
@@ -274,7 +296,7 @@ const CAPS: Composition = {
   build: ({ text: t, theme }, r) => {
     const LH = 1.3;
     // Measured uppercased and tracked out, since that is what actually renders.
-    const m: Measure = { letterSpacing: 0.06, uppercase: true };
+    const m: Measure = { ...display(theme), letterSpacing: 0.06, uppercase: true };
     const f = fit(t, { w: r.w, h: r.h }, [56, 22], LH, m);
     return [
       text(t, { x: r.x, y: clampY(centred(r, f.height), f.height, r.y, r.h), w: r.w, h: f.height }, theme.fg, {
@@ -306,7 +328,31 @@ const BY_ROLE: Record<string, Composition> = {
   result: NUMBERED,
 };
 
-export function compositionFor(index: number, total: number, role?: string): Composition {
+/**
+ * A stable number from the deck's own words.
+ *
+ * Used to rotate where the composition cycle starts, which is the difference
+ * between "four frameworks" and "the same eight-slide layout every time" — the
+ * loudest one-star complaint about every tool in this category. Two different
+ * carousels get different rhythms; the same carousel twice gets the same one,
+ * because the seed is the content rather than a clock or a counter.
+ */
+export function seedOf(texts: readonly string[]): number {
+  let h = 0;
+  for (const t of texts) {
+    for (let i = 0; i < t.length; i += 1) {
+      h = (h * 31 + t.charCodeAt(i)) | 0;
+    }
+  }
+  return Math.abs(h);
+}
+
+export function compositionFor(
+  index: number,
+  total: number,
+  role?: string,
+  seed = 0,
+): Composition {
   if (role) {
     const pinned = BY_ROLE[role];
     if (pinned) {
@@ -314,12 +360,12 @@ export function compositionFor(index: number, total: number, role?: string): Com
       const prev = index > 0 ? compositionFor(index - 1, total) : null;
       if (!prev || prev.id !== pinned.id) return pinned;
     }
-    return CYCLE[(index - 1 + CYCLE.length) % CYCLE.length]!;
+    return CYCLE[(index - 1 + seed + CYCLE.length) % CYCLE.length]!;
   }
   if (index === 0) return TITLE;
   // A short last slide closes on the colour block — the one loud slide in the deck.
   if (index === total - 1 && total > 2) return BLOCK;
-  return CYCLE[(index - 1) % CYCLE.length]!;
+  return CYCLE[(index - 1 + seed) % CYCLE.length]!;
 }
 
 export const compositionLabel = (index: number, total: number, role?: string): string =>
@@ -366,7 +412,48 @@ export type BuildOptions = {
   images?: boolean | undefined;
   /** 0 removes accent rules, 1 is normal, 1.8 is bold. */
   decor?: number | undefined;
+  /**
+   * Set false to take the layout exactly as composed, overflow and all.
+   * Only the tests that assert on overflow want this.
+   */
+  split?: boolean | undefined;
 };
+
+/**
+ * Copy that does not fit gets ANOTHER SLIDE rather than a smaller font.
+ *
+ * Built, measured, and rebuilt with the offending entry split — rather than
+ * predicted up front — because the region a slide gets depends on which
+ * composition it lands on, which depends on how many slides there are, which is
+ * the thing splitting changes. Measuring the real output sidesteps the circle,
+ * and each pass strictly shrinks the worst slide, so it converges.
+ *
+ * The alternative is what every tool in this category does and what its users
+ * complain about loudest: shrink until it fits. `fit()` still shrinks — a couple
+ * of ladder steps is a reasonable accommodation — but it no longer falls to the
+ * floor silently and calls that a layout.
+ */
+const MAX_SPLIT_PASSES = 10;
+
+/**
+ * The first slide whose copy does not fit the ARTBOARD.
+ *
+ * Against the artboard rather than against the layer's own box, which is the
+ * subtle part: when `fit` runs out of ladder it returns the real height it
+ * needed, and the layer is built at that height. So the box grows to match the
+ * overflow and "does this fit its box" is answered yes by a slide that is
+ * visibly hanging off the bottom of the canvas. The board is the only reference
+ * that cannot move.
+ */
+function overflowingIndex(slides: Slide[]): number | null {
+  for (let i = 0; i < slides.length; i += 1) {
+    for (const l of slides[i]?.layers ?? []) {
+      if (l.kind !== "text" || !(l.text ?? "").trim()) continue;
+      if (l.y < -0.5 || l.y + l.h > H + 0.5) return i;
+    }
+  }
+  return null;
+}
 
 export function buildSlides(
   texts: string[],
@@ -374,17 +461,77 @@ export function buildSlides(
   roles?: string[],
   options: BuildOptions = {},
 ): Slide[] {
+  let entries = texts.map((t, i) => ({ text: t, role: roles?.[i] }));
+
+  let slides = layout(entries, theme, options);
+  if (options.split === false) return slides;
+
+  for (let pass = 0; pass < MAX_SPLIT_PASSES; pass += 1) {
+    const bad = overflowingIndex(slides);
+    if (bad === null) break;
+
+    const kept = entries.filter((e) => e.text.trim() !== "");
+    const target = kept[bad];
+    if (!target) break;
+
+    const pieces = splitAtMiddle(target.text);
+    if (pieces.length < 2) break;
+
+    // The role rides with the first piece only. A repeated slot would otherwise
+    // pin both halves to the same composition and print the same layout twice.
+    const at = entries.indexOf(target);
+    entries = [
+      ...entries.slice(0, at),
+      { text: pieces[0] ?? "", role: target.role },
+      ...pieces.slice(1).map((text) => ({ text, role: undefined })),
+      ...entries.slice(at + 1),
+    ];
+
+    slides = layout(entries, theme, options);
+  }
+
+  return slides;
+}
+
+/** One cut at the sentence boundary nearest the middle. Never rewords. */
+function splitAtMiddle(text: string): string[] {
+  const t = text.trim();
+  const breaks: number[] = [];
+  const re = /[.!?]["')\]]*\s+/g;
+  let m: RegExpExecArray | null;
+  while ((m = re.exec(t)) !== null) breaks.push(m.index + m[0].length);
+
+  if (breaks.length === 0) {
+    for (let i = 1; i < t.length - 1; i += 1) if (/\s/.test(t[i] ?? "")) breaks.push(i + 1);
+  }
+  const usable = breaks.filter((i) => i > 0 && i < t.length);
+  if (usable.length === 0) return [t];
+
+  const middle = t.length / 2;
+  const at = usable.reduce((a, b) => (Math.abs(a - middle) <= Math.abs(b - middle) ? a : b));
+  const head = t.slice(0, at).trim();
+  const tail = t.slice(at).trim();
+  return head && tail ? [head, tail] : [t];
+}
+
+function layout(
+  entries: { text: string; role: string | undefined }[],
+  theme: Theme,
+  options: BuildOptions,
+): Slide[] {
   const images = options.images ?? true;
   const decor = options.decor ?? 1;
 
   const kept: { text: string; role: string | undefined }[] = [];
-  texts.forEach((t, i) => {
-    if (t.trim()) kept.push({ text: t.trim(), role: roles?.[i] });
+  entries.forEach((e) => {
+    if (e.text.trim()) kept.push({ text: e.text.trim(), role: e.role });
   });
   if (kept.length === 0) return [makeSlide(theme.bg, "Slide 1")];
 
+  const seed = seedOf(kept.map((k) => k.text));
+
   return kept.map((k, i) => {
-    const comp = compositionFor(i, kept.length, k.role);
+    const comp = compositionFor(i, kept.length, k.role, seed);
     const { image, textRegion } = bandsFor(comp.image, images);
     const built = comp
       .build({ text: k.text, index: i, total: kept.length, theme, decor }, textRegion)

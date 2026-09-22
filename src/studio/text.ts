@@ -35,6 +35,14 @@ const MONO_ADVANCE = 0.6;
 const SAFETY = 1.02;
 
 export type Measure = {
+  /**
+   * A FONTS id — "sans", "serif", "mono" — NOT a CSS stack.
+   *
+   * FAMILY_SCALE is keyed by id, so handing this a stack makes every lookup miss
+   * and silently measures as sans. That was live in two callers and is exactly
+   * the kind of miss that shows up as text overflowing in production and fitting
+   * in the tests.
+   */
   family?: string | undefined;
   /** em, as stored on the layer */
   letterSpacing?: number | undefined;

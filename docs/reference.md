@@ -1008,7 +1008,11 @@ that would otherwise be lost:
 
 Found by reading the code for this document. Ordered by consequence. None are fixed.
 
-### D1 — Text is fitted with sans metrics, then restyled. Terminal overflows.
+> **D1, D10 and F1 are fixed** as of Batch 4. They are kept below with their
+> original text, because the reasoning is the useful part and a defect list that
+> silently loses its entries teaches nothing. Each carries a note.
+
+### D1 — ~~Text is fitted with sans metrics, then restyled. Terminal overflows.~~ FIXED
 
 `compositions.ts` fits every text layer through `fit()` with the **default** `Measure`, then maps
 `applyFonts` over the result. So the size is chosen using sans metrics and the layer is *then* given
@@ -1027,8 +1031,10 @@ overflows" guarantee currently holds for sans and serif, not for mono — and no
 `slab`, `elegant` or `impact`, which have no `FAMILY_SCALE` entry at all and silently take sans
 metrics. `impact` is condensed and `elegant` is a Didot; both will mis-fit.
 
-**Fix:** pass the family into `Measure` at fit time, and apply fonts before fitting rather than
-after.
+**Fixed in Batch 4:** every `fit()` call in `compositions.ts` now passes the face the layer will
+actually wear, and `Measure.family` is documented as taking a FONTS id rather than a CSS stack —
+which was the same bug in `split.ts` and `preflight.ts` (F1). `generation.test.ts` asserts every
+shipped style fits its own copy.
 
 ### D2 — Resizing a text layer compounds its font size
 
@@ -1090,7 +1096,12 @@ contradicting its own file header.
 composition branch. Quote prose and numbered body text all take the *display* face, despite the
 module comment saying prose takes the body face.
 
-### D10 — Samples and bulk decks are invisible to analytics
+### D10 — ~~Samples and bulk decks are invisible to analytics~~ FIXED
+
+**Fixed in Batch 4:** `buildDocs` and `buildFrameworkSamples` both stamp `framework`, and
+`buildDocs` takes a `styleId`.
+
+#### Original
 
 `buildFrameworkSamples` and `buildDocs` never stamp `doc.framework` or `doc.styleId`, so example and
 bulk carousels are excluded from the attribution that is the product's main differentiator — even

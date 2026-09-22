@@ -13,6 +13,7 @@ import {
 import type { Gradient } from "./gradient.js";
 import type { PlatformId } from "./platforms.js";
 import { reflowDoc } from "./reflow.js";
+import { markEdited } from "./regenerate.js";
 import { isUnnamed, nameFromDoc } from "./search.js";
 import { saveDoc } from "./storage.js";
 
@@ -115,7 +116,13 @@ export function useStudio(initial: Doc) {
     (ids: string[], patch: Partial<Layer>, coalesce?: string) => {
       patchSlide(
         index,
-        (s) => ({ ...s, layers: s.layers.map((l) => (ids.includes(l.id) ? { ...l, ...patch } : l)) }),
+        // markEdited here rather than at each call site: this and updateEach are
+        // the only two funnels an editor change can come through, so flagging
+        // them both is the whole of it.
+        (s) => ({
+          ...s,
+          layers: s.layers.map((l) => (ids.includes(l.id) ? markEdited({ ...l, ...patch }) : l)),
+        }),
         coalesce,
       );
     },
@@ -126,7 +133,7 @@ export function useStudio(initial: Doc) {
     (fn: (l: Layer) => Layer, ids: string[], coalesce?: string) => {
       patchSlide(
         index,
-        (s) => ({ ...s, layers: s.layers.map((l) => (ids.includes(l.id) ? fn(l) : l)) }),
+        (s) => ({ ...s, layers: s.layers.map((l) => (ids.includes(l.id) ? markEdited(fn(l)) : l)) }),
         coalesce,
       );
     },
