@@ -11,7 +11,8 @@ import Anthropic from "@anthropic-ai/sdk";
 import { zodOutputFormat } from "@anthropic-ai/sdk/helpers/zod";
 import { z } from "zod";
 
-import { HttpError, json, readJson } from "./http.js";
+import { bearer, HttpError, json, readJson } from "./http.js";
+import { requirePro } from "./supabase.js";
 
 const MODEL = "claude-opus-5";
 
@@ -81,6 +82,14 @@ async function run(body: DraftRequest) {
   return parsed;
 }
 
+/**
+ * Drafting, gated.
+ *
+ * This route spends money — an unauthenticated caller with the URL can run up an
+ * Anthropic bill with no ceiling, and until this batch one could. The plan check
+ * is second, after the key check, so somebody on a server with no key set gets
+ * told that rather than being sold an upgrade that would not help.
+ */
 export async function draft(req: IncomingMessage, res: ServerResponse): Promise<void> {
   if (!draftConfigured()) {
     throw new HttpError(
@@ -88,6 +97,8 @@ export async function draft(req: IncomingMessage, res: ServerResponse): Promise<
       "No ANTHROPIC_API_KEY. Copy .env.example to .env, add your key, and restart the server.",
     );
   }
+
+  await requirePro(bearer(req), "AI drafting");
 
   const body = await readJson<DraftRequest>(req);
   if (!body?.brief?.trim()) throw new HttpError(400, "Brief is empty");
@@ -155,6 +166,8 @@ export async function hooks(req: IncomingMessage, res: ServerResponse): Promise<
       "No ANTHROPIC_API_KEY. Copy .env.example to .env, add your key, and restart the server.",
     );
   }
+
+  await requirePro(bearer(req), "Hook variants");
 
   const body = await readJson<HookRequest>(req);
   const deck = Array.isArray(body?.deck) ? body.deck.filter((t) => t.trim()) : [];

@@ -12,7 +12,9 @@ import {
 } from "./model.js";
 import type { Gradient } from "./gradient.js";
 import type { PlatformId } from "./platforms.js";
+import { platformForSize } from "./platforms.js";
 import { reflowDoc } from "./reflow.js";
+import { fitToSafeArea } from "./safearea.js";
 import { markEdited } from "./regenerate.js";
 import { isUnnamed, nameFromDoc } from "./search.js";
 import { saveDoc } from "./storage.js";
@@ -258,7 +260,15 @@ export function useStudio(initial: Doc) {
   // content in the top two-thirds — see reflow.ts for why it is not a scale
   // either, and why it does not regenerate from the source text.
   const setFormat = useCallback(
-    (w: number, h: number) => commit(reflowDoc(doc, w, h)),
+    (w: number, h: number) => {
+      const reflowed = reflowDoc(doc, w, h);
+      // Reflow knows the new artboard; it does not know what the PLATFORM draws
+      // on top of it. A deck moved to 1080x1920 kept its 96px side margins and
+      // put every headline under TikTok's action rail. When the new size belongs
+      // to a platform, pull the content clear of its chrome as well.
+      const platform = platformForSize(w, h);
+      commit(platform ? fitToSafeArea(reflowed, platform) : reflowed);
+    },
     [commit, doc],
   );
 

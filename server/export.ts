@@ -10,7 +10,8 @@ import type { IncomingMessage, ServerResponse } from "node:http";
 
 import JSZip from "jszip";
 
-import { HttpError, json, readJson } from "./http.js";
+import { bearer, callerKey, HttpError, json, rateLimit, readJson } from "./http.js";
+import { requireCaller, requirePro } from "./supabase.js";
 import { renderPdf, renderSlides, type RenderRequest } from "./render.js";
 
 type ExportBody = RenderRequest & {
@@ -50,6 +51,9 @@ const send = (res: ServerResponse, type: string, filename: string, body: Buffer)
  * downloaded one are the same pixels.
  */
 export async function renderImages(req: IncomingMessage, res: ServerResponse): Promise<void> {
+  // Publishing already needs an account to upload the result anywhere, so
+  // requiring one here takes nothing away and closes an open Playwright route.
+  await requireCaller(bearer(req));
   const body = await readJson<RenderRequest>(req, 60_000_000);
   const slides = await renderSlides(body);
 
@@ -64,16 +68,47 @@ export async function renderImages(req: IncomingMessage, res: ServerResponse): P
  * takes one at a URL, so a published deck needs the file as well as the pages.
  */
 export async function renderDocument(req: IncomingMessage, res: ServerResponse): Promise<void> {
+  await requireCaller(bearer(req));
   const body = await readJson<RenderRequest>(req, 60_000_000);
   const pdf = await renderPdf(body);
   json(res, 200, { base64: pdf.toString("base64") });
 }
 
+/**
+ * How many full renders one address may ask for in a minute.
+ *
+ * A ten-slide deck is ten headless screenshots, so this is generous for a person
+ * and useless to a script. It exists because this route CANNOT require an
+ * account — see below.
+ */
+const EXPORTS_PER_MINUTE = 10;
+
 export async function exportDeck(req: IncomingMessage, res: ServerResponse): Promise<void> {
+  /*
+   * This is the one route that stays open, and the reason is the product rather
+   * than an oversight.
+   *
+   * "Make carousels and export them" IS the free tier, and CLAUDE.md commits to
+   * everything except drafting working with no key and no account at all.
+   * Requiring a bearer token here would break that to fix an abuse problem, so
+   * abuse is answered with a rate limit instead.
+   *
+   * The paid half is enforced separately and only on the image path: a bearer
+   * token is OPTIONAL, absent means PDF only, and present is checked.
+   */
+  rateLimit(`export:${callerKey(req)}`, EXPORTS_PER_MINUTE);
+
   const body = await readJson<ExportBody>(req, 60_000_000);
 
   if (body.output !== "pdf" && body.output !== "images") {
     throw new HttpError(400, "output must be pdf or images");
+  }
+
+  // Free is "PDF export"; Pro is "PNG and PDF export". The numbered-image path
+  // is the one that costs money, so it is the one that checks — and it checks on
+  // the SERVER, because the platform picker is a dropdown anyone can edit.
+  if (body.output === "images") {
+    await requirePro(bearer(req), "Exporting numbered images");
   }
 
   const name = slug(body.name);

@@ -994,7 +994,7 @@ cannot take back.
 
 ## Batch 9 — Make the paywall real
 
-**Status:** next
+**Status:** done
 **Size:** medium
 **Why here:** every feature the pricing screen sells is currently free, and five
 server routes answer to anyone. Written after an audit against the live database
@@ -1099,6 +1099,66 @@ taking money.
   person's volume; revisit when somebody has a library big enough to notice.
 - **Anything from `docs/reference.md` §29.** The defect list is separate work and
   mixing it in would make this batch impossible to judge.
+
+### Built as
+
+Four of the six. 9.1 and 9.6 are not mine to do — applying SQL and setting env
+vars are yours — so what shipped is everything that makes them safe to do, plus
+`npm run check:schema`, which probes the live project and names each unrun file.
+
+**The five open routes did not all get the same answer, and the plan was right
+that they should not.** `/api/draft` and `/api/hooks` spend money, so they need a
+caller AND a plan. `/api/slides` and `/api/document` already needed an account to
+upload their own output, so requiring one closes them for free. `/api/export`
+**stays open**, because "make carousels and export them" is the free tier and
+CLAUDE.md commits to it working with no key and no sign-in — breaking that to fix
+an abuse problem would be fixing the wrong thing. It gets a rate limit instead,
+and the paid half is enforced only on the numbered-image path, with an OPTIONAL
+bearer token: absent means PDF, present is checked.
+
+**402, not 403.** Payment Required is the one status that means exactly this, and
+the difference is the whole of 9.4: the client opens the pricing panel on a 402
+and shows an error on a 403. The panel is mounted at `App` level rather than in
+`Home`, because three of the five gated calls happen in the studio or a dialog
+above it and `App` swaps screens rather than nesting them.
+
+**`is_pro()` cannot be called from the server, and finding that out early
+mattered.** It is `security definer` and reads `auth.uid()`, which is null for
+the service role — so it would have answered false for everybody and the gate
+would have looked like it worked while refusing paying customers. The server
+reads `profiles.plan` through `readBilling` instead.
+
+**The rate limiter moved into `http.ts` and is keyed differently per route.**
+Export counts per address; review counts per SHARE TOKEN, because a review link
+is deliberately sent to a roomful of people who may all be behind one office NAT
+and one reviewer's enthusiasm must not lock out their colleagues.
+
+### And a bug the audit did not find
+
+Reported mid-batch, and worth recording here because it is the same shape of
+problem: **every generated carousel failed the pre-flight this product runs on
+it.** "Image reaches into the area Instagram covers with its own interface", on
+every slide of every deck. Three separate faults:
+
+1. **`M = 96` was smaller than Instagram's 135px inset.** One margin constant
+   served both axes, so clearing the top and bottom crop would have made every
+   slide needlessly narrow. Split into `MX = 96` and `MY = 140`.
+2. **The full-bleed exemption tested both axes at once.** A band spanning the
+   full width and a few hundred pixels tall — every framework's closing block —
+   was reported as a mistake. Now judged per axis (this was D4).
+3. **The message was wrong and the scope was wrong.** Instagram's box is a
+   profile-grid CROP, not an interface overlay, and the grid only ever shows the
+   cover — so warning about slide 7 described something that cannot happen.
+   `Platform` gained `safeKind` and `safeScope`.
+
+And a fourth thing no constant could fix: a deck reflowed to TikTok's 1080x1920
+kept its 96px side margins and put every headline under an action rail that
+covers the right 180px. `safearea.ts` pulls content clear of the destination's
+chrome on a format change — uniform scale, not per-axis clamping, because
+clamping each layer separately unaligns a composition that was aligned.
+
+**180 deck/platform combinations now produce zero safe-zone warnings**, and a
+test asserts it for every style and framework so it cannot regress.
 
 ---
 

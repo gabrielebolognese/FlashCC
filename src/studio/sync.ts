@@ -41,6 +41,7 @@ import { listAssets, saveAssets, type Asset } from "./assets.js";
 import { listBrands, saveBrands, type Brand } from "./brand.js";
 import { listClients, saveClients, type Client } from "./clients.js";
 import { forgetLibrary } from "./library.js";
+import { forgetAllVersions } from "./versions.js";
 import type { Doc } from "./model.js";
 import { listPosts, savePosts, type Post } from "./pipeline.js";
 import { dropDoc, listDocs, loadDoc, putDoc } from "./storage.js";
@@ -540,6 +541,10 @@ export function forgetLocal(): void {
   saveBrands([]);
   saveClients([]);
   forgetLibrary();
+  // Swept by prefix, because version keys are per document and there is no index
+  // to walk. Without this, signing out on a shared machine leaves whole
+  // documents behind for whoever signs in next.
+  forgetAllVersions();
   clearAllTombstones();
   clearCursor();
 }

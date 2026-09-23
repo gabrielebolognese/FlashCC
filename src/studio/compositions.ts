@@ -22,8 +22,28 @@ const SHRINK_FLOOR = 0.6;
 
 const W = 1080;
 const H = 1350;
-const M = 96;
-const COL = W - M * 2;
+
+/**
+ * The margin is split by AXIS, and the vertical one is the larger.
+ *
+ * It used to be one number, 96, and that number was smaller than Instagram's
+ * safe inset — so every generated carousel failed its own pre-flight with
+ * "reaches into the area Instagram covers", on every slide. A template that
+ * cannot pass the check the same product runs on it is not a template.
+ *
+ * Instagram crops a 4:5 post to a centred square for the profile grid, which
+ * takes (1350 - 1080) / 2 = 135 from the top and the bottom and NOTHING from the
+ * sides. So the vertical margin has to clear 135 and the horizontal one does
+ * not — one constant could only satisfy both by making every slide needlessly
+ * narrow.
+ *
+ * 140 rather than 135 exactly: a margin equal to the boundary is a rounding
+ * error away from crossing it, and a warning that fires on half your decks is a
+ * warning people learn to ignore.
+ */
+const MX = 96;
+const MY = 140;
+const COL = W - MX * 2;
 
 /** How much height the image band takes, and the air between it and the text. */
 const BAND = 430;
@@ -376,19 +396,19 @@ export function bandsFor(
   placement: ImagePlacement,
   withImage = true,
 ): { image: Region; textRegion: Region } {
-  const innerH = H - M * 2;
-  const full = { x: M, y: M, w: COL, h: innerH };
+  const innerH = H - MY * 2;
+  const full = { x: MX, y: MY, w: COL, h: innerH };
   // No pictures: the text gets the whole safe box rather than a band of dead space.
   if (!withImage) return { image: full, textRegion: full };
   if (placement === "above") {
     return {
-      image: { x: M, y: M, w: COL, h: BAND },
-      textRegion: { x: M, y: M + BAND + BAND_GAP, w: COL, h: innerH - BAND - BAND_GAP },
+      image: { x: MX, y: MY, w: COL, h: BAND },
+      textRegion: { x: MX, y: MY + BAND + BAND_GAP, w: COL, h: innerH - BAND - BAND_GAP },
     };
   }
   return {
-    image: { x: M, y: H - M - BAND, w: COL, h: BAND },
-    textRegion: { x: M, y: M, w: COL, h: innerH - BAND - BAND_GAP },
+    image: { x: MX, y: H - MY - BAND, w: COL, h: BAND },
+    textRegion: { x: MX, y: MY, w: COL, h: innerH - BAND - BAND_GAP },
   };
 }
 

@@ -270,7 +270,8 @@ export function restoreSlide(doc: Doc, version: Version, index: number): Doc {
  * document's worth. One key for the lot would mean reading and rewriting every
  * version of every project to add a single entry.
  */
-const KEY = (docId: string) => `flashcc:v1:versions:${docId}`;
+const PREFIX = "flashcc:v1:versions:";
+const KEY = (docId: string) => `${PREFIX}${docId}`;
 
 export function listVersions(docId: string): Version[] {
   try {
@@ -312,6 +313,38 @@ export function removeVersion(docId: string, id: string): Version[] {
   const next = listVersions(docId).filter((v) => v.id !== id);
   saveVersions(docId, next);
   return next;
+}
+
+/**
+ * Which stored keys are version history.
+ *
+ * Pure, and separated from the sweep below only so it can be tested — the sweep
+ * itself is three lines of localStorage and nothing worth asserting about.
+ */
+export const versionKeysIn = (keys: readonly string[]): string[] =>
+  keys.filter((k) => k.startsWith(PREFIX));
+
+/**
+ * Everything, for sign-out.
+ *
+ * `forgetLocal` clears docs, posts, brands, clients, assets and tombstones, and
+ * used not to clear these — so signing out on a shared machine left whole
+ * documents in localStorage for whoever signed in next. The keys are per
+ * document, so there is no index to walk: the store has to be swept by prefix.
+ */
+export function forgetAllVersions(): void {
+  try {
+    const keys: string[] = [];
+    for (let i = 0; i < localStorage.length; i += 1) {
+      const k = localStorage.key(i);
+      if (k) keys.push(k);
+    }
+    // Collected first, then removed: removing while enumerating shifts the
+    // indices underneath the loop and silently skips every other key.
+    for (const k of versionKeysIn(keys)) localStorage.removeItem(k);
+  } catch {
+    /* Nothing to do, and nothing that should stop a sign-out. */
+  }
 }
 
 /** Deleting a project takes its history with it. Nothing else references them. */

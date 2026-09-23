@@ -64,6 +64,32 @@ export async function requireCaller(token: string | null): Promise<Caller> {
 
 export type PlanName = "free" | "pro" | "agency";
 
+/**
+ * A verified caller who is also on a paid plan.
+ *
+ * **402, not 403.** Payment Required is the one status code that means exactly
+ * this, and the difference matters downstream: the client opens the pricing
+ * panel on a 402 and shows an error on a 403, so using the wrong one turns an
+ * upgrade prompt into "Drafting failed (403)".
+ *
+ * The plan is read from `profiles` with the service key rather than by calling
+ * `is_pro()`. That function is `security definer` and reads `auth.uid()`, which
+ * is null for the service role — so it would answer false for everybody and the
+ * gate would look like it worked while refusing paying customers.
+ */
+export async function requirePro(
+  token: string | null,
+  feature: string,
+): Promise<Caller & { plan: PlanName }> {
+  const caller = await requireCaller(token);
+  const { plan } = await readBilling(caller.id);
+
+  if (plan === "free") {
+    throw new HttpError(402, `${feature} is part of Pro.`);
+  }
+  return { ...caller, plan };
+}
+
 export type PlanUpdate = {
   plan: PlanName;
   stripeCustomerId?: string | undefined;

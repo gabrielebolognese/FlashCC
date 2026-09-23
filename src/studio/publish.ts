@@ -19,7 +19,9 @@
  * thing being asked for. See 04-storage.sql.
  */
 
+import { authHeader } from "./billing.js";
 import { publicUrl, SLIDES_BUCKET, storageReady, uploadObject } from "./cloud.js";
+import { readRefusal } from "./gate.js";
 import { renderPayload } from "./exporter.js";
 import type { Doc } from "./model.js";
 import type { Platform } from "./platforms.js";
@@ -45,21 +47,16 @@ function decode(base64: string): Uint8Array {
 async function postSlides(payload: unknown): Promise<RenderedResponse> {
   const response = await fetch("/api/slides", {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
+    // Publishing already needs an account to upload the result, so the token is
+    // always available here — this closes the route, it does not narrow it.
+    headers: await authHeader(),
     // `output` is meaningless to this route — it always returns images — but the
     // payload is shared with the download path and trimming it here would mean
     // two shapes to keep in step.
     body: JSON.stringify(payload),
   });
 
-  if (!response.ok) {
-    const problem: unknown = await response.json().catch(() => null);
-    const message =
-      problem && typeof problem === "object" && "error" in problem
-        ? String((problem as { error: unknown }).error)
-        : `Render failed (${response.status})`;
-    throw new Error(message);
-  }
+  if (!response.ok) throw await readRefusal(response);
 
   return (await response.json()) as RenderedResponse;
 }
@@ -76,7 +73,7 @@ async function renderDocumentPdf(payload: unknown): Promise<Uint8Array | null> {
   try {
     const response = await fetch("/api/document", {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: await authHeader(),
       body: JSON.stringify(payload),
     });
     if (!response.ok) return null;

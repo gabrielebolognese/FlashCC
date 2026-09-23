@@ -75,6 +75,10 @@ it should stay deleted. That second half is the one that catches real bugs.
 | `06-clients.sql` | Now. The `clients` table, the tier limit, and `client_id` on four tables. |
 | `07-review.sql` | Now. Review links and comments. **Required** — review has no offline half. |
 | `08-pipeline-fields.sql` | Now. Five planning fields on `posts`, and one billing boolean. |
+| `09-gates.sql` | **After Stripe**, with `02-pro-gate.sql`. Review links become Pro. |
+
+Run `npm run check:schema` at any point: it probes the live project with the
+publishable key and names every migration that has not been applied.
 
 ## 6. The asset library (`04-storage.sql`)
 

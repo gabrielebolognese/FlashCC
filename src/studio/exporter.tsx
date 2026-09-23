@@ -19,6 +19,8 @@
  */
 import { renderToStaticMarkup } from "react-dom/server";
 
+import { authHeader } from "./billing.js";
+import { readRefusal } from "./gate.js";
 import { listCustomFonts } from "./fonts.js";
 import { inlineDoc, inlineSources } from "./inline.js";
 import { LayerView } from "./LayerView.js";
@@ -99,24 +101,31 @@ export type ExportResult =
 export async function exportDeck(doc: Doc, platform: Platform): Promise<ExportResult> {
   const body = await renderPayload(doc, platform);
 
+  /*
+   * The token is OPTIONAL on this one call, and that is the whole design.
+   *
+   * PDF export is the free tier and works with no account at all, so a missing
+   * session must not stop the request — it just means the server will refuse the
+   * numbered-image path. Sent when there is one, omitted when there is not.
+   */
+  let headers: Record<string, string> = { "Content-Type": "application/json" };
+  try {
+    headers = await authHeader();
+  } catch {
+    /* Signed out. PDF still works; images will come back 402. */
+  }
+
   let response: Response;
   try {
-    response = await fetch("/api/export", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(body),
-    });
+    response = await fetch("/api/export", { method: "POST", headers, body: JSON.stringify(body) });
   } catch {
     return { ok: false, error: "Could not reach the export server. Is it running?" };
   }
 
   if (!response.ok) {
-    const problem: unknown = await response.json().catch(() => null);
-    const message =
-      problem && typeof problem === "object" && "error" in problem
-        ? String((problem as { error: unknown }).error)
-        : `Export failed (${response.status})`;
-    return { ok: false, error: message };
+    // Opens the pricing panel on a 402 as a side effect, and still returns the
+    // message so the dialog has something to show in place.
+    return { ok: false, error: (await readRefusal(response)).message };
   }
 
   const blob = await response.blob();

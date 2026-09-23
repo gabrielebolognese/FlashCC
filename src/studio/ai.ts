@@ -1,3 +1,5 @@
+import { authHeader } from "./billing.js";
+import { readRefusal } from "./gate.js";
 import type { Structure } from "./structures.js";
 
 export type DraftedSlide = { role: string; text: string };
@@ -13,7 +15,10 @@ export async function draftSlides(
 ): Promise<DraftedSlide[]> {
   const res = await fetch("/api/draft", {
     method: "POST",
-    headers: { "content-type": "application/json" },
+    // Drafting is Pro and the server checks the plan, so the token goes with it.
+    // `authHeader` throws "Sign in first" when there is no session, which is the
+    // honest answer before a round trip rather than after one.
+    headers: await authHeader(),
     ...(signal ? { signal } : {}),
     body: JSON.stringify({
       brief,
@@ -30,16 +35,9 @@ export async function draftSlides(
     }),
   });
 
+  if (!res.ok) throw await readRefusal(res);
+
   const body: unknown = await res.json().catch(() => null);
-
-  if (!res.ok) {
-    const message =
-      body && typeof body === "object" && "error" in body
-        ? String((body as { error: unknown }).error)
-        : `Drafting failed (${res.status})`;
-    throw new Error(message);
-  }
-
   const slides = (body as { slides?: DraftedSlide[] } | null)?.slides;
   if (!Array.isArray(slides) || slides.length === 0) throw new Error("No slides came back");
   return slides;

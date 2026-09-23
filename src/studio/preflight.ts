@@ -46,14 +46,40 @@ const measureOf = (l: Layer): Measure => ({
 const isText = (l: Layer): boolean => l.kind === "text" && (l.text ?? "").trim() !== "";
 
 /**
- * A layer counts as intruding only if it actually overlaps the covered band —
- * touching the boundary is fine, and a full-bleed background is not a mistake.
+ * Does this layer cross into the band, on an axis where crossing is a mistake?
+ *
+ * Full bleed is judged PER AXIS, and that is the fix for a whole class of false
+ * positives. The old test asked whether a layer bled on both axes at once, which
+ * assumed symmetric insets and missed the commonest deliberate shape in the
+ * whole product: a band that spans the full width and is a few hundred pixels
+ * tall. Every CTA block in every framework is one, and every one of them was
+ * reported as a mistake.
+ *
+ * Bleeding on an axis is a decision. Stopping just short of the edge on that
+ * axis is the thing worth mentioning.
  */
-function intrudes(l: Layer, box: { x: number; y: number; w: number; h: number }): boolean {
-  const bleeds = l.w >= box.w + box.x * 2 - 1 && l.h >= box.h + box.y * 2 - 1;
-  if (bleeds) return false;
-  return l.x < box.x || l.y < box.y || l.x + l.w > box.x + box.w || l.y + l.h > box.y + box.h;
+function intrudes(
+  l: Layer,
+  box: { x: number; y: number; w: number; h: number },
+  width: number,
+  height: number,
+): boolean {
+  // Half a pixel of tolerance, because a layer laid out at exactly the artboard
+  // edge can land at 1079.9997 after a reflow and is not a different design.
+  const bleedsX = l.x <= 0.5 && l.x + l.w >= width - 0.5;
+  const bleedsY = l.y <= 0.5 && l.y + l.h >= height - 0.5;
+
+  const crossesX = !bleedsX && (l.x < box.x || l.x + l.w > box.x + box.w);
+  const crossesY = !bleedsY && (l.y < box.y || l.y + l.h > box.y + box.h);
+
+  return crossesX || crossesY;
 }
+
+/** What to say about it, which depends on what the band actually is. */
+const safeZoneMessage = (name: string, platform: Platform): string =>
+  platform.safeKind === "crop"
+    ? `"${name}" sits in the part ${platform.label} crops off in the profile grid. It is fine in the feed; it is the cover thumbnail that loses it.`
+    : `"${name}" reaches into the area ${platform.label} covers with its own interface.`;
 
 export function preflight(doc: Doc, platform: Platform): Finding[] {
   const out: Finding[] = [];
@@ -159,13 +185,18 @@ export function preflight(doc: Doc, platform: Platform): Finding[] {
         });
       }
 
-      if (intrudes(l, box)) {
+      // A crop that only the profile grid performs can only affect the slide the
+      // grid shows. Reporting it on slide 7 described something that cannot
+      // happen, and drowned the one slide where it can.
+      const inScope = platform.safeScope === "all" || i === 0;
+
+      if (inScope && intrudes(l, box, doc.width, doc.height)) {
         add({
           severity: "warn",
           code: "outside-safe-zone",
           slide: n,
           layerId: l.id,
-          message: `"${l.name}" reaches into the area ${platform.label} covers with its own interface.`,
+          message: safeZoneMessage(l.name, platform),
         });
       }
     }

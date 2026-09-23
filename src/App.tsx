@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 
 import { AiChat } from "./studio/AiChat.js";
 import { BulkCreate } from "./studio/BulkCreate.js";
@@ -11,6 +11,9 @@ import { FirstRun } from "./studio/FirstRun.js";
 import { Home } from "./studio/Home.js";
 import { Repurpose } from "./studio/Repurpose.js";
 import { ReviewLink } from "./studio/ReviewLink.js";
+import { onPaywall } from "./studio/gate.js";
+import { sessionPlan, sessionUserId } from "./studio/session.js";
+import { Upgrade } from "./studio/Upgrade.js";
 import { tokenFromPath } from "./studio/sharing.js";
 import { Frameworks } from "./studio/Frameworks.js";
 import { makeDoc, type Doc } from "./studio/model.js";
@@ -57,11 +60,56 @@ type Screen =
  */
 const REVIEW_TOKEN = typeof window === "undefined" ? null : tokenFromPath(window.location.pathname);
 
+/**
+ * The pricing panel, mounted where every screen can reach it.
+ *
+ * Three of the five gated calls happen in `Studio` or in a dialog above it, and
+ * `Home` — which owns the panel normally — is a different screen entirely since
+ * `App` swaps rather than nests. So a second mount lives here, driven by the
+ * channel in `gate.ts`, and it is the only thing that works from everywhere.
+ *
+ * It reads the plan from `session.ts` rather than from `useAccount`, because
+ * `App` has no account context and adding one to mount a modal would be a lot of
+ * wiring for a panel that is right about the plan either way — the server is the
+ * boundary, this is the offer.
+ */
+function PaywallPrompt() {
+  const [feature, setFeature] = useState<string | null>(null);
+
+  useEffect(() => onPaywall(setFeature), []);
+
+  if (feature === null) return null;
+  return (
+    <Upgrade
+      plan={sessionPlan()}
+      signedIn={sessionUserId() !== null}
+      // The billing portal needs a Stripe customer, which this mount cannot know
+      // about. Showing the button and having it fail would be worse than the
+      // person opening the panel again from the rail, where it is known.
+      manageable={false}
+      onSignIn={() => setFeature(null)}
+      onClose={() => setFeature(null)}
+    />
+  );
+}
+
 export function App() {
   // A stranger with a link gets the review page and nothing else — no onboarding,
-  // no welcome, no account prompt. See Review.tsx.
+  // no welcome, and emphatically no pricing panel. See ReviewLink.tsx.
   if (REVIEW_TOKEN) return <ReviewLink token={REVIEW_TOKEN} />;
 
+  // The prompt sits OUTSIDE the screen switch so a 402 from the studio, a dialog
+  // or the compose flow all reach the same panel. `Screens` returns early a
+  // dozen times; wrapping is the only way to be present for all of them.
+  return (
+    <>
+      <Screens />
+      <PaywallPrompt />
+    </>
+  );
+}
+
+function Screens() {
   // First run gets the welcome; everyone else goes straight in.
   const [screen, setScreen] = useState<Screen>(() =>
     hasOnboarded() ? { view: "start" } : { view: "welcome" },

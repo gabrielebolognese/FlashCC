@@ -52,6 +52,29 @@ export type Platform = {
   /** What the native app accepts, when it is more. The gap is a trap. */
   appMaxSlides?: number | undefined;
   safe: SafeZone;
+  /**
+   * What the safe box actually IS, which decides what to say about it.
+   *
+   * "interface" — platform chrome is drawn on top: an author name, a slide
+   * counter, an action rail. Content under it is genuinely obscured.
+   *
+   * "crop" — nothing is drawn on top and nothing is obscured. The image is
+   * CUT, somewhere specific, and only there.
+   *
+   * These were one thing until a bug report, and the message said "covers with
+   * its own interface" for both — which is simply untrue of Instagram and sent
+   * people looking for an overlay that does not exist.
+   */
+  safeKind: "interface" | "crop";
+  /**
+   * Which slides it applies to.
+   *
+   * "all" for chrome, because chrome is on every slide. "first" for Instagram,
+   * because the thing doing the cropping is the PROFILE GRID and the grid only
+   * ever shows the cover — warning about slides 2 to 10 was reporting a
+   * consequence that cannot happen.
+   */
+  safeScope: "all" | "first";
   /** Below these, type stops surviving the platform's compression. */
   minBodyPt: number;
   minHeadingPt: number;
@@ -75,6 +98,8 @@ export const PLATFORMS: Platform[] = [
     maxSlides: 300,
     // Author name sits over the top, the slide counter and arrows over the bottom.
     safe: { top: 80, right: 40, bottom: 80, left: 40 },
+    safeKind: "interface",
+    safeScope: "all",
     minBodyPt: 18,
     minHeadingPt: 24,
     minStrokePx: 2,
@@ -95,6 +120,9 @@ export const PLATFORMS: Platform[] = [
     // Not UI: the profile grid crops 4:5 to a centred square, so (1350-1080)/2
     // at top and bottom is invisible to anyone browsing your profile.
     safe: { top: 135, right: 0, bottom: 135, left: 0 },
+    // A crop, not an overlay, and only on the cover — see the field docs above.
+    safeKind: "crop",
+    safeScope: "first",
     minBodyPt: 18,
     minHeadingPt: 24,
     minStrokePx: 2,
@@ -114,6 +142,8 @@ export const PLATFORMS: Platform[] = [
     // Caption, username, music ticker and nav eat the bottom; the action rail
     // covers the right edge.
     safe: { top: 100, right: 180, bottom: 480, left: 40 },
+    safeKind: "interface",
+    safeScope: "all",
     minBodyPt: 20,
     minHeadingPt: 28,
     minStrokePx: 2,

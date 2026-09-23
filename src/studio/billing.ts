@@ -18,7 +18,14 @@ export type BillingStatus = {
   manageable: boolean;
 };
 
-async function authHeader(): Promise<Record<string, string>> {
+/**
+ * The bearer token, for any call the server gates.
+ *
+ * Exported since Batch 9: five routes outside billing now need it, and a second
+ * copy of this would be a second place for the "Sign in first" wording and the
+ * session lookup to drift.
+ */
+export async function authHeader(): Promise<Record<string, string>> {
   const db = cloud();
   if (!db) throw new Error("Sign in first");
 

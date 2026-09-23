@@ -17,6 +17,8 @@
  * every other slide came from, so type scale and composition stay deterministic.
  */
 
+import { authHeader } from "./billing.js";
+import { readRefusal } from "./gate.js";
 import type { Structure } from "./structures.js";
 
 export type HookVariant = {
@@ -44,7 +46,7 @@ export async function draftHooks(
 ): Promise<HookVariant[]> {
   const res = await fetch("/api/hooks", {
     method: "POST",
-    headers: { "content-type": "application/json" },
+    headers: await authHeader(),
     ...(signal ? { signal } : {}),
     body: JSON.stringify({
       hook,
@@ -54,16 +56,9 @@ export async function draftHooks(
     }),
   });
 
+  if (!res.ok) throw await readRefusal(res);
+
   const body: unknown = await res.json().catch(() => null);
-
-  if (!res.ok) {
-    const message =
-      body && typeof body === "object" && "error" in body
-        ? String((body as { error: unknown }).error)
-        : `Could not write hooks (${res.status})`;
-    throw new Error(message);
-  }
-
   const hooks = (body as { hooks?: HookVariant[] } | null)?.hooks;
   if (!Array.isArray(hooks) || hooks.length === 0) throw new Error("No hooks came back");
   return hooks;

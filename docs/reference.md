@@ -347,6 +347,23 @@ easier and silently deletes every hand-drawn shape, moved block and placed image
 `verticalFill` exists purely for the tests: *"everything is inside the artboard"* passes for the
 broken version too, because stranded content overflows nothing.
 
+### Clearing the destination's chrome (`safearea.ts`)
+
+`reflow.ts` knows the new artboard. It does not know what the PLATFORM draws on top of it — so a
+deck reflowed to 1080x1920 kept its 96px side margins and put every headline under TikTok's action
+rail, which covers the right 180px of every slide.
+
+`fitToSafeArea(doc, platform)` runs after the reflow in `setFormat`, when the new size belongs to a
+platform. One **uniform** scale plus a translate, applied to everything that is not deliberately
+full-bleed — clamping each layer into the box separately would move a headline and the rule beneath
+it by different amounts and unalign a composition that was aligned.
+
+Font size scales with the box and is **floored**, not rounded: the box shrinks by exactly `scale`,
+so a font rounded up is proportionally larger than the box it now sits in, and one extra wrapped
+line pushes the layer out the bottom.
+
+`safeScope` is honoured, so Instagram's crop only ever moves the cover.
+
 ---
 
 ## 10. The four frameworks
@@ -428,6 +445,13 @@ every framework has a repeatable slot.
 4. The image placeholder is **layer 0 (back)**, so it and the text cannot hide each other.
 
 ### Geometry
+
+**The margin is split by axis**: `MX = 96`, `MY = 140`. One constant served both until Batch 9, and
+96 is smaller than Instagram's 135px crop — so every generated carousel failed its own pre-flight.
+A single constant could only clear 135 by making every slide needlessly narrow, since Instagram
+takes nothing from the sides. 140 rather than 135 exactly, because a margin equal to the boundary is
+a rounding error away from crossing it.
+
 
 `W 1080 · H 1350 · M 96 · COL 888 · BAND 430 · BAND_GAP 56`, inner height 1158.
 
@@ -1168,6 +1192,22 @@ box. Warnings: the app-vs-API slide gap, wrong artboard size, placeholder copy, 
 anything reaching into a safe zone, a weak hook on slide 1, and — after rendering — a file outside
 the byte band.
 
+**The safe box is not one thing.** `Platform` carries `safeKind` and `safeScope`, because the
+insets mean different things and apply to different slides:
+
+| Platform | Kind | Scope | What it actually is |
+| --- | --- | --- | --- |
+| LinkedIn | `interface` | `all` | author name on top, slide counter and arrows at the bottom |
+| TikTok | `interface` | `all` | action rail right, caption and nav bottom |
+| Instagram | **`crop`** | **`first`** | the profile grid crops 4:5 to a centred square — nothing is drawn over it, and the grid only ever shows the cover |
+
+Both of those were wrong until Batch 9, and together they made every generated carousel fail: the
+message said "covers with its own interface" for a crop, and it fired on all ten slides for a
+constraint that can only reach slide 1.
+
+**Full bleed is judged per axis.** A layer spanning the full width is a decision, not a mistake —
+every framework's closing block is one, and the old both-axes test reported all of them (D4).
+
 **Blocks block; warnings do not.** A tool that refuses to export because a stroke is 1px is a tool
 people route around. The overflow message names another slide as the remedy and names shrinking as
 the thing not to do, because shrink-to-fit is the complaint rather than the fix.
@@ -1338,6 +1378,33 @@ the session carries a snapshot and the subscription carries the truth.
 Stripe returns the browser before the webhook necessarily lands, so the app polls the profile for
 about 20 seconds and says "turning your plan on" rather than showing Free to somebody who has just
 paid.
+
+### What is gated, and where
+
+Every paid boundary is a Postgres policy or a check in `server/`. The interface explains the
+boundary before the database refuses; it is never the boundary itself, because the publishable key
+is in the bundle by design and anyone can POST to PostgREST with it.
+
+| Feature | Enforced by |
+| --- | --- |
+| Cloud pipeline (`posts` writes) | `02-pro-gate.sql` — INSERT/UPDATE require `is_pro()` |
+| Brand count | `03-brands.sql` — INSERT policy, allowance by plan |
+| Client count | `06-clients.sql` — INSERT policy, allowance by plan |
+| Review links | `09-gates.sql` — INSERT on `shares` requires `is_pro()` |
+| AI drafting, hook variants | `server/draft.ts` — `requirePro()` → **402** |
+| Numbered image export | `server/export.ts` — `requirePro()` → **402** |
+
+And what is deliberately ungated: the editor, every framework and style, localStorage, document
+sync, PDF export, and being a reviewer on somebody else's link (invariant 6).
+
+**`is_pro()` is not callable from the server.** It is `security definer` and reads `auth.uid()`,
+which is null for the service role — it would answer false for everybody and refuse paying
+customers while looking like it worked. `server/` reads `profiles.plan` through `readBilling`.
+
+**402, not 403.** Payment Required is the one status that means this, and `gate.ts` turns it into a
+`PaywallError` that opens the pricing panel; every other status stays an ordinary error shown in
+place. The panel is mounted at `App` level because three of the five gated calls happen in the
+studio or a dialog above it, and `App` swaps screens rather than nesting them.
 
 ### Honest billing, said out loud
 
@@ -1568,7 +1635,13 @@ never checks that the block does too.
 
 **Fix:** block at `appMaxSlides ?? maxSlides`.
 
-### D4 — `intrudes()` assumes symmetric safe-zone insets
+### D4 — ~~`intrudes()` assumes symmetric safe-zone insets~~ FIXED
+
+**Fixed in Batch 9**, and it was worse than recorded: the both-axes test meant every framework's
+full-width closing block was reported as a mistake, on every deck. Full bleed is now judged per
+axis in `preflight.ts`, and `safearea.ts` uses the same rule.
+
+#### Original
 
 It tests `l.w >= box.w + box.x * 2 - 1`, using the left inset twice. TikTok's insets are 40 left and
 180 right, 100 top and 480 bottom, so the effective full-bleed threshold is 939×1539 rather than
@@ -1703,6 +1776,31 @@ with fifteen clients will notice.
 
 **Fix:** pass the selection into both screens and filter with `belongsTo`, keeping unscoped assets
 visible everywhere.
+
+### D26 — Reflow to a taller artboard overflows text
+
+Reflowing a 1080x1350 deck to TikTok's 1080x1920 produces 13 `text-overflows` findings across 60
+style/framework combinations. Measured before and after the safe-area pass and it is unchanged by
+it — this is `reflowDoc` re-laying vertically without re-fitting the type to the new box.
+
+`compositions.ts` splits and shrinks to fit at generation time; `reflow.ts` does neither, so a
+layer that grew taller in the new proportions simply hangs out of its box.
+
+**Fix:** run the same `fit`/`splitToFit` pass over reflowed text that generation uses, or re-run
+generation against the new artboard when the deck still carries its source copy. The second is
+closer to the grain of the product — see `regenerate.restateSlide`.
+
+### D27 — TikTok's caption band is too big for a re-laid deck to respect
+
+TikTok's safe box reserves 480px at the bottom and 180px on the right of 1080x1920. `safearea.ts`
+pulls content clear, but a deck composed for 1350 and then squeezed into that box is scaled toward
+0.8 — legible, and not what anybody would have designed.
+
+The real answer is size-aware generation, which `CLAUDE.md` already lists as not built: compositions
+take `W`/`H` as module constants and only ever target 1080x1350.
+
+**Fix:** parameterise `compositions.ts` on the artboard, so a TikTok deck is composed for 1920 rather
+than reflowed into it.
 
 ### D21 — Scheduler column names are unverified against live templates
 

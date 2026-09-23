@@ -34,7 +34,7 @@
 import type { IncomingMessage, ServerResponse } from "node:http";
 import { randomUUID } from "node:crypto";
 
-import { HttpError, json, readJson } from "./http.js";
+import { HttpError, json, rateLimit, readJson } from "./http.js";
 import { serviceClient } from "./supabase.js";
 
 /** Mirrors `review.ts` in the browser. Both halves have to agree, so both say so. */
@@ -43,31 +43,15 @@ const MAX_AUTHOR_CHARS = 60;
 const MAX_COMMENTS_PER_SHARE = 500;
 const MAX_NOTE_CHARS = 2000;
 
-/** Crude, in-process, and enough. A real limiter belongs at the edge, not here. */
-const WINDOW_MS = 60_000;
+/**
+ * Counted per SHARE TOKEN rather than per address.
+ *
+ * A review link is deliberately sent to a roomful of people who may all be
+ * behind one office NAT, so limiting by address would have one reviewer's
+ * enthusiasm lock out their colleagues. The token is the conversation, and the
+ * conversation is the thing worth bounding.
+ */
 const MAX_WRITES_PER_WINDOW = 20;
-const writes = new Map<string, { n: number; until: number }>();
-
-function rateLimit(token: string): void {
-  const now = Date.now();
-  const hit = writes.get(token);
-
-  if (!hit || hit.until < now) {
-    writes.set(token, { n: 1, until: now + WINDOW_MS });
-    return;
-  }
-  hit.n += 1;
-  if (hit.n > MAX_WRITES_PER_WINDOW) {
-    throw new HttpError(429, "That is a lot of comments at once. Give it a minute.");
-  }
-}
-
-/** Keeps the map from growing without bound on a long-lived process. */
-function sweep(): void {
-  if (writes.size < 1000) return;
-  const now = Date.now();
-  for (const [key, hit] of writes) if (hit.until < now) writes.delete(key);
-}
 
 type ShareRow = {
   user_id: string;
@@ -258,8 +242,7 @@ export async function addComment(req: IncomingMessage, res: ServerResponse): Pro
   const token = (body.token ?? "").trim();
   if (!token) throw new HttpError(400, "No link token");
 
-  rateLimit(token);
-  sweep();
+  rateLimit(`review:${token}`, MAX_WRITES_PER_WINDOW);
 
   const text = (body.body ?? "").trim();
   if (!text) throw new HttpError(400, "Write something first.");
@@ -333,7 +316,7 @@ export async function decide(req: IncomingMessage, res: ServerResponse): Promise
     throw new HttpError(400, "That is not a decision");
   }
 
-  rateLimit(token);
+  rateLimit(`review:${token}`, MAX_WRITES_PER_WINDOW);
   const share = await findShare(token);
 
   const snapshotVersion =
