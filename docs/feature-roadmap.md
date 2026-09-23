@@ -992,6 +992,116 @@ cannot take back.
 
 ---
 
+## Batch 9 — Make the paywall real
+
+**Status:** next
+**Size:** medium
+**Why here:** every feature the pricing screen sells is currently free, and five
+server routes answer to anyone. Written after an audit against the live database
+on 2026-09-23 rather than from the code alone — every claim below was verified.
+
+### What the audit found
+
+Probed with the publishable key against the real project:
+
+| Object | State |
+| --- | --- |
+| `profiles`, `docs`, `posts` | live, and RLS correctly returns 0 rows to an anonymous caller |
+| `brands`, `assets`, `clients`, `shares`, `comments` | **missing** — 03, 04, 06, 07 unrun |
+| `docs.series_id`, `docs.client_id`, `posts.pillar`, `profiles.plan_ends_at_period_end` | **missing** — 05, 06, 08 unrun |
+
+And in the code: **`isPro` is exported from `auth.ts` and used in zero places.**
+Nothing anywhere gates on plan except the label on the account card. Somebody who
+pays today receives precisely what they already had.
+
+### 9.1 Run 03 through 08
+
+Not code, but it is the prerequisite for everything else and belongs in the plan
+of record. Six migrations exist and none has been applied, so Batches 3, 5, 6, 7
+and half of 8 are local-only in production and review links cannot function at
+all. The tier limits on brands and clients are, right now, client-side
+suggestions that anyone can edit in devtools.
+
+**Done when:** all eight tables exist and a second account can be shown to read
+none of the first account's rows.
+
+### 9.2 Close the open routes — but not all of them the same way
+
+Five routes take no bearer token. They are not the same problem and must not get
+the same answer:
+
+| Route | Cost of abuse | Answer |
+| --- | --- | --- |
+| `/api/draft`, `/api/hooks` | **your Anthropic key, unmetered** | require a caller AND `is_pro` |
+| `/api/slides`, `/api/document` | Playwright CPU, and publishing already needs an account to upload | require a caller |
+| `/api/export` | Playwright CPU | **stays open** — see below |
+
+**`/api/export` must not require an account.** "Make carousels and export them"
+is the free product and it is documented to work with no key and no sign-in at
+all. Requiring auth there would break the free tier to fix an abuse problem, so
+export gets rate limiting and tighter size caps instead — the limiter already
+written for the review endpoint, lifted somewhere both can use it.
+
+**Done when:** an unauthenticated POST to `/api/draft` is refused, an
+unauthenticated POST to `/api/export` still returns a file, and a free account's
+draft request is refused by the server rather than by the interface.
+
+### 9.3 Decide what Pro actually is, then enforce it server-side
+
+The pricing screen currently promises eight things for Pro and five for Agency.
+Each needs a real boundary or needs removing from the list — an advertised
+feature with no gate is a promise to the customer that the product does not keep
+in either direction.
+
+The boundary already exists for two of them and is unrun: `02-pro-gate.sql`
+gates `posts` writes, and the brand and client limits are INSERT policies in
+03 and 06. Those are the model. What is missing is everywhere else.
+
+**The free tier stays generous and local.** Nothing here gates the editor, and
+nothing gates localStorage. The split this product sells on is the one it already
+has: making a carousel is free, and the durable synced history that compounds is
+what costs money. Gating the canvas would just make this a worse Canva.
+
+**Done when:** every line on the pricing screen is either enforced in Postgres or
+on the server, or gone from the screen.
+
+### 9.4 Refuse in a way somebody can act on
+
+A gate that returns a raw 403 to `ai.ts` surfaces as "Drafting failed (403)".
+Every gated call needs to come back as an upgrade prompt rather than an error,
+and the client already has the shape for it — `useAccount` knows the plan and
+`Upgrade` is one state away.
+
+**Done when:** hitting a Pro feature on a free account opens the pricing panel
+with a line saying what was being attempted.
+
+### 9.5 Sign-out leaves version history behind
+
+`forgetLocal` clears docs, posts, brands, clients, assets, tombstones and the
+cursor. It does not clear `flashcc:v1:versions:<id>`, so signing out on a shared
+machine leaves whole documents in localStorage for whoever signs in next. Small
+blast radius, ten-minute fix, and it is the kind of thing that is embarrassing
+rather than dangerous — which is exactly the kind that ships.
+
+### 9.6 The things Stripe needs that are not code
+
+`PUBLIC_SITE_URL` still defaults to `http://localhost:5173`, and a webhook needs
+a public HTTPS endpoint. `ANTHROPIC_API_KEY` is currently empty, so drafting is
+dead regardless of any gate. None of this is a code change and all of it blocks
+taking money.
+
+### Explicitly out of scope for this batch
+
+- **Per-IP distributed rate limiting.** The in-process limiter resets on deploy
+  and will not survive a second node. That is a real limit and the wrong thing to
+  solve before there is a second node.
+- **Incremental sync.** The full pull downloads every row every time. Fine at one
+  person's volume; revisit when somebody has a library big enough to notice.
+- **Anything from `docs/reference.md` §29.** The defect list is separate work and
+  mixing it in would make this batch impossible to judge.
+
+---
+
 ## Explicitly not building
 
 Each of these was considered and rejected on evidence.
@@ -1094,10 +1204,11 @@ that endpoint is not.
 
 ---
 
-## Every batch is done
+## Where this stands
 
-Eight batches, and the roadmap is finished. What the eight turned out to be, in
-one line each:
+Eight batches built the product. A ninth, added after an audit on 2026-09-23,
+makes it sellable — see Batch 9 above. What the eight turned out to be, in one
+line each:
 
 | | Was | Turned out to be |
 | --- | --- | --- |
@@ -1119,5 +1230,5 @@ is worth remembering when the next one is written.
 effort. That list is the other half of the plan and should be re-read before
 anything is added to it.
 
-The open work is now `docs/reference.md` §29 — the defect list — and the five
-migrations that have never been run. Neither of those is a roadmap item.
+The open work is Batch 9, and `docs/reference.md` §29 — the defect list, which is
+deliberately not a roadmap item and should not be folded into one.
