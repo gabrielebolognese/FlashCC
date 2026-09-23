@@ -10,6 +10,7 @@ import { Compose } from "./studio/Compose.js";
 import { FirstRun } from "./studio/FirstRun.js";
 import { Home } from "./studio/Home.js";
 import { Repurpose } from "./studio/Repurpose.js";
+import { Landing } from "./landing/Landing.js";
 import { ReviewLink } from "./studio/ReviewLink.js";
 import { onPaywall } from "./studio/gate.js";
 import { sessionPlan, sessionUserId } from "./studio/session.js";
@@ -61,6 +62,30 @@ type Screen =
 const REVIEW_TOKEN = typeof window === "undefined" ? null : tokenFromPath(window.location.pathname);
 
 /**
+ * Where the app lives, now that the front door sells rather than edits.
+ *
+ * Read once at module scope for the same reason the review token is: it is one
+ * path, it cannot change under a render, and a router for three routes would be
+ * a dependency earning its keep on nothing.
+ */
+const APP_PATH = "/app";
+
+const atApp = (): boolean =>
+  typeof window !== "undefined" && window.location.pathname.startsWith(APP_PATH);
+
+/**
+ * A real navigation rather than a state flip.
+ *
+ * `pushState` would be smoother and would also mean the landing page and the app
+ * share one React tree, one set of effects and one bundle-worth of state — so
+ * the first thing `useAccount` does on a marketing page is open a session. A
+ * visitor who never presses Start should cost nothing.
+ */
+const openApp = (): void => {
+  window.location.href = APP_PATH;
+};
+
+/**
  * The pricing panel, mounted where every screen can reach it.
  *
  * Three of the five gated calls happen in `Studio` or in a dialog above it, and
@@ -97,6 +122,9 @@ export function App() {
   // A stranger with a link gets the review page and nothing else — no onboarding,
   // no welcome, and emphatically no pricing panel. See ReviewLink.tsx.
   if (REVIEW_TOKEN) return <ReviewLink token={REVIEW_TOKEN} />;
+
+  // Everything that is not /app or a review link is the front door.
+  if (!atApp()) return <Landing onStart={openApp} />;
 
   // The prompt sits OUTSIDE the screen switch so a 402 from the studio, a dialog
   // or the compose flow all reach the same panel. `Screens` returns early a
