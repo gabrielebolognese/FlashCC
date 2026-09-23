@@ -28,15 +28,62 @@ the only thing standing between one account and everyone else's carousels.
 
 **Authentication → Providers → Email.** Enable it, and leave **Confirm email** on.
 
-Magic links only, so **disable** password sign-in if it is on. There is no password field anywhere
-in the app.
+No passwords, so **disable** password sign-in if it is on. There is no password field anywhere in
+the app.
 
-**Authentication → URL Configuration:** set **Site URL** to `http://localhost:5173` while
-developing, and add your real domain to **Redirect URLs** before launch. The emailed link will not
-work against an origin that is not listed here.
+### 3a. Put the code in the email — REQUIRED
 
-The built-in mailer is rate limited to a handful of emails an hour, which is fine for testing. Set
-up a real SMTP provider (Resend, Postmark) before anyone else signs up.
+The app asks for a **six-digit code** first and offers the link as a fallback. Supabase's default
+template only contains the link, so **without this step no code ever arrives** and the sign-in
+screen waits for something that was never sent.
+
+**Authentication → Emails → Magic Link.** Add `{{ .Token }}` to the template, for example:
+
+```html
+<h2>Your sign-in code</h2>
+<p style="font-size:28px;letter-spacing:6px;"><b>{{ .Token }}</b></p>
+<p>Or <a href="{{ .ConfirmationURL }}">click here</a> — in the same browser you started in.</p>
+```
+
+Why the code leads, rather than the link:
+
+- **Mail scanners eat magic links.** Outlook Safe Links, Defender and Proofpoint fetch every URL in
+  an incoming message to check it, and that fetch REDEEMS a one-time link. The recipient clicks and
+  is told it has already been used. It is invisible from this side and it is one of the commonest
+  ways this kind of auth fails.
+- **PKCE links are single-browser.** The app uses the PKCE flow, so the verifier lives in the
+  browser that asked. That is what makes a stolen link worthless — and it also means a link opened
+  on a phone cannot finish a sign-in begun on a laptop. A code has neither problem.
+
+### 3b. The Site URL has to match the port you are actually on
+
+**Authentication → URL Configuration.** Set **Site URL** to the origin you develop on, and add
+every other one to **Redirect URLs**.
+
+This bites more often than anything else here, because `npm run dev` **falls forward** when 5173 is
+taken — so the app can be on 5174, 5175 or 5176 while the dashboard still says 5173, and the link
+silently refuses to come back. Add them all:
+
+```
+http://localhost:5173
+http://localhost:5174
+http://localhost:5175
+http://localhost:5176
+```
+
+Check the address bar for the port you are really on before blaming anything else.
+
+### 3c. "Email rate limit exceeded"
+
+That is Supabase's built-in mailer, which sends **a handful of messages an hour** across the whole
+project. It is not about the address and it is not something the person signing in can fix.
+
+Fine for the first few tests, and **not** fine for anybody else — set up SMTP before a second
+person ever tries. **Project Settings → Authentication → SMTP Settings.** Resend is free for 3,000
+a month and takes about ten minutes; Postmark and SendGrid work the same way.
+
+Until that is done, expect to be locked out for an hour after a few attempts, and note that every
+"send another" press spends one.
 
 ## 4. Point the app at it
 

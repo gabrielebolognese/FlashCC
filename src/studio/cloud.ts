@@ -39,7 +39,24 @@ export function cloud(): SupabaseClient | null {
     auth: {
       persistSession: true,
       autoRefreshToken: true,
-      // The magic link lands back on the app with the session in the URL.
+      /*
+       * PKCE, not the implicit flow supabase-js defaults to.
+       *
+       * The difference is what comes back in the URL. Implicit returns
+       * `#access_token=...&refresh_token=...` — the real, long-lived credential,
+       * sitting in browser history and readable by anything running on the page.
+       * The fragment never reaches a server, which is the only reason that was
+       * tolerable at all.
+       *
+       * PKCE returns `?code=...`: one-time, and worthless without a verifier
+       * this browser generated and kept to itself. A link copied out of an inbox
+       * and opened somewhere else cannot be redeemed.
+       *
+       * The cost is real and is why the code path below exists: the verifier
+       * lives in the browser that ASKED, so a link opened on a different device
+       * fails. Six digits typed into the original tab has neither problem.
+       */
+      flowType: "pkce",
       detectSessionInUrl: true,
     },
   });

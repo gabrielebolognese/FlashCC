@@ -1,11 +1,28 @@
 /**
  * Sign in, sign out, and who is signed in.
  *
- * Magic link rather than passwords. There is no password to store, no reset flow
- * to build, no "I forgot it" support thread, and no credential for this app to be
+ * Email rather than passwords. There is no password to store, no reset flow to
+ * build, no "I forgot it" support thread, and no credential for this app to be
  * careless with — the whole category of problem is skipped for the price of one
  * email round trip. For a tool someone opens a few times a week that trade is
  * plainly worth it.
+ *
+ * ── A code, with the link as the fallback ────────────────────────────────────
+ *
+ * The same email carries both. The CODE is offered first, for two reasons that
+ * are not about preference:
+ *
+ * 1. Corporate mail scanners — Outlook Safe Links, Defender, Proofpoint — fetch
+ *    every URL in an incoming message to check it. That fetch REDEEMS a one-time
+ *    magic link, so the recipient clicks it and is told it has already been
+ *    used. It is one of the commonest ways magic-link auth fails in the field
+ *    and it is invisible from this side. A six-digit code cannot be consumed by
+ *    something that only follows links.
+ *
+ * 2. PKCE keeps the code verifier in the browser that ASKED. That is what makes
+ *    a stolen link worthless — and it also means a link opened on a different
+ *    device cannot complete. Typing six digits into the tab that is already open
+ *    sidesteps both.
  *
  * Everything here returns quietly when the cloud is not configured, because the
  * app has to keep working with no account at all. That is the free tier.
@@ -30,12 +47,47 @@ const redirectTo = (): string =>
 
 export type SignInResult = { ok: boolean; error?: string };
 
-export async function sendMagicLink(email: string): Promise<SignInResult> {
+export const normaliseEmail = (email: string): string => email.trim().toLowerCase();
+
+export const looksLikeEmail = (email: string): boolean =>
+  /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(normaliseEmail(email));
+
+/**
+ * Supabase's own wording, translated into what to do about it.
+ *
+ * "email rate limit exceeded" is the single most likely thing anybody setting
+ * this up will see, and on its own it sounds like the user did something wrong.
+ * It means the project is still on the built-in mailer, which sends a handful an
+ * hour — a configuration fact, and one nobody can act on without being told.
+ */
+export function explain(message: string): string {
+  const text = message.toLowerCase();
+
+  if (text.includes("rate limit") || text.includes("too many")) {
+    return "This project is still using Supabase's built-in mailer, which only sends a few messages an hour. Wait a few minutes, or set up an SMTP provider — see supabase/README.md.";
+  }
+  if (text.includes("expired") || text.includes("invalid")) {
+    return "That code is wrong or has expired. Ask for a new one.";
+  }
+  if (text.includes("signups not allowed") || text.includes("signup is disabled")) {
+    return "New accounts are turned off for this project. Enable email sign-ups in Authentication → Providers.";
+  }
+  return message;
+}
+
+/**
+ * Sends the email. It carries both a code and a link.
+ *
+ * `shouldCreateUser` is left at its default of true on purpose: there is no
+ * separate sign-up here, and an unknown address being quietly refused would be
+ * a registration flow that never says it exists.
+ */
+export async function sendCode(email: string): Promise<SignInResult> {
   const db = cloud();
   if (!db) return { ok: false, error: "Cloud is not configured" };
 
-  const address = email.trim().toLowerCase();
-  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(address)) {
+  const address = normaliseEmail(email);
+  if (!looksLikeEmail(address)) {
     return { ok: false, error: "That does not look like an email address" };
   }
 
@@ -44,7 +96,40 @@ export async function sendMagicLink(email: string): Promise<SignInResult> {
     options: { emailRedirectTo: redirectTo() },
   });
 
-  return error ? { ok: false, error: error.message } : { ok: true };
+  return error ? { ok: false, error: explain(error.message) } : { ok: true };
+}
+
+/** Kept under its old name because three call sites and a lot of copy say "link". */
+export const sendMagicLink = sendCode;
+
+/** Digits only, so a pasted "123 456" or "123-456" is not rejected for punctuation. */
+export const cleanCode = (code: string): string => code.replace(/\D/g, "").slice(0, 6);
+
+export const CODE_LENGTH = 6;
+
+/**
+ * Exchanges the six digits for a session.
+ *
+ * `type: "email"` covers both a first sign-up and a returning sign-in — Supabase
+ * issues the same kind of token for each, and splitting them here would mean
+ * guessing which one this person is and being wrong half the time.
+ */
+export async function verifyCode(email: string, code: string): Promise<SignInResult> {
+  const db = cloud();
+  if (!db) return { ok: false, error: "Cloud is not configured" };
+
+  const token = cleanCode(code);
+  if (token.length !== CODE_LENGTH) {
+    return { ok: false, error: `The code is ${CODE_LENGTH} digits.` };
+  }
+
+  const { error } = await db.auth.verifyOtp({
+    email: normaliseEmail(email),
+    token,
+    type: "email",
+  });
+
+  return error ? { ok: false, error: explain(error.message) } : { ok: true };
 }
 
 export async function signOut(): Promise<void> {
