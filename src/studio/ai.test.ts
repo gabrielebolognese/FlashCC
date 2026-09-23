@@ -12,7 +12,7 @@ describe("alignToSlots", () => {
   });
 
   it("keeps repeated slots distinct rather than reusing one draft", () => {
-    // Three slots share the id "point" — each must get its own text.
+    // Three slots share the id "point", each must get its own text.
     const drafted: DraftedSlide[] = [
       { role: "hook", text: "H" },
       { role: "problem", text: "P" },

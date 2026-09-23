@@ -4,15 +4,15 @@
  * Two ideas carry this file.
  *
  * The first is the BASELINE. An outlier is not "a big number", it is "a big number
- * for you" — 4,000 impressions is a triumph on a small account and a flop on a large
+ * for you", 4,000 impressions is a triumph on a small account and a flop on a large
  * one. So everything here is a ratio against the median of your own recent posts.
  * Median, never mean: one genuinely viral post would drag a mean so far up that
  * nothing would ever clear the bar again, and the feature would quietly stop working
  * exactly when it got interesting.
  *
  * The second is ATTRIBUTION, and it is the part no other tool can copy. FlashCC knows
- * the structure of what went out — which framework, what shape of hook, how many
- * slides, which style — so it can group posts by those and compare. Canva does not
+ * the structure of what went out, which framework, what shape of hook, how many
+ * slides, which style, so it can group posts by those and compare. Canva does not
  * know your frameworks; a scheduler does not know your slides.
  *
  * Both ideas are easy to abuse, which is what the gates below are for. With four
@@ -94,7 +94,7 @@ export const BASELINE_WINDOW = 20;
 
 /**
  * Never let the UI quote a number without saying how thin the evidence is. The
- * wording is deliberately hedged at the low end — "early signal" invites another
+ * wording is deliberately hedged at the low end, "early signal" invites another
  * post, "consistent" invites a decision.
  */
 export const confidence = (n: number): "early" | "watching" | "consistent" =>
@@ -199,7 +199,7 @@ export const DIMENSIONS: Dimension[] = [
   { id: "style", label: "Style", of: (p) => (p.styleId ? styleById(p.styleId).name : null) },
   { id: "platform", label: "Platform", of: (p) => p.platform },
   // The two of the five new pipeline fields worth attributing. Campaign and
-  // reviewer are proper nouns — grouping by them would produce one bucket per
+  // reviewer are proper nouns, grouping by them would produce one bucket per
   // post, which is a list rather than a finding.
   { id: "pillar", label: "Pillar", of: (p) => (p.pillar.trim() ? p.pillar.trim() : null) },
   { id: "objective", label: "Objective", of: (p) => objectiveLabel(p.objective) },
@@ -221,7 +221,7 @@ export type Group = {
 };
 
 /**
- * Every bucket of one dimension, including the thin ones — a table is allowed to show
+ * Every bucket of one dimension, including the thin ones, a table is allowed to show
  * a group of two as long as it also shows the two. `findings` is the filtered view
  * for anywhere the app speaks in sentences.
  */

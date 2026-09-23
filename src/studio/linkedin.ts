@@ -1,7 +1,7 @@
 /**
  * Reading LinkedIn's own analytics export, and getting the numbers onto posts.
  *
- * Manual metric entry is genuinely differentiated — nobody else asks for it, and
+ * Manual metric entry is genuinely differentiated, nobody else asks for it, and
  * it is what makes the insight screens honest. It is also the churn risk: a
  * minute a post is fine for ten posts and unbearable for a year of them.
  * AuthoredUp's LinkedIn-archive backfill is one of the most-praised features in
@@ -23,7 +23,7 @@
  * LinkedIn's export has changed shape at least twice and will again. Every alias
  * lives in `COLUMNS` and nowhere else, matching is case- and
  * punctuation-insensitive, and an unrecognised column is REPORTED rather than
- * silently ignored — so the failure mode is "we did not understand this column"
+ * silently ignored, so the failure mode is "we did not understand this column"
  * rather than a silently empty number.
  *
  * Pure and DOM-free. It reads text and returns records.
@@ -70,7 +70,7 @@ const fieldFor = (header: string): Field | null => {
 };
 
 /**
- * "1,234", "1 234", "12.5%", "—".
+ * "1,234", "1 234", "12.5%", or a dash for nothing at all.
  *
  * A blank and an unparseable value both become null rather than 0, and the
  * difference matters: writing a zero where LinkedIn gave nothing would put a
@@ -136,7 +136,7 @@ const isMetric = (f: Field): f is keyof Metrics => (METRIC_FIELDS as Field[]).in
  *
  * Their analytics download puts a title row and sometimes a blank row above the
  * headers, so the first line is not reliably the header line. This finds the
- * first row that looks like one — two or more recognised columns — rather than
+ * first row that looks like one, two or more recognised columns, rather than
  * assuming, because assuming produces a confident parse of the wrong row.
  */
 function headerRowIndex(rows: string[][]): number {
@@ -169,7 +169,7 @@ export function parseAnalytics(source: string): ParsedAnalytics {
 
   if (!fields.some((f) => f !== null && isMetric(f))) {
     warnings.push(
-      "No columns of numbers were recognised. This looks like a different export — check it is the post analytics one.",
+      "No columns of numbers were recognised. This looks like a different export, check it is the post analytics one.",
     );
   }
   if (!fields.includes("url") && !fields.includes("title")) {
@@ -254,7 +254,7 @@ const dayGap = (a: string, b: string): number =>
  * Three passes, in descending confidence, each consuming what it claims.
  *
  * A post already matched cannot be matched again, and a row already matched is
- * not offered to the next pass — otherwise a weaker rule would overwrite a
+ * not offered to the next pass, otherwise a weaker rule would overwrite a
  * stronger one, and the numbers would land on the wrong post with no sign that
  * anything went wrong.
  *
@@ -288,7 +288,7 @@ export function matchRows(rows: readonly AnalyticsRow[], posts: readonly Post[])
     if (post && free(post)) claim(row, post, "url");
   }
 
-  // 2. An exact title, against the post title and its hook — LinkedIn's export
+  // 2. An exact title, against the post title and its hook, LinkedIn's export
   //    carries the post's own first line, which is usually the hook rather than
   //    whatever the carousel was named in here.
   for (const row of rows) {
@@ -345,7 +345,7 @@ export type ApplyResult = { posts: Post[]; changed: number; filled: number };
  * exists to protect.
  *
  * `postedAt` is filled from the export when the post does not have one, because
- * a post that has numbers has demonstrably gone out — but never overwritten,
+ * a post that has numbers has demonstrably gone out, but never overwritten,
  * since the local date is the one somebody entered deliberately.
  */
 export function applyMatches(

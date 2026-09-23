@@ -5,7 +5,7 @@
  *
  * THE HOOK AND THE PAYOFF are editable here and nowhere else in the flow,
  * because they are the two slides an operator should write themselves. Measured,
- * not theorised — someone scaling from two to ten carousels a week watched saves
+ * not theorised, someone scaling from two to ten carousels a week watched saves
  * and shares fall and fixed it exactly this way: "AI is great for volume and the
  * boring middle, weak at the two slides that decide whether anyone cares."
  *
@@ -35,7 +35,7 @@ export type ItemProblem = { index: number; severity: "block" | "warn"; message: 
  *
  * Deliberately not `preflight.ts`: that one measures laid-out layers against a
  * platform, and none of this has been laid out yet. These are the input-shaped
- * problems — the ones that are cheap to fix here and expensive to find later.
+ * problems, the ones that are cheap to fix here and expensive to find later.
  */
 export function checkBatch(blocks: BulkBlock[]): ItemProblem[] {
   const out: ItemProblem[] = [];

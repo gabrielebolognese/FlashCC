@@ -220,7 +220,7 @@ export function Compose({
 
               {/* Handle and delete are full-height rails either side of the field, so
                   neither is a 12px target hidden until hover. Only the handle is
-                  draggable — making the whole card draggable fights text selection. */}
+                  draggable, making the whole card draggable fights text selection. */}
               <div
                 className="relative flex min-w-0 flex-1 items-stretch gap-2"
                 onDragOver={(e) => {
@@ -334,7 +334,7 @@ export function Compose({
   );
 }
 
-/** Twice the length of a stock arrow, and white — it has to read as a pointer. */
+/** Twice the length of a stock arrow, and white, it has to read as a pointer. */
 function LongArrow() {
   return (
     <svg

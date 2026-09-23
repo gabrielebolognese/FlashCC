@@ -23,7 +23,7 @@ Attention resets every time the frame changes. Cutting to the rhythm of the
 audio is cutting to the wrong thing entirely.
 
 The fix is to cut on movement instead. A hand leaving frame, a head turning, a
-door closing — those are where the eye is already going.
+door closing, those are where the eye is already going.
 
 ## Punch in on the second sentence
 

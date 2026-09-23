@@ -1,5 +1,5 @@
 /**
- * Assets — the pictures and faces that belong to the ACCOUNT rather than to one
+ * Assets, the pictures and faces that belong to the ACCOUNT rather than to one
  * carousel.
  *
  * Until now every image lived inside its document as a base64 data URL. That was
@@ -10,7 +10,7 @@
  *
  * So an asset is now a RECORD, and the bytes live in Supabase Storage under a
  * path. A document refers to an asset by id. `src` still carries something an
- * `<img>` can paint — it is simply a URL that gets refreshed rather than the
+ * `<img>` can paint, it is simply a URL that gets refreshed rather than the
  * file itself.
  *
  * That is not a hole in "nothing is derived". The layer still owns its box, its
@@ -18,7 +18,7 @@
  * slide looks like is still stored on the slide. What moved out is the file,
  * which is what `<img src>` has always meant.
  *
- * With no account — or no Supabase configured at all — an asset keeps its bytes
+ * With no account, or no Supabase configured at all, an asset keeps its bytes
  * inline in `data` and behaves exactly as the old media pool did. That is the
  * free tier, not a degraded mode, and it is why every function here treats a
  * missing `path` as ordinary rather than as an error.
@@ -47,7 +47,7 @@ export type Asset = {
   /** Object path in the `media` bucket. Empty while the asset is local-only. */
   path: string;
   mime: string;
-  /** Decoded file size. Not the length of a base64 string — see `dataUrlBytes`. */
+  /** Decoded file size. Not the length of a base64 string, see `dataUrlBytes`. */
   bytes: number;
 
   /** images */
@@ -67,15 +67,15 @@ export type Asset = {
   folder?: string | undefined;
 
   /**
-   * A fingerprint of the file's bytes, so the same picture imported twice — or
-   * found inlined in twenty old documents — becomes one object rather than
+   * A fingerprint of the file's bytes, so the same picture imported twice, or
+   * found inlined in twenty old documents, becomes one object rather than
    * twenty. This is what makes "a shared logo is stored once" true.
    */
   key?: string | undefined;
 
   /**
    * The bytes, inline, for an asset that has never reached a bucket. Dropped the
-   * moment it uploads — keeping both would put the thing this batch exists to
+   * moment it uploads, keeping both would put the thing this batch exists to
    * remove back into every sync.
    */
   data?: string | undefined;
@@ -107,7 +107,7 @@ export const isDataUrl = (src: string): boolean => src.startsWith("data:");
  * What the file actually weighs.
  *
  * The media pool used to report `src.length`, which is the length of a base64
- * STRING — a third larger than the bytes it encodes. Every size the UI showed
+ * STRING, a third larger than the bytes it encodes. Every size the UI showed
  * was wrong by 33%, and so was every quota decision made from it.
  */
 export function dataUrlBytes(src: string): number {
@@ -192,7 +192,7 @@ export const assetToMedia = (asset: Asset, url: string): MediaItem => ({
 
 export const folderOf = (asset: Asset): string => asset.folder?.trim() || UNFILED;
 
-/** Every folder in use, unfiled last — it is a fallback, not a category. */
+/** Every folder in use, unfiled last, it is a fallback, not a category. */
 export function foldersOf(assets: readonly Asset[]): string[] {
   const named = new Set<string>();
   let anyUnfiled = false;
@@ -215,7 +215,7 @@ export type AssetQuery = {
 /**
  * Filtering, in the order a person narrows: kind, then folder, then words.
  *
- * `brandId` is deliberately an INCLUSIVE filter rather than an exclusive one —
+ * `brandId` is deliberately an INCLUSIVE filter rather than an exclusive one,
  * asking for a brand's assets returns its own plus everything unscoped, because
  * a stock photo does not stop being usable when a client folder is open.
  */
@@ -286,7 +286,7 @@ export function resolveDoc(doc: Doc, urlOf: (assetId: string) => string | undefi
  * A stable fingerprint of a file's bytes.
  *
  * FNV-1a over the base64 payload, with the length appended. Not a checksum for
- * integrity — a bucket key for "have I already stored this?", where the length
+ * integrity, a bucket key for "have I already stored this?", where the length
  * is what keeps a 32-bit collision from ever merging two files of different
  * sizes. Two genuinely different pictures of identical length that also collide
  * would share an object; the odds are remote and the cost is one wrong picture,
@@ -321,7 +321,7 @@ export type Hoisted = { doc: Doc; created: Asset[]; changed: number };
  * come back ok.
  *
  * `known` is matched on the content fingerprint, so the same logo across twenty
- * carousels resolves to one asset — including assets already in the library from
+ * carousels resolves to one asset, including assets already in the library from
  * an earlier run, which is what makes re-running this cheap.
  */
 export function hoistInlineAssets(doc: Doc, known: readonly Asset[] = []): Hoisted {
@@ -383,7 +383,7 @@ export function hoistInlineAssets(doc: Doc, known: readonly Asset[] = []): Hoist
  * Anything that came from the library drops its `src`, because the file is in
  * the library and a second copy in every document is the whole problem this
  * batch was opened to solve. `resolveDoc` puts a live URL back on the way in, so
- * the version held in memory — the one the painter and the exporter see — is
+ * the version held in memory, the one the painter and the exporter see, is
  * always complete.
  *
  * A picture with no `assetId` keeps its data URL untouched. That is a document

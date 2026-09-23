@@ -77,7 +77,7 @@ const atApp = (): boolean =>
  * A real navigation rather than a state flip.
  *
  * `pushState` would be smoother and would also mean the landing page and the app
- * share one React tree, one set of effects and one bundle-worth of state — so
+ * share one React tree, one set of effects and one bundle-worth of state, so
  * the first thing `useAccount` does on a marketing page is open a session. A
  * visitor who never presses Start should cost nothing.
  */
@@ -89,13 +89,13 @@ const openApp = (): void => {
  * The pricing panel, mounted where every screen can reach it.
  *
  * Three of the five gated calls happen in `Studio` or in a dialog above it, and
- * `Home` — which owns the panel normally — is a different screen entirely since
+ * `Home`, which owns the panel normally, is a different screen entirely since
  * `App` swaps rather than nests. So a second mount lives here, driven by the
  * channel in `gate.ts`, and it is the only thing that works from everywhere.
  *
  * It reads the plan from `session.ts` rather than from `useAccount`, because
  * `App` has no account context and adding one to mount a modal would be a lot of
- * wiring for a panel that is right about the plan either way — the server is the
+ * wiring for a panel that is right about the plan either way, the server is the
  * boundary, this is the offer.
  */
 function PaywallPrompt() {
@@ -119,7 +119,7 @@ function PaywallPrompt() {
 }
 
 export function App() {
-  // A stranger with a link gets the review page and nothing else — no onboarding,
+  // A stranger with a link gets the review page and nothing else, no onboarding,
   // no welcome, and emphatically no pricing panel. See ReviewLink.tsx.
   if (REVIEW_TOKEN) return <ReviewLink token={REVIEW_TOKEN} />;
 

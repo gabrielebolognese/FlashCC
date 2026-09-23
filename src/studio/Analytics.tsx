@@ -212,7 +212,7 @@ function Breakdown({
                     thin || !ready ? "text-muted" : g.lift >= 1 ? "text-accent" : "text-secondary",
                   ].join(" ")}
                 >
-                  {thin || !ready ? "—" : liftLabel(g.lift)}
+                  {thin || !ready ? "-" : liftLabel(g.lift)}
                 </span>
               </div>
               <div className="mt-1.5">

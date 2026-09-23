@@ -10,14 +10,14 @@ Load the next batch of work from `docs/feature-roadmap.md` into context, then st
 1. **Read `docs/feature-roadmap.md` in full.**
 
 2. **Find the target batch.** If the user passed an argument (`$ARGUMENTS`), that
-   names the batch — match it against the batch number or its title. Otherwise take
+   names the batch, match it against the batch number or its title. Otherwise take
    the **first batch whose status line is not `done`**. Batch status is the
    `**Status:**` line directly under each `## Batch N` heading: `next`, `queued`,
    `in progress`, or `done`.
 
 3. **If every batch is `done`**, say so plainly and stop. Do not invent more work.
 
-4. **Print the whole batch verbatim** — every feature, its rationale, its
+4. **Print the whole batch verbatim**, every feature, its rationale, its
    acceptance criteria. This is the point of the command: the batch has to be in
    context, not summarised away. Do not compress it.
 
@@ -25,7 +25,7 @@ Load the next batch of work from `docs/feature-roadmap.md` into context, then st
    - Which existing files each feature touches, verified by actually looking
    - What order to build them in, and why
    - Anything in the batch that is now wrong, already built, or blocked by
-     something outside the repo — say so now rather than discovering it mid-build
+     something outside the repo, say so now rather than discovering it mid-build
    - Roughly how big the batch is
 
 6. **Stop there. Do not write a single line of code.** End with one line saying you
@@ -38,7 +38,7 @@ Build the whole batch. Then:
 - Follow `CLAUDE.md`: ESM with `.js` extensions on relative imports, the strict
   tsconfig flags, pure DOM-free modules where the logic is testable, `LayerView`
   as the only painter, FlashFX tokens for app chrome.
-- Put the reasoning in code comments where a reader would otherwise wonder — the
+- Put the reasoning in code comments where a reader would otherwise wonder, the
   non-obvious decision, not the obvious one.
 - Add tests for anything with real logic. Tests here are design guards; they have
   already caught contrast failures, identical adjacent slides and silently dropped

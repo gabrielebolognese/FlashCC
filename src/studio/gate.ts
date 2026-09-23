@@ -6,12 +6,12 @@
  * Payment Required is the one status code that means exactly this, and the
  * distinction is load-bearing rather than pedantic: a 403 is a wall and a 402 is
  * an offer. Without the split, a gated feature surfaces as "Drafting failed
- * (403)" — which reads as a bug, sends people to support, and sells nothing.
+ * (403)", which reads as a bug, sends people to support, and sells nothing.
  *
  * ── Why a channel rather than a prop ─────────────────────────────────────────
  *
  * The pricing panel lives in `Home`, and three of the five gated calls happen in
- * `Studio` or in a dialog above it — different screens entirely, since `App`
+ * `Studio` or in a dialog above it, different screens entirely, since `App`
  * swaps rather than nests. Threading an `onPaywall` callback down to `ai.ts` and
  * `variants.ts` would mean passing it through four component trees to reach two
  * fetch calls.
@@ -66,7 +66,7 @@ export function firePaywall(feature: string): void {
  * ordinary error the caller shows in place.
  *
  * Both, deliberately. The panel is the useful response, but the calling dialog
- * still needs something to put in its own error slot — a screen that goes
+ * still needs something to put in its own error slot, a screen that goes
  * silent while a modal opens somewhere else reads as a dropped click.
  */
 export async function readRefusal(response: Response): Promise<Error> {
@@ -79,7 +79,7 @@ export async function readRefusal(response: Response): Promise<Error> {
   if (response.status !== 402) return new Error(message);
 
   // The server names the feature in its message ("AI drafting is part of Pro."),
-  // so the first clause is the label — no second field to keep in step.
+  // so the first clause is the label, no second field to keep in step.
   const feature = message.split(" is part of")[0] ?? "This";
   firePaywall(feature);
   return new PaywallError(feature, message);
@@ -88,7 +88,7 @@ export async function readRefusal(response: Response): Promise<Error> {
 /**
  * The plan as the client last heard it.
  *
- * Used only to decide whether to bother asking. It is never the boundary — the
+ * Used only to decide whether to bother asking. It is never the boundary, the
  * server checks `profiles.plan` on every gated call, and this is a courtesy that
  * saves a round trip and a flash of failure.
  */

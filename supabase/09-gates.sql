@@ -1,4 +1,4 @@
--- FlashCC — turn the remaining gates on
+-- FlashCC, turn the remaining gates on
 --
 -- RUN THIS LAST, and only once Stripe is wired and something is actually setting
 -- `profiles.plan`. Before that, every account is 'free' and this takes review
@@ -31,7 +31,7 @@
 -- And what is deliberately NOT gated, because it is the free product:
 --
 --   the editor, every framework, every style, localStorage, document sync,
---   PDF export, and being a reviewer on somebody else's link — see invariant 6.
+--   PDF export, and being a reviewer on somebody else's link, see invariant 6.
 -- ─────────────────────────────────────────────────────────────────────────────
 
 begin;
@@ -74,7 +74,7 @@ commit;
 --     for insert with check ((select auth.uid()) = user_id);
 --
 -- To check it: on a free account, try to create a review link. Postgres must
--- refuse with "new row violates row-level security policy" — not the interface.
+-- refuse with "new row violates row-level security policy", not the interface.
 -- Turn the interface check off once and confirm the database still says no,
 -- because that is the half that actually holds.
 -- ─────────────────────────────────────────────────────────────────────────────

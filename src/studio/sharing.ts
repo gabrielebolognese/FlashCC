@@ -33,7 +33,7 @@ import { docVersion, type Comment, type CommentScope, type Share, type Snapshot 
  * The whole security of a review link is this string.
  *
  * `randomUUID` is a CSPRNG in every browser that has it, and two of them is 256
- * bits of entropy with the hyphens taken out — unguessable, and short enough to
+ * bits of entropy with the hyphens taken out, unguessable, and short enough to
  * paste into a message without wrapping. Not derived from the document id,
  * the user id or the time, because anything derived can be enumerated.
  */
@@ -206,7 +206,7 @@ export async function listShares(docId: string, userId: string): Promise<Share[]
  * Turns a link off.
  *
  * A status change rather than a delete, so the comments and the decision survive
- * — the conversation is the record of what happened, and throwing it away
+ *, the conversation is the record of what happened, and throwing it away
  * because the link expired would lose the answer along with the question.
  */
 export async function revokeShare(share: Share, userId: string): Promise<boolean> {

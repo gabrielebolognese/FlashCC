@@ -1,7 +1,7 @@
 /**
  * The four carousel frameworks.
  *
- * A carousel is not an arbitrary pile of slides — it is one of four shapes, and each
+ * A carousel is not an arbitrary pile of slides, it is one of four shapes, and each
  * one opens differently. The hook of a problem-solve names a cost; the hook of a
  * story names a moment. Getting that wrong is the most expensive mistake in the
  * format, so the shape is chosen first and every box says what belongs in it.
@@ -92,7 +92,7 @@ export const STRUCTURES: Structure[] = [
         detail: "Lead with the instruction, then the reason. If it needs an “and also”, it's two slides.",
         placeholder: "Fix #1",
         examples: [
-          "Cut on movement — a hand raise, a head turn, a step.",
+          "Cut on movement, a hand raise, a head turn, a step.",
           "Kill every shot that's only there because you filmed it.",
         ],
         repeatable: true,
@@ -189,7 +189,7 @@ export const STRUCTURES: Structure[] = [
           "Don't just show the final product. The decision is what demonstrates expertise; the result alone only demonstrates taste.",
         placeholder: "A decision you made, and why.",
         examples: [
-          "Dropped the intro — the product shot was the stronger open.",
+          "Dropped the intro, the product shot was the stronger open.",
           "Warmed the grade 200K so the kitchen reads as morning.",
         ],
         repeatable: true,
@@ -225,7 +225,7 @@ export const STRUCTURES: Structure[] = [
         placeholder: "DM me 'EDIT' if you want this style.",
         examples: [
           "DM me “EDIT” if you want this style.",
-          "Booking two projects for next month — DM to check dates.",
+          "Booking two projects for next month, DM to check dates.",
         ],
       },
     ],
@@ -278,7 +278,7 @@ export const STRUCTURES: Structure[] = [
         placeholder: "Technique #1",
         examples: [
           "Punch in 15% on the second sentence of every answer.",
-          "Cut the breath, not the pause — the pause is the performance.",
+          "Cut the breath, not the pause, the pause is the performance.",
         ],
       },
       {
@@ -289,7 +289,7 @@ export const STRUCTURES: Structure[] = [
         placeholder: "Technique #2",
         examples: [
           "Watch any A24 trailer: every cut lands on a movement.",
-          "Same interview, two cuts — one keeps the breath, one doesn't.",
+          "Same interview, two cuts, one keeps the breath, one doesn't.",
         ],
         repeatable: true,
       },
@@ -428,7 +428,7 @@ export const STRUCTURES: Structure[] = [
 
 export const DEFAULT_STRUCTURE = STRUCTURES[0]!;
 
-/** Numbered label when a structure repeats a slot — "Fix 1", "Fix 2". */
+/** Numbered label when a structure repeats a slot, "Fix 1", "Fix 2". */
 export function labelFor(slots: Slot[], index: number): string {
   const slot = slots[index];
   if (!slot) return "Slide";

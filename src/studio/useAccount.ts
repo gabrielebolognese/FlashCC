@@ -7,7 +7,7 @@
  * places that each have to know when the other two are ready.
  *
  * Signing in is OPTIONAL and this hook never blocks the app. With no account, or
- * no Supabase configured at all, everything keeps working against localStorage —
+ * no Supabase configured at all, everything keeps working against localStorage,
  * that is the free tier, not a degraded mode.
  */
 import type { Session, User } from "@supabase/supabase-js";
@@ -81,7 +81,7 @@ export function useAccount(changeSignal: number): Account {
 
     // Assets first, and only once. Both of these CREATE records that the sync
     // then pushes, so running them after it would leave everything a round
-    // behind — the pictures would reach the bucket and the rows describing them
+    // behind, the pictures would reach the bucket and the rows describing them
     // would not go up until the next sync fired.
     if (!lifted.current) {
       lifted.current = true;
@@ -90,15 +90,15 @@ export function useAccount(changeSignal: number): Account {
         await migrateInlineDocs(id);
       } catch {
         // A migration that cannot finish leaves the documents exactly as they
-        // were — inline and working — so it must never fail a sync.
+        // were, inline and working, so it must never fail a sync.
       }
     }
 
     const result = await syncAll(id);
 
     // One signing pass for the whole library once the records have landed.
-    // Everything that paints an asset — the pool, the library grid, a brand's
-    // logo — reads the same cache, so this is one round trip for all of it
+    // Everything that paints an asset, the pool, the library grid, a brand's
+    // logo, reads the same cache, so this is one round trip for all of it
     // rather than one per picture per screen.
     if (result.ok) await ensureUrls(listAssets());
 
@@ -171,7 +171,7 @@ export function useAccount(changeSignal: number): Account {
 
   /**
    * Stripe returns the browser the moment payment succeeds, but the plan is
-   * granted by a webhook arriving separately — usually within a second, sometimes
+   * granted by a webhook arriving separately, usually within a second, sometimes
    * not. Without this the person who just paid lands back on a page that says
    * Free, which is the worst possible first impression of a subscription. So poll
    * briefly, then give up quietly rather than claiming anything went wrong.

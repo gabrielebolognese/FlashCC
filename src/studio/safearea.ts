@@ -4,7 +4,7 @@
  * ── The gap this fills ───────────────────────────────────────────────────────
  *
  * `compositions.ts` lays out for one artboard and `reflow.ts` moves that layout
- * to another. Neither knows anything about the DESTINATION — and it is the
+ * to another. Neither knows anything about the DESTINATION, and it is the
  * destination that decides where an action rail sits, or a caption, or a nav
  * bar. So a deck reflowed to TikTok's 1080×1920 kept its 96px side margins and
  * put every headline under the action rail, which covers the right 180px of
@@ -12,8 +12,8 @@
  *
  * Raising the generation margin cannot fix that. TikTok's rail alone would want
  * 180 on the right, its caption band wants 480 at the bottom, and a single
- * constant big enough for those would make LinkedIn and Instagram — the
- * platforms most decks are actually for — needlessly narrow. The margin belongs
+ * constant big enough for those would make LinkedIn and Instagram, the
+ * platforms most decks are actually for, needlessly narrow. The margin belongs
  * to the artboard; the chrome belongs to the platform.
  *
  * ── Uniform scale, not per-axis clamping ─────────────────────────────────────
@@ -26,7 +26,7 @@
  * ── Full bleed is a decision ─────────────────────────────────────────────────
  *
  * A band spanning the full width is the commonest deliberate shape in this
- * product — every framework's closing block is one. Those are left exactly where
+ * product, every framework's closing block is one. Those are left exactly where
  * they are, per axis, and are not counted when working out how far the rest has
  * to move.
  *
@@ -55,7 +55,7 @@ export type Box = { x: number; y: number; w: number; h: number };
  *
  * Full-bleed layers are excluded on the axis they bleed on, because including
  * them would report a span of the whole artboard and conclude that nothing can
- * fit — the correction would then be a scale factor of about 0.8 applied to a
+ * fit, the correction would then be a scale factor of about 0.8 applied to a
  * slide that needed no correction at all.
  */
 export function movableBounds(slide: Slide, w: number, h: number): Box | null {
@@ -96,7 +96,7 @@ export const IDENTITY: Transform = { scale: 1, dx: 0, dy: 0 };
 /**
  * What it takes to get `bounds` inside `box`.
  *
- * Scale is uniform and never above 1 — this only ever pulls content in. A slide
+ * Scale is uniform and never above 1, this only ever pulls content in. A slide
  * already inside the box is left alone rather than stretched out to fill it,
  * because "it fits" and "it should be bigger" are different questions and only
  * one of them was asked.
@@ -132,7 +132,7 @@ export const isIdentity = (t: Transform): boolean =>
  * Applies it, leaving each full-bleed axis alone.
  *
  * `fontSize` scales with the box, because a layer made 7% narrower with its type
- * unchanged is a layer whose text no longer fits — which is the "some text
+ * unchanged is a layer whose text no longer fits, which is the "some text
  * ending up too small to read" complaint arriving from the other direction.
  * Stroke width does not: a 2px rule is 2px because thinner than that disappears
  * after the platform recompresses it, and that floor is absolute.

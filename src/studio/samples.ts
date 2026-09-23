@@ -1,8 +1,8 @@
 /**
  * One worked example per framework, in the user's own style.
  *
- * The copy is each slot's placeholder — which is already finished example writing
- * rather than lorem — so the examples double as a demonstration of what belongs in
+ * The copy is each slot's placeholder, which is already finished example writing
+ * rather than lorem, so the examples double as a demonstration of what belongs in
  * each slide, which is the thing the framework screen can only describe.
  */
 import { buildSlides, type BuildOptions } from "./compositions.js";

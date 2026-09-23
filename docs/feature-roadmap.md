@@ -2,7 +2,7 @@
 
 The plan of record. Worked through with `/next-batch`, one batch at a time.
 
-Built from four parallel research passes in September 2026 — speed pain points, batch workflows,
+Built from four parallel research passes in September 2026, speed pain points, batch workflows,
 organisation at volume, and a seventeen-tool competitive audit. **Read the evidence caveats at the
 bottom before treating any single quote as load-bearing.**
 
@@ -11,21 +11,21 @@ bottom before treating any single quote as load-bearing.**
 ## The frame
 
 **PostNitro is the competitor that matters.** At $20/mo it already ships every table-stakes
-feature FlashCC lacks — PNG per slide, brand kits, client workspaces, approvals, saved templates,
-native publishing — and it has no analytics, no frameworks, and a much lighter editor.
+feature FlashCC lacks, PNG per slide, brand kits, client workspaces, approvals, saved templates,
+native publishing, and it has no analytics, no frameworks, and a much lighter editor.
 
 That gives a clean test for every item below:
 
 > **Batches 1–5 remove reasons to choose PostNitro. Batches 6–8 are the reason to choose us.**
 
 **And the finding that defines the opening:** of nine schedulers audited for bulk import, **not one
-generates carousel slides.** Bulk universally means scheduling assets that already exist — every
+generates carousel slides.** Bulk universally means scheduling assets that already exist, every
 one of them assumes the pixels are already made. Six of the nine cannot bulk-ship a LinkedIn
 carousel at all, two of those denying it in writing (Buffer: *"Bulk upload currently supports text
 and single-image posts only. Video and carousel posts are not supported."* SocialBee: *"Carousel
 posts cannot be uploaded using CSV files."*).
 
-The one place the full shape exists is PostNitro bolted into Publer as a third-party integration —
+The one place the full shape exists is PostNitro bolted into Publer as a third-party integration,
 CSV bulk import plus AI topic-to-slides. **Treat Publer+PostNitro as the closest direct
 competitor**, and note that someone has already validated the shape from the other end.
 
@@ -33,16 +33,16 @@ Three findings shape the order.
 
 **Writing the slides is the biggest time sink, not designing them.** 30–60 minutes of a 45–120
 minute carousel. Layout is second, visual design third. Most competitors optimise the third.
-FlashCC's centre of gravity is already right — the roadmap defends it rather than chasing them.
+FlashCC's centre of gravity is already right, the roadmap defends it rather than chasing them.
 
 **Structural attribution is genuinely unclaimed.** Zero of seventeen audited tools connect hook
 shape, framework or slide count to outcome, and the analytics industry's own guides tell marketers
 to do it *by hand*. But nobody asks a carousel tool for analytics either. So it does not win the
-sale — it wins the renewal. It stays, and it sits behind the table-stakes work rather than in
+sale, it wins the renewal. It stays, and it sits behind the table-stakes work rather than in
 front of it.
 
 **Batching is smaller and far more perishable than the marketing implies, and designing for the
-marketing number would be a mistake.** The real batch breaks at post three or four — *"you've
+marketing number would be a mistake.** The real batch breaks at post three or four, *"you've
 tried batching before, and it actually fell apart somewhere around the third post"*, *"they sit
 down to make 12 reels and end up making 4"*, *"cap at 12-15. after that, energy drops and quality
 follows."* Honest self-reported time is 3–4 hours per content day and 10–12 hours weekly; the
@@ -53,7 +53,7 @@ tells you you can just generate and it's 2 minutes and bye."*
 Content also goes stale in about a week. *"We used to plan a month out, batch it all... and it
 went nowhere."* *"Plan formats and lanes ahead, not finished posts."* A creator whose entire
 business is teaching batching, on the record: *"I used to sort of teach and preach like, oh, batch
-30 days ahead — I'm not batching 30 days ahead anymore... I am batching two to three posts, but
+30 days ahead, I'm not batching 30 days ahead anymore... I am batching two to three posts, but
 just the week before."*
 
 **So: optimise for 8–15, design for the wall at post three or four, and treat a batch as a
@@ -62,7 +62,7 @@ feel finished.
 
 **The bottleneck has a name, and it is the design step.** A r/smallbusiness poll literally offered
 *"the actual design process (the 'Canva black hole')"* as an option. Two creators whose businesses
-are content systems confess the same thing — *"I procrastinate a lot on creating the content. I
+are content systems confess the same thing, *"I procrastinate a lot on creating the content. I
 can create the plans... That's the piece that I find myself pushing down the to-do list."* And the
 fix is stated twice, independently: *"the batching only works once the format is locked, cause
 then you're just swapping the content into a template, not inventing a new thing weekly"* and
@@ -75,7 +75,7 @@ cancel. Nobody has taken the opposite position, and it costs nothing to take.
 
 ---
 
-## Batch 1 — Ship a file people can actually post
+## Batch 1, Ship a file people can actually post
 
 **Status:** done
 **Size:** large. The rendering path is a real decision, the rest is small.
@@ -100,13 +100,13 @@ converters are unreliable on exactly those two features, which FlashCC uses heav
 Playwright**, and note it also fixes PDF quality.
 
 **Landmine, worth knowing before writing the encoder:** emit **JPG, not PNG, for LinkedIn-bound
-slides.** A live bug report on another tool: *"LinkedIn carousel: PNG slides render blank — JPG
+slides.** A live bug report on another tool: *"LinkedIn carousel: PNG slides render blank, JPG
 works."* PNGs convert to PDF and lose their content downstream. Closed `not_planned`, still open.
 Instagram and TikTok are happy with either, so make the format part of the platform preset rather
 than a global choice.
 
 **Done when:** a 10-slide deck exports as `01.png … 10.png` at exact pixel dimensions, gradients
-and custom fonts intact, in a zip — and the LinkedIn preset emits JPG.
+and custom fonts intact, in a zip, and the LinkedIn preset emits JPG.
 
 ### 1.2 Platform export presets
 
@@ -122,13 +122,13 @@ CMYK, and land between 800KB and 2MB.
 
 ### 1.3 Pre-export quality guard
 
-**What:** a blocking check before export — body text under 18pt, headlines under 24pt, strokes
+**What:** a blocking check before export, body text under 18pt, headlines under 24pt, strokes
 under 2px, anything intruding on a platform safe zone, file size outside 800KB–2MB, slide count
 over the platform ceiling.
 
 **Why:** this is currently solved by an entire genre of blog post. Slide-count ceilings are the
 sharpest hidden trap: **Instagram's Graph API caps carousels at 10 while the app allows 20**, so a
-20-slide deck cannot be published by any scheduler, ever — and the same API allows only **100
+20-slide deck cannot be published by any scheduler, ever, and the same API allows only **100
 published posts per rolling 24 hours per account**, which is a real constraint on "batch 30
 posts". LinkedIn takes 300 pages. TikTok 35.
 
@@ -150,12 +150,12 @@ reported exactly this bug: *"Navigation elements were obscuring important conten
 **What:** decide what changing format does, then make it do that.
 
 **Why:** `Properties.tsx` ships three format buttons wired to `setFormat`, which does
-`{ ...doc, width, height }` — every layer keeps its pixel position. Switch 4:5 to 9:16 and content
+`{ ...doc, width, height }`, every layer keeps its pixel position. Switch 4:5 to 9:16 and content
 strands in the top two-thirds with 570px of dead space. This is exactly what users describe as
 *"the spacing never survives the resize."* Nothing has ever decided what it *should* do, so this
 is an open question, not a violated rule.
 
-**Recommend:** re-flow to the new artboard — re-run the composition pass with the same content, so
+**Recommend:** re-flow to the new artboard, re-run the composition pass with the same content, so
 type re-ladders and text refits rather than proportionally squashing. That is the thing Canva's
 Magic Resize cannot do and users complain about constantly.
 
@@ -167,7 +167,7 @@ outside the safe box.
 1.1–1.4 and 1.6 as written. **1.5 was reduced deliberately.**
 
 The roadmap said "re-run the composition pass with the same content", which means
-calling `buildSlides` — regenerating from text. That would have silently deleted
+calling `buildSlides`, regenerating from text. That would have silently deleted
 every hand-drawn shape, every moved block and every placed image: a worse bug than
 the stranded-layers one it fixes. `compositions.ts` also hardcodes `W`/`H`/`M` as
 module constants across 19 usages with 27 tests pinned to them, so making it
@@ -184,7 +184,7 @@ scheduled.
 
 ### 1.6 Two pieces of rot found while checking
 
-- `FORMATS` in `model.ts` is dead — never imported. `Properties.tsx` hardcodes its own inline
+- `FORMATS` in `model.ts` is dead, never imported. `Properties.tsx` hardcodes its own inline
   copy. Delete one.
 - `CLAUDE.md`'s "Canvas elements" section describes `overlays: Overlay[]` with fractional
   coordinates. **There is no `Overlay` type in the codebase.** It is a leftover from the
@@ -193,12 +193,12 @@ scheduled.
 
 ---
 
-## Batch 2 — Find anything
+## Batch 2, Find anything
 
 **Status:** done
 **Size:** small. Everything needed is already stored locally.
 **Why here:** cheapest batch in the document and pure churn prevention. There is currently **no
-search box anywhere in FlashCC** — less than any competitor, all of whom get complained about for
+search box anywhere in FlashCC**, less than any competitor, all of whom get complained about for
 it anyway.
 
 ### 2.1 Search across projects
@@ -225,7 +225,7 @@ differentiator. **Highest pain-removed-to-effort ratio in the entire document.**
 ### 2.3 Facet filters
 
 **What:** filter by framework, style, format, date, and later client. **Derived automatically from
-data already stored — not user tags.**
+data already stored, not user tags.**
 
 **Why:** tagging reliably fails, and not from laziness: vocabulary drift (one DAM vendor's example
 is "blazer" vs "sportscoat" for the same asset) plus dedicated maintenance time small teams do not
@@ -255,7 +255,7 @@ to see everything not given a clear name? An option to show designs NOT associat
 folder?"* *"I have copies on copies... Because of my copies I get overwhelmed when I see my
 homepage."* *"I had like 40 different designs over the last 10 years, and I can't find any of
 them."* And on filing being actively broken there: moving an asset to a folder leaves it in Recent
-and Uploads too — *"now they live in three different places in my UI... there's no way to select
+and Uploads too, *"now they live in three different places in my UI... there's no way to select
 multiple items at once."*
 
 ### Built as
@@ -272,7 +272,7 @@ which does not exist.
 and no style, so 2.1 and 2.3 had nothing to read. The summary now carries a
 flattened lowercase `search` blob written at save time, plus `framework`,
 `styleId` and `archived`. Parsing every document on every keystroke was the
-alternative, and a document carries its media as base64 — so that would have made
+alternative, and a document carries its media as base64, so that would have made
 search feel broken at exactly the volume where search starts to matter.
 
 A one-time index rebuild backfills all of it from the stored documents, because a
@@ -283,7 +283,7 @@ search box that cannot find anything made before today reads as broken.
 **What:** mark a carousel as published, and filter on it.
 
 **Why:** accidental repeat posting is real and the current fix is manual. A thread titled
-*"Organizational strategy to avoid posting same images"* — *"there's no way to know if they've been
+*"Organizational strategy to avoid posting same images"*, *"there's no way to know if they've been
 used unless I go look"*, solved by *"moving the images to a completed file once I post."* Also
 *"Every once in a while we will accidentally deliver too many pieces of content because we lost
 track in the mess"*, and *"the one thing worth keeping in a doc is which post went where and what
@@ -294,7 +294,7 @@ Cheap here, because `posts` already carries the stage.
 
 ---
 
-## Batch 3 — Brands
+## Batch 3, Brands
 
 **Status:** done
 **Size:** medium
@@ -304,7 +304,7 @@ already almost exactly the right shape, which makes this cheaper than it looks.
 
 ### 3.1 Brand as a saved object
 
-**What:** promote `Theme` to a named, user-owned `Brand` — colours with roles, display and body
+**What:** promote `Theme` to a named, user-owned `Brand`, colours with roles, display and body
 font, default format. Stored in Supabase, synced.
 
 **Why:** today every carousel re-picks colours from scratch. `Theme { bg, fg, accent, muted,
@@ -340,8 +340,8 @@ does not confiscate brands somebody already made.
 
 **An idempotence test caught a real bug in the remap.** The CTA block prints `theme.bg` on
 `theme.accent`, and the name-based fallback saw a layer called `Text`, reached for `fg`, and would
-have made that copy invisible against its own block. The fix — skip the fallback whenever a layer
-already wears one of the target theme's colours — is now guarded by its own test.
+have made that copy invisible against its own block. The fix, skip the fallback whenever a layer
+already wears one of the target theme's colours, is now guarded by its own test.
 
 **Still thin until Batch 5.** Brand logos need Supabase Storage, so a brand is currently colours,
 typefaces and a default format. Per-brand fonts are scoped but still capped at six in localStorage.
@@ -352,18 +352,18 @@ typefaces and a default format. Per-brand fonts are scoped but still capped at s
 
 ---
 
-## Batch 4 — Batch creation, done properly
+## Batch 4, Batch creation, done properly
 
 **Status:** done
 **Size:** large
 **Why here:** this is the wedge. No tool in the market offers a human-writable batch format.
-Contentdrips comes closest and its API turns out to be a **renderer, not a splitter** — the caller
+Contentdrips comes closest and its API turns out to be a **renderer, not a splitter**, the caller
 supplies every slide's content, and its own blog-to-carousel tutorial routes the splitting through
 ChatGPT in Make.com. Its CSV is one row per *field*, so a 10-slide carousel is 20+ rows. The hard
 part is explicitly not theirs.
 
 **The design constraint for this whole batch:** the loudest 1-star complaint in the category is
-sameness — *"the carousel tools I tried all spit out the same 8-slide hook / 5 tips / CTA
+sameness, *"the carousel tools I tried all spit out the same 8-slide hook / 5 tips / CTA
 layout."* Note the shape of that: it is **precisely what four frameworks become if applied
 mechanically at batch scale.** Vary slide count and section rhythm *within* a framework, not just
 the words. This is the single biggest risk in the document to FlashCC specifically.
@@ -387,7 +387,7 @@ survives regeneration.
 
 ### 4.2 Same words, more slides
 
-**What:** split a slide, merge two slides, and move a break — **without rewording anything.**
+**What:** split a slide, merge two slides, and move a break, **without rewording anything.**
 
 **Why:** explicitly unmet, from a paying API customer of a competitor: *"We use preserve, because
 our copy is client-approved and must not be reworded. That leaves us no way to express 'same
@@ -400,11 +400,11 @@ Related bug worth not repeating: a numbered list broken across a slide break res
 
 ### 4.3 One row per slide, grouped by post
 
-**What:** long-format *internally* — `post_id, slide_index, headline, body, …` — but **accept a
+**What:** long-format *internally*, `post_id, slide_index, headline, body, …`, but **accept a
 wide paste too, and normalise it.**
 
 **Why accept wide:** the wide shape is what everybody has been trained on, and it is taught
-verbatim — *"Each row in your table is going to become an entire carousel, and each column is one
+verbatim, *"Each row in your table is going to become an entire carousel, and each column is one
 text or image placeholder in your design"*, *"please put all the carousels in a table with one
 column per slide."* It is a learned workaround rather than a preference, but assuming long format
 is self-evidently right would be wrong: it is not what anyone has been shown. Meet people where
@@ -421,7 +421,7 @@ Long format gives variable slide count for free, in a sheet people can actually 
 
 ### 4.4 Batch pre-flight
 
-**What:** one screen before export — empty fields, overflowing text, missing images, slide count
+**What:** one screen before export, empty fields, overflowing text, missing images, slide count
 over the platform ceiling, duplicate hooks.
 
 **Why:** Canva's only signal for an unbound field is a small coloured dot, and the documented
@@ -444,7 +444,7 @@ the problem."* A batch that fails must say which item and leave the rest alone.
 
 ### 4.5 Text that does not fit gets another slide
 
-**What:** check every text layer in the batch, surface "7 of 240 slides overflow — here they are"
+**What:** check every text layer in the batch, surface "7 of 240 slides overflow, here they are"
 as a reviewable list, and offer **reflow or an extra slide** as the remedy.
 
 **Why:** overflow is the #1 documented Bulk Create failure and its only fix there is re-running the
@@ -455,7 +455,7 @@ presentation... almost every slide is visibly squashed."* And bluntly, 1-star: *
 everything into the top 5th of each page and then blanks the rest."*
 
 **This lands on code already shipped.** `fitToBox` in `text.ts` walks a 12-step ladder from
-largest to smallest and takes the first size that fits — the overflow guarantee *is*
+largest to smallest and takes the first size that fits, the overflow guarantee *is*
 shrink-to-fit. It has a floor so it never goes microscopic, but the remedy is still smaller type
 rather than another slide. The measurement work stays and is good; the remedy changes.
 
@@ -486,7 +486,7 @@ All eight, plus two defects the work exposed.
 
 **4.5 turned out to be unimplementable as written, twice over.** First, `fit()`
 measured with the default sans metric and `applyFonts` ran afterwards, so a mono
-or serif theme was sized for one typeface and rendered in another — that is D1
+or serif theme was sized for one typeface and rendered in another, that is D1
 in `reference.md`, and Terminal overflowed three slides in four. Second, and only
 visible once D1 was fixed: the split pass measured each layer against **its own
 box**, and when `fit` runs out of ladder the layer is built at the height it
@@ -497,19 +497,19 @@ reference that cannot move.
 **The shrink allowance needed a floor, not a step count.** "One or two steps"
 assumed a short ladder; the generation ladders span 104→40 across twelve steps,
 where two steps is 104→92 and would chop hooks constantly. It floors at 60% of
-each composition's own top size instead — below that a slide stops reading as
+each composition's own top size instead, below that a slide stops reading as
 designed and starts reading as crammed.
 
 **The sameness constraint became a mechanism, not a note.** The composition cycle
 now starts at an offset derived from the deck's own words, so two different
 carousels get different rhythms and the same carousel twice gets the same one.
 A test builds twenty decks from one framework and asserts they do not all come
-out identical — which the first version of that test proved they did.
+out identical, which the first version of that test proved they did.
 
 **4.6 was built as specified** despite the concern raised before starting. It is
 genuinely useful in the editor, where "Re-lay" re-runs generation and keeps
 anything you touched. `handEdited` is set in the two mutation funnels rather than
-at call sites, and is never inferred from content — a layer deliberately restored
+at call sites, and is never inferred from content, a layer deliberately restored
 to its original colour would otherwise silently lose its protection.
 
 **Also fixed in passing:** F1 from the reference (`Measure.family` was handed a
@@ -523,10 +523,10 @@ Canva already names files from a chosen column. Shipping without it is a visible
 
 ---
 
-## Batch 5 — The asset library
+## Batch 5, The asset library
 
 **Status:** done
-**Size:** large. The biggest engineering cost in this document — budget for it properly.
+**Size:** large. The biggest engineering cost in this document, budget for it properly.
 **Why here:** it blocks brand logos, and the current model is actively wrong at scale.
 
 ### 5.1 Media moves to Supabase Storage
@@ -573,12 +573,12 @@ paste the image url into csv and then reupload to scheduling tool for bulk sched
 FlashCC already renders the slides. Hosting them and emitting the row turns it from a design tool
 you then wrestle into a scheduler, into the missing first half of the bulk pipeline.
 
-**There is no lingua franca — build per-tool dialects, not one generic CSV.** The three that
+**There is no lingua franca, build per-tool dialects, not one generic CSV.** The three that
 accept carousels disagree fundamentally, and two of them are exact opposites:
 
 | Destination | Shape | Notes |
 | --- | --- | --- |
-| **Metricool** | One column per image, `Picture Url 1`..`10` | Explicitly warns *"Don't put all URLs in a single cell"*. Has a boolean `LinkedIn Images as Carousel` that **builds the LinkedIn PDF from image URLs for you** — the most directly competitive capability found anywhere. ~70 columns. |
+| **Metricool** | One column per image, `Picture Url 1`..`10` | Explicitly warns *"Don't put all URLs in a single cell"*. Has a boolean `LinkedIn Images as Carousel` that **builds the LinkedIn PDF from image URLs for you**, the most directly competitive capability found anywhere. ~70 columns. |
 | **Publer** | Comma-separated URLs in one cell | 12 columns, 500 rows. `Post subtype` accepts PDF, so it also ingests a finished document. Per-slide alt text separated by `\|\|`. $5/mo. |
 | **ContentStudio** | Newline-separated URLs in one cell | 9 columns, 500 rows. `Post Type` takes a literal `Instagram Carousel` / `LinkedIn Carousel` enum. |
 
@@ -601,7 +601,7 @@ mention.
 **The roadmap said "signed URL" for 5.1 and "public URLs" for 5.5, and those are
 not the same bucket.** A signed URL expires; the scheduler fetches the picture
 days later with no credentials, so it cannot host a published slide. So there are
-two buckets with opposite postures — `media` private and signed per session,
+two buckets with opposite postures, `media` private and signed per session,
 `slides` public and written only by pressing Publish. Anything else either breaks
 the CSV or makes every private upload world-readable.
 
@@ -610,8 +610,8 @@ posted to `server/render.ts` used to be self-contained: every image and every
 uploaded face travelled as a data URL, so the headless Chromium needed nothing
 from the network. Remote URLs would have made it fetch a customer's bucket
 mid-screenshot with credentials it does not have, and a slow fetch is a slide
-that ships with a hole in it. `inline.ts` fetches and re-inlines in the browser —
-which already holds a session that can read those files — just before serialising,
+that ships with a hole in it. `inline.ts` fetches and re-inlines in the browser,
+which already holds a session that can read those files, just before serialising,
 so the server's contract is unchanged.
 
 **`media.ts` was reporting every file a third too large.** `bytes: src.length`
@@ -626,7 +626,7 @@ document exactly as it was, and the next run finds the same pictures again.
 Content-fingerprinted, so one logo across twenty carousels becomes one object.
 
 **Fonts became assets rather than getting a bigger cap.** `MAX_FONTS = 6` was
-never a design decision — it was localStorage arithmetic wearing a product's
+never a design decision, it was localStorage arithmetic wearing a product's
 clothes. A font is now an `Asset` with `kind: "font"`, the ceiling is the plan,
 and the old localStorage key migrates itself on first run.
 
@@ -648,7 +648,7 @@ field, not a failed import.
 
 ---
 
-## Batch 6 — One asset becomes many
+## Batch 6, One asset becomes many
 
 **Status:** done
 **Size:** medium
@@ -661,7 +661,7 @@ field, not a failed import.
 then build carousels from the ones picked.
 
 **Why the interaction is this way round:** across the whole corpus nobody complains that slides
-look bad — they complain the machine picked the wrong material. The most-upvoted articulation:
+look bad, they complain the machine picked the wrong material. The most-upvoted articulation:
 *"its virality score and my audience disagree, constantly... I have stopped trusting the ranking
 and now I scrub the whole thing myself anyway, which defeats the point of paying... Looking
 specifically for: I choose the moment, it does the work."* Same failure in text: *"The Quotes,
@@ -675,9 +675,9 @@ operation.
 
 ### 6.2 Series as an object
 
-**Upgraded from inference to evidenced — and the pain is not what I assumed.** I had this as a
+**Upgraded from inference to evidenced, and the pain is not what I assumed.** I had this as a
 numbering-consistency feature. The actual problem is **discovery**: *"My Part 4 has 1M views but
-Part 1 has only 5K — because viewers can't find it."* *"It's tiresome for the audience to look for
+Part 1 has only 5K, because viewers can't find it."* *"It's tiresome for the audience to look for
 other parts in the profile section... So they just scroll to the next video."*
 
 The second problem is **momentum**: *"the last thing you want is for a piece of content to finally
@@ -685,7 +685,7 @@ go viral, but then by the time you make the part two in the series, it's like a 
 there's just no momentum anymore."*
 
 The third is that numbering lives in a doc and design lives elsewhere, and nothing reconciles them
-— *"scripts go into a single document, numbered 1-12."* People also ask out loud how to even
+*"scripts go into a single document, numbered 1-12."* People also ask out loud how to even
 schedule one: *"Drop them all at once? One per day? Spread them out more?"*
 
 **So a series should:** auto-number, generate a **cross-reference slide or caption pointing at the
@@ -700,7 +700,7 @@ do it by hand.
 
 **What:** derive the text post from slides 1–2, in the same screen.
 
-**Why:** the workflow experienced creators already hand-roll — *"write the carousel first, then
+**Why:** the workflow experienced creators already hand-roll, *"write the carousel first, then
 pull the text post out of slides 1 and 2. You're forced to fix the hook."* Currently everyone
 leaves for a second tool.
 
@@ -708,7 +708,7 @@ leaves for a second tool.
 
 **What:** a copyable text version of the whole deck for the caption or first comment.
 
-**Why:** per-slide alt text is **impossible** on both platforms — LinkedIn's Documents API carries
+**Why:** per-slide alt text is **impossible** on both platforms, LinkedIn's Documents API carries
 only a `title` field, and Meta's API excludes `alt_text` from carousel children. An accessibility
 audit found LinkedIn *"will acknowledge the presence of a graphic but fail to provide the
 corresponding alt text."* A transcript is the only available fix and **nobody ships it.**
@@ -726,13 +726,13 @@ All six, and the sixth turned out to be free.
 
 **6.6 was already the architecture.** Every route returns words and nothing else;
 `compositions.ts` makes every visual decision from them. There was no code to
-write, so it went into `CLAUDE.md` as invariant 5 instead — a rule that lives
+write, so it went into `CLAUDE.md` as invariant 5 instead, a rule that lives
 only in a roadmap is a rule the next feature quietly breaks.
 
 **6.1's candidate detection is deterministic and runs with no API key.** That was
 not in the plan and it is the most important decision in the batch. The thing
-people distrust is a model choosing their material — "I have stopped trusting the
-ranking and now I scrub the whole thing myself anyway" — and a heading is a choice
+people distrust is a model choosing their material, "I have stopped trusting the
+ranking and now I scrub the whole thing myself anyway", and a heading is a choice
 the author already made. `longform.ts` follows headings where there are any and
 falls back to even stretches cut at sentence ends, labelled as exactly that.
 Nothing is scored, nothing is pre-ticked, nothing is called recommended.
@@ -760,12 +760,12 @@ nothing shows until the gap is genuinely open.
 font size were chosen for the old words; writing longer text into them is how
 "some text ending up too small to read" arrives by a different door. `restateSlide`
 rebuilds the whole deck and takes one slide, because composition selection depends
-on the index, the total and the seed — and returns the whole regeneration when the
+on the index, the total and the seed, and returns the whole regeneration when the
 rewrite is long enough to change the slide count.
 
 **6.4 is deterministic on purpose.** The words are already approved; a model
 rewriting them would be answering a question nobody asked. It is the rearrangement
-experienced creators already hand-roll — slides 1 and 2 and the closer — with a
+experienced creators already hand-roll, slides 1 and 2 and the closer, with a
 character count against the platform's real ceiling, because a caption is
 truncated live rather than rejected and nothing says so.
 
@@ -774,7 +774,7 @@ alone, which reads as a truncated caption; it is now the same derived text post.
 
 ---
 
-## Batch 7 — Clients and approval
+## Batch 7, Clients and approval
 
 **Status:** done
 **Size:** large
@@ -787,7 +787,7 @@ alone, which reads as a truncated caption; it is now the same derived text post.
 > forms a series out of a group's contents. A client owns; a group organises.
 
 **What:** a Client owns brands, assets, projects and posts. Ship **both** per-client filter and
-all-client roll-up — the evidence demands both: *"I can separate each one so that nothing gets
+all-client roll-up, the evidence demands both: *"I can separate each one so that nothing gets
 mixed"* (Gain, praise) alongside *"it was a downside to have to toggle back and forth between
 clients instead of seeing everything under one view"* (CoSchedule, complaint).
 
@@ -816,7 +816,7 @@ they're able to view only what's needed and not all our comments"* (Planable).
 
 Agency logo and colour on the share page. Gain gates this at $199; trivially cheap here.
 
-### 7.6 Approvers are free and unlimited — non-negotiable
+### 7.6 Approvers are free and unlimited, non-negotiable
 
 Sprout charges **$499/month per external approver** and caps the account at three. It is the
 loudest single complaint in the corpus. Planable, Gain and Ziflow all give reviewer seats away as
@@ -827,7 +827,7 @@ an acquisition lever. Campaign against the anti-pattern.
 All six, and one of them was a paragraph rather than a feature.
 
 **7.1 does not replace the group string, and the roadmap was wrong to say it
-would.** `group` is a folder — "March", "Launch" — and somebody with one client
+would.** `group` is a folder, "March", "Launch", and somebody with one client
 still wants folders; Batch 6 also forms a series out of a group's contents, so
 removing it would have taken that with it. A client sits ABOVE the group: it owns
 brands, assets, projects and posts, and the folder is a drawer inside. `ALL_CLIENTS`
@@ -836,7 +836,7 @@ the CoSchedule complaint is precisely about a tool that only does separation.
 
 **Deleting a client does not delete their work.** Everything it owned becomes
 unassigned. A cascading foreign key here would mean an agency losing a client
-loses a year of carousels, with no undo — so `client_id` is a plain nullable
+loses a year of carousels, with no undo, so `client_id` is a plain nullable
 column on four tables and deliberately not an FK, and the confirmation says so
 before anybody presses it.
 
@@ -846,7 +846,7 @@ only place where RLS is not the boundary: a reviewer has no `auth.uid()`, and an
 anon policy that trusts a token in the row means letting the anon key read
 `shares` to find the match, which is the same as letting it read every share. So
 `server/review.ts` holds the service role key and is the boundary, written to be
-read end to end — and `strip()` is an allow list rather than a delete list, so a
+read end to end, and `strip()` is an allow list rather than a delete list, so a
 column added next year is absent by default instead of leaking by default.
 
 **A share is a SNAPSHOT of rendered slides, not a window onto the editor.** Three
@@ -859,15 +859,15 @@ records the public URLs.
 **7.4 is `docVersion` and one stored string.** The fingerprint covers geometry
 and colour as well as words, because "safeties to ensure that approved images
 aren't confused with modified ones" is about a nudged headline as much as a
-rewritten one — and it ignores ids and timestamps, so re-laying a deck to the
+rewritten one, and it ignores ids and timestamps, so re-laying a deck to the
 identical result does not invalidate an approval. A stale approval is reported,
 never revoked: deciding for somebody that their sign-off is void is worse than
 telling them it is old.
 
 **7.3's filter lives on the server, not in the page.** A leak in that direction
 is the single worst bug this product could ship, so `scope` is hard-coded to
-`client` on the public insert route — a malformed body cannot mint an internal
-note — and the reviewer's read never selects one.
+`client` on the public insert route, a malformed body cannot mint an internal
+note, and the reviewer's read never selects one.
 
 **7.5 turned out to need a signing step nobody mentioned.** `brands.logos` holds
 asset IDS, and those assets live in the private `media` bucket. The server signs
@@ -876,7 +876,7 @@ opened in six weeks still shows a logo.
 
 **7.6 was a paragraph.** There was nothing to build except not adding a seat cap.
 It is now invariant 6 in `CLAUDE.md`, a comment at the foot of `07-review.sql`,
-and `REVIEWER_PROMISE` on the pricing screen — because a commitment that lives
+and `REVIEWER_PROMISE` on the pricing screen, because a commitment that lives
 only in a roadmap is one the next paywall quietly breaks.
 
 **Also:** a component may no longer share a name with a module beside it. This
@@ -885,7 +885,7 @@ so the convention is written into `CLAUDE.md` with the four existing pairs named
 
 ---
 
-## Batch 8 — Trust, and the long tail
+## Batch 8, Trust, and the long tail
 
 **Status:** done
 **Size:** small to medium
@@ -894,7 +894,7 @@ so the convention is written into `CLAUDE.md` with the four existing pairs named
 
 **What:** import LinkedIn's own post-analytics export to backfill metrics.
 
-**Why:** manual metric entry is genuinely differentiated — nobody else has it — but it is also the
+**Why:** manual metric entry is genuinely differentiated, nobody else has it, but it is also the
 churn risk. AuthoredUp's LinkedIn-archive backfill is one of the most-praised features in the
 entire audit and the only comparable thing in the market. This de-risks the loop.
 
@@ -915,18 +915,18 @@ already uses "no credit limits" as its wedge. **Costs nothing. Nobody has taken 
 not a general undo history.
 
 **This call partially reverses.** The earlier passes found no complaints about version history and
-I treated that as a reason to deprioritise. The community layer does have the pain — it is just
+I treated that as a reason to deprioritise. The community layer does have the pain, it is just
 never called "version history". It is called file chaos: *"my desktop used to be a graveyard of
 Canva exports, CapCut drafts, random PNGs and 'final_final' files."* On the incumbent
 specifically: *"I wanted to keep proper versioning but it seems I have to make copies of the file
 to keep older versions."* And from an agency, which is the version that matters most: *"I'd also
 like some safeties to ensure that approved images aren't confused with modified ones."*
 
-That last one pairs directly with 7.4 — approval stamped to a version — and is the strongest
+That last one pairs directly with 7.4, approval stamped to a version, and is the strongest
 argument for building this at all.
 
 **Still true:** nobody names it as a buying reason, so build it and do not lead marketing with it.
-Tier by retention — none free, 30 days Pro, unlimited Agency — which is Planable's proven ladder.
+Tier by retention, none free, 30 days Pro, unlimited Agency, which is Planable's proven ladder.
 
 ### 8.4 Pipeline fields the market converges on
 
@@ -944,7 +944,7 @@ All five, and two of them were paragraphs.
 
 **8.2 was already true and nobody was being told.** `ENTITLED` in
 `server/billing.ts` treats `active` as entitled, and Stripe keeps a cancelled
-subscription active until the period it was paid for ends — so "you keep what
+subscription active until the period it was paid for ends, so "you keep what
 you paid for" has held since billing shipped. What was missing was that
 `plan_renews_at` alone cannot distinguish "renews on the 3rd" from "ends on the
 3rd", and the account card showed a renewal date either way. One boolean carried
@@ -953,15 +953,15 @@ in the words somebody would use if they were telling you honestly.
 
 **8.5 was nothing at all.** Grep found no credit, quota, usage or metering
 concept anywhere in `src/` or `server/`. There was nothing to remove, so it
-became invariant 7 and `UNMETERED_PROMISE` beside the reviewer one — because a
+became invariant 7 and `UNMETERED_PROMISE` beside the reviewer one, because a
 commitment that lives only in a roadmap is one the next paywall quietly breaks.
 That is now the third time a roadmap item has turned out to be a rule rather than
 a feature, after 6.6 and 7.6, and the pattern is worth naming: the cheapest
 things in this document are the ones that cost nothing and nobody has taken.
 
 **8.1's matching is the feature, and the unmatched rows are the screen.** Three
-passes of descending confidence — URL, exact text, leading text within a date
-window — each consuming what it claims, so a weaker rule can never overwrite a
+passes of descending confidence, URL, exact text, leading text within a date
+window, each consuming what it claims, so a weaker rule can never overwrite a
 stronger one. Anything unplaced is RETURNED and shown with a dropdown rather than
 dropped: an import that quietly places 40 of 60 is worse than one that places 40
 and tells you, because the first leaves somebody believing their history is
@@ -970,7 +970,7 @@ complete.
 **Absent is not zero, and that took two guards.** `readNumber` returns null for a
 blank rather than 0, because a fabricated zero goes straight into the median
 every insight screen runs on. And `applyMatches` writes only the fields the file
-carried — LinkedIn's export has no saves column, and zeroing a hand-entered saves
+carried, LinkedIn's export has no saves column, and zeroing a hand-entered saves
 count because the file was silent would destroy exactly the data this feature
 exists to protect.
 
@@ -978,7 +978,7 @@ exists to protect.
 make.** The stated pain is losing your own earlier state on the machine you are
 working on; syncing a snapshot of every export across devices would multiply the
 largest records in the product for a need nobody described. That also means it
-needed no migration and works today with no database — so this batch ships ONE
+needed no migration and works today with no database, so this batch ships ONE
 migration rather than the two flagged in the plan.
 
 **The diff compares by position, not by slide id.** Re-laying a deck mints new
@@ -992,13 +992,13 @@ cannot take back.
 
 ---
 
-## Batch 9 — Make the paywall real
+## Batch 9, Make the paywall real
 
 **Status:** done
 **Size:** medium
 **Why here:** every feature the pricing screen sells is currently free, and five
 server routes answer to anyone. Written after an audit against the live database
-on 2026-09-23 rather than from the code alone — every claim below was verified.
+on 2026-09-23 rather than from the code alone, every claim below was verified.
 
 ### What the audit found
 
@@ -1007,8 +1007,8 @@ Probed with the publishable key against the real project:
 | Object | State |
 | --- | --- |
 | `profiles`, `docs`, `posts` | live, and RLS correctly returns 0 rows to an anonymous caller |
-| `brands`, `assets`, `clients`, `shares`, `comments` | **missing** — 03, 04, 06, 07 unrun |
-| `docs.series_id`, `docs.client_id`, `posts.pillar`, `profiles.plan_ends_at_period_end` | **missing** — 05, 06, 08 unrun |
+| `brands`, `assets`, `clients`, `shares`, `comments` | **missing**, 03, 04, 06, 07 unrun |
+| `docs.series_id`, `docs.client_id`, `posts.pillar`, `profiles.plan_ends_at_period_end` | **missing**, 05, 06, 08 unrun |
 
 And in the code: **`isPro` is exported from `auth.ts` and used in zero places.**
 Nothing anywhere gates on plan except the label on the account card. Somebody who
@@ -1025,7 +1025,7 @@ suggestions that anyone can edit in devtools.
 **Done when:** all eight tables exist and a second account can be shown to read
 none of the first account's rows.
 
-### 9.2 Close the open routes — but not all of them the same way
+### 9.2 Close the open routes, but not all of them the same way
 
 Five routes take no bearer token. They are not the same problem and must not get
 the same answer:
@@ -1034,12 +1034,12 @@ the same answer:
 | --- | --- | --- |
 | `/api/draft`, `/api/hooks` | **your Anthropic key, unmetered** | require a caller AND `is_pro` |
 | `/api/slides`, `/api/document` | Playwright CPU, and publishing already needs an account to upload | require a caller |
-| `/api/export` | Playwright CPU | **stays open** — see below |
+| `/api/export` | Playwright CPU | **stays open**, see below |
 
 **`/api/export` must not require an account.** "Make carousels and export them"
 is the free product and it is documented to work with no key and no sign-in at
 all. Requiring auth there would break the free tier to fix an abuse problem, so
-export gets rate limiting and tighter size caps instead — the limiter already
+export gets rate limiting and tighter size caps instead, the limiter already
 written for the review endpoint, lifted somewhere both can use it.
 
 **Done when:** an unauthenticated POST to `/api/draft` is refused, an
@@ -1049,7 +1049,7 @@ draft request is refused by the server rather than by the interface.
 ### 9.3 Decide what Pro actually is, then enforce it server-side
 
 The pricing screen currently promises eight things for Pro and five for Agency.
-Each needs a real boundary or needs removing from the list — an advertised
+Each needs a real boundary or needs removing from the list, an advertised
 feature with no gate is a promise to the customer that the product does not keep
 in either direction.
 
@@ -1069,7 +1069,7 @@ on the server, or gone from the screen.
 
 A gate that returns a raw 403 to `ai.ts` surfaces as "Drafting failed (403)".
 Every gated call needs to come back as an upgrade prompt rather than an error,
-and the client already has the shape for it — `useAccount` knows the plan and
+and the client already has the shape for it, `useAccount` knows the plan and
 `Upgrade` is one state away.
 
 **Done when:** hitting a Pro feature on a free account opens the pricing panel
@@ -1081,7 +1081,7 @@ with a line saying what was being attempted.
 cursor. It does not clear `flashcc:v1:versions:<id>`, so signing out on a shared
 machine leaves whole documents in localStorage for whoever signs in next. Small
 blast radius, ten-minute fix, and it is the kind of thing that is embarrassing
-rather than dangerous — which is exactly the kind that ships.
+rather than dangerous, which is exactly the kind that ships.
 
 ### 9.6 The things Stripe needs that are not code
 
@@ -1102,8 +1102,8 @@ taking money.
 
 ### Built as
 
-Four of the six. 9.1 and 9.6 are not mine to do — applying SQL and setting env
-vars are yours — so what shipped is everything that makes them safe to do, plus
+Four of the six. 9.1 and 9.6 are not mine to do, applying SQL and setting env
+vars are yours, so what shipped is everything that makes them safe to do, plus
 `npm run check:schema`, which probes the live project and names each unrun file.
 
 **The five open routes did not all get the same answer, and the plan was right
@@ -1111,7 +1111,7 @@ that they should not.** `/api/draft` and `/api/hooks` spend money, so they need 
 caller AND a plan. `/api/slides` and `/api/document` already needed an account to
 upload their own output, so requiring one closes them for free. `/api/export`
 **stays open**, because "make carousels and export them" is the free tier and
-CLAUDE.md commits to it working with no key and no sign-in — breaking that to fix
+CLAUDE.md commits to it working with no key and no sign-in, breaking that to fix
 an abuse problem would be fixing the wrong thing. It gets a rate limit instead,
 and the paid half is enforced only on the numbered-image path, with an OPTIONAL
 bearer token: absent means PDF, present is checked.
@@ -1124,7 +1124,7 @@ above it and `App` swaps screens rather than nesting them.
 
 **`is_pro()` cannot be called from the server, and finding that out early
 mattered.** It is `security definer` and reads `auth.uid()`, which is null for
-the service role — so it would have answered false for everybody and the gate
+the service role, so it would have answered false for everybody and the gate
 would have looked like it worked while refusing paying customers. The server
 reads `profiles.plan` through `readBilling` instead.
 
@@ -1144,17 +1144,17 @@ every slide of every deck. Three separate faults:
    served both axes, so clearing the top and bottom crop would have made every
    slide needlessly narrow. Split into `MX = 96` and `MY = 140`.
 2. **The full-bleed exemption tested both axes at once.** A band spanning the
-   full width and a few hundred pixels tall — every framework's closing block —
+   full width and a few hundred pixels tall, every framework's closing block,
    was reported as a mistake. Now judged per axis (this was D4).
 3. **The message was wrong and the scope was wrong.** Instagram's box is a
    profile-grid CROP, not an interface overlay, and the grid only ever shows the
-   cover — so warning about slide 7 described something that cannot happen.
+   cover, so warning about slide 7 described something that cannot happen.
    `Platform` gained `safeKind` and `safeScope`.
 
 And a fourth thing no constant could fix: a deck reflowed to TikTok's 1080x1920
 kept its 96px side margins and put every headline under an action rail that
 covers the right 180px. `safearea.ts` pulls content clear of the destination's
-chrome on a format change — uniform scale, not per-axis clamping, because
+chrome on a format change, uniform scale, not per-axis clamping, because
 clamping each layer separately unaligns a composition that was aligned.
 
 **180 deck/platform combinations now produce zero safe-zone warnings**, and a
@@ -1183,7 +1183,7 @@ Each of these was considered and rejected on evidence.
 
 ---
 
-## Evidence caveats — read before treating any quote as load-bearing
+## Evidence caveats, read before treating any quote as load-bearing
 
 **Reddit was hard-blocked for every research pass.** Direct fetch, `r.jina.ai`, `old.reddit`, the
 JSON API and search proxies all 403'd. One pass reached it through the PullPush Pushshift
@@ -1191,7 +1191,7 @@ replacement; the others fell back to Capterra, GetApp, SoftwareAdvice and Trustp
 populations are more price-sensitive and more vocal than Reddit**, which likely biases the "churn
 is all about price" finding upward.
 
-**G2 and TrustRadius 403'd on nearly every fetch** — the richest B2B "cons" corpus was
+**G2 and TrustRadius 403'd on nearly every fetch**, the richest B2B "cons" corpus was
 inaccessible.
 
 **The shared 200-call WebSearch budget was exhausted early**, shared across all four passes and
@@ -1229,8 +1229,8 @@ where those probably live. Twitter/X was inaccessible throughout.
 
 **One research pass corrected itself twice after filing**, and both sets of corrections are folded
 in above. The second addendum closed the per-tool bulk question by going at vendor help centres,
-changelogs, raw CSV template files, the GitHub REST API and a redlib Reddit mirror — roughly 250
-fetches — after the direct routes were blocked. It also skews Trustpilot/GetApp/AppSumo, because
+changelogs, raw CSV template files, the GitHub REST API and a redlib Reddit mirror, roughly 250
+fetches, after the direct routes were blocked. It also skews Trustpilot/GetApp/AppSumo, because
 G2, Capterra-direct and TrustRadius were CAPTCHA-blocked throughout, and it flags its own
 unresolved items (Hypefury row limits, a Publer "50 images per cell" claim, a SocialBee 300-vs-1,000
 row conflict).
@@ -1238,12 +1238,12 @@ row conflict).
 **The first addendum corrected itself on two points.**
 It had overcredited a competitor's API by reading its marketing rather than its tutorial, and had
 recommended shrink-to-fit before the community layer showed shrink-to-fit is the complaint. Where
-the addendum conflicted with the first report, the addendum won — it had the Reddit evidence the
+the addendum conflicted with the first report, the addendum won, it had the Reddit evidence the
 first pass lacked.
 
 **Do not treat "presets run once, nothing is derived" as a differentiator.** A competitor shipped
 an AI design agent in March 2026 doing the same LLM-to-JSON-to-editable-layers thing. It is still
-the right architecture — it is the structural answer to fixed-box-then-squeeze — but it is table
+the right architecture, it is the structural answer to fixed-box-then-squeeze, but it is table
 stakes. Differentiate on split quality and on control over slide count and break points.
 
 **Post-generation editing is the stated churn path**, verbatim from a $90/mo customer: *"The
@@ -1260,14 +1260,14 @@ that endpoint is not.
 
 **Worth closing later:** a browser-driven Reddit session would reach the r/Design thread
 *"Designers, how do you deal with 'Can we go back to version 2?'"* and r/SocialMediaManagers
-*"How do you organize client content?"* — both located and confirmed live, neither readable.
+*"How do you organize client content?"*, both located and confirmed live, neither readable.
 
 ---
 
 ## Where this stands
 
 Eight batches built the product. A ninth, added after an audit on 2026-09-23,
-makes it sellable — see Batch 9 above. What the eight turned out to be, in one
+makes it sellable, see Batch 9 above. What the eight turned out to be, in one
 line each:
 
 | | Was | Turned out to be |
@@ -1281,8 +1281,8 @@ line each:
 | 7 | Clients and approval | A review link, and the only place RLS is not the boundary |
 | 8 | Trust, and the long tail | Two features and three promises |
 
-**Three roadmap items turned out to be rules rather than features** — 6.6, 7.6
-and 8.5 — and all three are now invariants in `CLAUDE.md` with the copy that
+**Three roadmap items turned out to be rules rather than features**, 6.6, 7.6
+and 8.5, and all three are now invariants in `CLAUDE.md` with the copy that
 states them. They were also three of the cheapest things in this document, which
 is worth remembering when the next one is written.
 
@@ -1290,5 +1290,5 @@ is worth remembering when the next one is written.
 effort. That list is the other half of the plan and should be re-read before
 anything is added to it.
 
-The open work is Batch 9, and `docs/reference.md` §29 — the defect list, which is
+The open work is Batch 9, and `docs/reference.md` §29, the defect list, which is
 deliberately not a roadmap item and should not be folded into one.

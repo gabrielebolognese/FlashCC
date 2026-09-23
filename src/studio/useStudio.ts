@@ -22,8 +22,8 @@ import { saveDoc } from "./storage.js";
 const LIMIT = 120;
 
 /**
- * All editor state. Snapshot history, so undo covers everything — every layer edit,
- * every reorder, every slide operation — without a command class per action.
+ * All editor state. Snapshot history, so undo covers everything, every layer edit,
+ * every reorder, every slide operation, without a command class per action.
  */
 export function useStudio(initial: Doc) {
   const [doc, setDoc] = useState(initial);
@@ -33,7 +33,7 @@ export function useStudio(initial: Doc) {
   const [editingId, setEditingId] = useState<string | null>(null);
   // Which platform's covered areas to draw over the canvas. Null is off. It lives
   // here rather than in Canvas so the toolbar can drive it, and it is deliberately
-  // NOT part of Doc — it is a view setting, not something about the artwork, and
+  // NOT part of Doc, it is a view setting, not something about the artwork, and
   // it must never reach the export path.
   const [safePlatform, setSafePlatform] = useState<PlatformId | null>(null);
 
@@ -47,7 +47,7 @@ export function useStudio(initial: Doc) {
 
   const commit = useCallback((raw: Doc, coalesce?: string) => {
     // A blank canvas has no hook to be named after yet. Rather than leaving it
-    // "Untitled" forever, it takes a name the moment there is one to take —
+    // "Untitled" forever, it takes a name the moment there is one to take,
     // which is also the only point at which the name would be right. A name the
     // user chose is never overwritten, because isUnnamed only matches the ones
     // the app supplied.
@@ -257,7 +257,7 @@ export function useStudio(initial: Doc) {
 
   // Re-lays the layers that are there rather than just changing the numbers.
   // The old version kept every pixel position, so going taller stranded the
-  // content in the top two-thirds — see reflow.ts for why it is not a scale
+  // content in the top two-thirds, see reflow.ts for why it is not a scale
   // either, and why it does not regenerate from the source text.
   const setFormat = useCallback(
     (w: number, h: number) => {

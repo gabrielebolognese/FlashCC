@@ -93,7 +93,7 @@ describe("regenerating", () => {
 
   /**
    * A shorter regeneration would otherwise strand hand-edited layers on slides
-   * that no longer exist — silently losing exactly the work this protects.
+   * that no longer exist, silently losing exactly the work this protects.
    */
   it("rescues hand edits from slides the regeneration removed", () => {
     const doc = deck();

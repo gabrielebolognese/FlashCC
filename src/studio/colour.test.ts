@@ -147,6 +147,6 @@ describe("fonts", () => {
   it("names a real format and a real source for every entry", () => {
     for (const f of FONT_FORMATS) expect(f.ext).toMatch(/^\.(woff2|woff|ttf|otf)$/);
     for (const s of FONT_SOURCES) expect(s.url).toMatch(/^[a-z0-9.-]+\.[a-z]{2,}$/);
-    expect(FONT_FORMATS[0]?.ext, "woff2 should lead — it is the smallest").toBe(".woff2");
+    expect(FONT_FORMATS[0]?.ext, "woff2 should lead, it is the smallest").toBe(".woff2");
   });
 });

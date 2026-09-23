@@ -5,7 +5,7 @@
  * export payload used to be SELF-CONTAINED. Every picture and every uploaded
  * face travelled as a data URL, so the headless Chromium in `server/render.ts`
  * rendered a page that needed nothing from the network. Swap in remote URLs and
- * that quietly stops being true — the renderer starts fetching a customer's
+ * that quietly stops being true, the renderer starts fetching a customer's
  * storage bucket mid-screenshot, with whatever credentials it does not have, and
  * a slow or failed fetch becomes a slide that ships with a hole in it.
  *
@@ -65,7 +65,7 @@ async function urlMap(urls: readonly string[]): Promise<Map<string, string>> {
 /**
  * The document, with every picture carried rather than referenced.
  *
- * Never persisted — this is the copy handed to the serialiser and then dropped.
+ * Never persisted, this is the copy handed to the serialiser and then dropped.
  * Writing it back would undo the whole point of the library.
  */
 export async function inlineDoc(doc: Doc): Promise<Doc> {

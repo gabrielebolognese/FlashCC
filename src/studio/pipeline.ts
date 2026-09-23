@@ -6,7 +6,7 @@
  * publication of it, so the same carousel can go to LinkedIn on Tuesday and Instagram
  * on Friday as two records carrying two sets of numbers.
  *
- * The load-bearing fields are the structural ones — framework, hook, slideCount,
+ * The load-bearing fields are the structural ones, framework, hook, slideCount,
  * styleId. They are COPIED off the document when the post is created rather than
  * looked up through docId later, because the document keeps being edited and the
  * thing that earned the numbers is the version that actually went out. That snapshot
@@ -27,7 +27,7 @@ export type Stage = "idea" | "drafting" | "ready" | "scheduled" | "posted";
  * Closed, because this is the one of the five new fields that analytics groups
  * by and an open set turns every typo into its own bucket. Four values, which is
  * the set every content calendar in the research converges on under different
- * names — deliberately not five, because "brand" and "authority" are the same
+ * names, deliberately not five, because "brand" and "authority" are the same
  * answer and offering both means the data splits across them.
  */
 export type Objective = "awareness" | "engagement" | "authority" | "conversion";
@@ -120,7 +120,7 @@ export type Post = {
   stage: Stage;
   platform: Platform;
 
-  /* the structural snapshot — see the note at the top of this file */
+  /* the structural snapshot, see the note at the top of this file */
   framework: string | null;
   slideCount: number;
   hook: string;
@@ -154,7 +154,7 @@ export type Post = {
    * every typo becomes its own bucket.
    */
 
-  /** "Education", "Behind the scenes" — the recurring theme. Attributable. */
+  /** "Education", "Behind the scenes", the recurring theme. Attributable. */
   pillar: string;
   /** A launch, a season, a campaign name. Free text; it is a proper noun. */
   campaign: string;

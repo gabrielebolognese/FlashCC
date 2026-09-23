@@ -2,7 +2,7 @@
  * Choose a platform, see what is wrong, get a file.
  *
  * The check runs before the export rather than after, because every problem it
- * finds is invisible at design time and expensive afterwards — a 14pt caption
+ * finds is invisible at design time and expensive afterwards, a 14pt caption
  * looks fine at 100% zoom and turns to mush once LinkedIn recompresses it, and a
  * twenty-slide Instagram carousel looks fine right up until no scheduler will
  * publish it.
@@ -12,7 +12,7 @@
  *
  * There are two ways out of here, and they are genuinely different jobs. DOWNLOAD
  * hands you a file to upload by hand. PUBLISH hosts the rendered slides and gives
- * you a CSV row that already knows their URLs — which is the half of the bulk
+ * you a CSV row that already knows their URLs, which is the half of the bulk
  * pipeline no scheduler provides and every scheduler requires.
  */
 import { AlertTriangle, Check, Download, FileDown, Images, Link2, Table, X } from "lucide-react";
@@ -90,7 +90,7 @@ export function ExportDialog({ doc, onClose }: { doc: Doc; onClose: () => void }
   const run = async () => {
     // Taken before the render rather than after it: the point of an export
     // snapshot is "this is what I sent out", and the deck cannot change during
-    // a render anyway — so the earlier call is the one that cannot be missed by
+    // a render anyway, so the earlier call is the one that cannot be missed by
     // a failure halfway through.
     snapshot(doc, "export", sessionPlan(), `Exported for ${platform.label}`);
     setPhase({ at: "working" });

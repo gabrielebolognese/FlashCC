@@ -4,7 +4,7 @@
  * The client does not draw anything here. It serialises the markup LayerView
  * already produces and posts it to the server, which renders it in a real
  * browser at exact size. That keeps the invariant that matters most in this
- * codebase — LayerView is the only painter — and it is why a gradient headline
+ * codebase, LayerView is the only painter, and it is why a gradient headline
  * in the editor is the same gradient headline in the export rather than an
  * approximation from a second renderer that drifted.
  *
@@ -13,7 +13,7 @@
  * them, so anything not sent is silently substituted with Arial.
  *
  * Since the asset library, pictures and faces are no longer data URLs in the
- * editor — they are signed URLs into a bucket. So the payload is INLINED first,
+ * editor, they are signed URLs into a bucket. So the payload is INLINED first,
  * by `inline.ts`, and the server goes on receiving a page that needs nothing
  * from the network. See the note there for why that matters more than it looks.
  */
@@ -93,7 +93,7 @@ export type ExportResult =
 /**
  * Renders server-side and hands the browser a download.
  *
- * The file is fetched rather than linked because the response is a POST — and
+ * The file is fetched rather than linked because the response is a POST, and
  * because the byte count is worth knowing: it feeds back into the size check,
  * which is the one pre-flight rule that cannot be evaluated until the pixels
  * exist.
@@ -105,7 +105,7 @@ export async function exportDeck(doc: Doc, platform: Platform): Promise<ExportRe
    * The token is OPTIONAL on this one call, and that is the whole design.
    *
    * PDF export is the free tier and works with no account at all, so a missing
-   * session must not stop the request — it just means the server will refuse the
+   * session must not stop the request, it just means the server will refuse the
    * numbered-image path. Sent when there is one, omitted when there is not.
    */
   let headers: Record<string, string> = { "Content-Type": "application/json" };

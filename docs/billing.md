@@ -1,14 +1,14 @@
 # Billing setup
 
-Stripe, end to end. Test mode throughout — swap to live keys only when you are ready to charge
+Stripe, end to end. Test mode throughout, swap to live keys only when you are ready to charge
 real people.
 
 ## How it works, in one paragraph
 
 The browser can do exactly one billing thing: ask the server for a Checkout link. It never says
 what plan someone is on, and the server never believes it if it does. What a person actually has
-is decided in one place — `server/billing.ts`, handling a webhook whose signature has been
-verified against the Stripe secret — and written with the Supabase service role key, because the
+is decided in one place, `server/billing.ts`, handling a webhook whose signature has been
+verified against the Stripe secret, and written with the Supabase service role key, because the
 database refuses `profiles.plan` to everyone else. Get that backwards and the paywall is theatre:
 a client that reports its own plan can report any plan.
 
@@ -30,7 +30,7 @@ It never gets a `VITE_` prefix, never goes in the browser, never gets logged.
 | FlashCC Pro | 29.00 | Recurring, monthly |
 | FlashCC Agency | 79.00 | Recurring, monthly |
 
-After saving each, copy the **price id** — it starts with `price_`, not `prod_`. That distinction
+After saving each, copy the **price id**, it starts with `price_`, not `prod_`. That distinction
 costs people an afternoon.
 
 ```
@@ -91,8 +91,8 @@ supabase/02-pro-gate.sql
 Paste it into the Supabase SQL editor and run it. Until then a free account syncs its pipeline
 like a paying one, and there is nothing to buy.
 
-After it, a free account can still **read** everything it already has — a lapsed subscriber
-pulling their own history back out is not the moment to look like confiscation — but cannot write
+After it, a free account can still **read** everything it already has, a lapsed subscriber
+pulling their own history back out is not the moment to look like confiscation, but cannot write
 new pipeline records to the cloud. Carousels are never gated; the editor is the free tier.
 
 ## What is deliberately not built
@@ -102,5 +102,5 @@ new pipeline records to the cloud. Carousels are never gated; the editor is the 
   details, which is a compliance burden for a screen Stripe hosts for free.
 - **Proration and plan switching logic.** The portal does it.
 - **Dunning.** Stripe's retry and reminder settings do it. Note that `past_due` currently counts
-  as entitled, so a failed payment does not cut access off mid-retry — change `ENTITLED` in
+  as entitled, so a failed payment does not cut access off mid-retry, change `ENTITLED` in
   `server/billing.ts` if you would rather it did.

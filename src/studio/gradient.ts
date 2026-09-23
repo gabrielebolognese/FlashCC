@@ -1,7 +1,7 @@
 /**
  * Gradients, for slide backgrounds and for text.
  *
- * Stored as data — type, angle, origin and an ordered list of stops — never as a CSS
+ * Stored as data, type, angle, origin and an ordered list of stops, never as a CSS
  * string, so the same value can be painted as CSS, read back into the editor, and
  * carried in a style preset.
  */
@@ -78,7 +78,7 @@ export function setStop(g: Gradient, index: number, patch: Partial<Stop>): Gradi
   };
 }
 
-/** The colour the ramp shows at a position — used when inserting a stop. */
+/** The colour the ramp shows at a position, used when inserting a stop. */
 export function sampleAt(g: Gradient, at: number): string {
   const stops = sortStops(g.stops);
   const t = clamp01(at);
@@ -110,7 +110,7 @@ function mixHex(a: string, b: string, t: number): string {
   return `#${((to(r1, r2) << 16) | (to(g1, g2) << 8) | to(b1, b2)).toString(16).padStart(6, "0")}`;
 }
 
-/** The average of the ramp — a readable stand-in wherever one flat colour is needed. */
+/** The average of the ramp, a readable stand-in wherever one flat colour is needed. */
 export function averageColour(g: Gradient): string {
   const stops = sortStops(g.stops);
   if (stops.length === 0) return "#000000";

@@ -35,7 +35,7 @@ export type DocSummary = {
    *
    * Denormalised on purpose. The alternative is parsing every stored document on
    * every keystroke, and a document carries its slides, its layers and its media
-   * as base64 — so that would make search feel broken at exactly the volume where
+   * as base64, so that would make search feel broken at exactly the volume where
    * search starts to matter.
    */
   search?: string | undefined;
@@ -70,7 +70,7 @@ export function listDocs(): DocSummary[] {
  * Backfills summaries written before search and facets existed.
  *
  * Without this, everything you made until today is invisible to the search box
- * and absent from every filter — which is the exact moment a new feature reads
+ * and absent from every filter, which is the exact moment a new feature reads
  * as broken, because the work you most want to find is the oldest.
  *
  * Runs once. Reading every document is expensive and pointless to repeat, so a

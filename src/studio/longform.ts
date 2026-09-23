@@ -47,8 +47,8 @@ const normalise = (source: string): string => source.replace(/\r\n?/g, "\n").rep
 const MD_HEADING = /^#{1,6}\s+(.+)$/;
 const SETEXT = /^(=|-){3,}\s*$/;
 
-/** `00:12`, `1:02:33`, `[00:12]`, `(00:12:33)` — with or without a trailing dash. */
-const TIMESTAMP = /^[\s([]*\d{1,2}:\d{2}(?::\d{2})?[\s)\]]*[-–—]?\s*/;
+/** `00:12`, `1:02:33`, `[00:12]`, `(00:12:33)`, with or without a trailing dash. */
+const TIMESTAMP = /^[\s([]*\d{1,2}:\d{2}(?::\d{2})?[\s)\]]*[-\u2013\u2014]?\s*/;
 
 /** `Name:` or `NAME [00:12]:` at the head of a line. Two words at most, so a
  *  sentence containing a colon is not mistaken for a speaker turn. */
@@ -105,7 +105,7 @@ export function segments(source: string): Segment[] {
       .filter(Boolean);
 
     // A transcript has no paragraphs, so sentences are regrouped into readable
-    // ones. Three is not a rule about prose — it is the size at which a chunk
+    // ones. Three is not a rule about prose, it is the size at which a chunk
     // still fits on a slide after fitting.
     const all = sentences(cleaned.join(" "));
     for (let i = 0; i < all.length; i += 3) {
@@ -164,7 +164,7 @@ export function segments(source: string): Segment[] {
 
 /* ── sentences ────────────────────────────────────────────────────────────── */
 
-/** Endings that are not endings. Extended rather than clever — it is a list. */
+/** Endings that are not endings. Extended rather than clever, it is a list. */
 const ABBREVIATIONS = new Set([
   "mr", "mrs", "ms", "dr", "prof", "sr", "jr", "st", "vs", "etc", "eg", "ie",
   "approx", "fig", "inc", "ltd", "co", "no", "al", "dept", "est", "min", "max",
@@ -179,7 +179,7 @@ const ABBREVIATIONS = new Set([
  *
  * A candidate boundary is a terminator followed by whitespace and something that
  * can start a sentence. It is rejected when the word before it is a known
- * abbreviation, a single initial, or a number — "3." is a list marker, not the
+ * abbreviation, a single initial, or a number, "3." is a list marker, not the
  * end of a thought.
  */
 export function sentences(text: string): string[] {
@@ -242,7 +242,7 @@ export type LongFormResult = {
  *
  * A heading defines a candidate when the document has headings, because whoever
  * wrote it already decided where the ideas divide and second-guessing them is
- * the mistake. Material with no headings is windowed at sentence boundaries — an
+ * the mistake. Material with no headings is windowed at sentence boundaries, an
  * arbitrary but honest cut, and the labelling says so rather than implying the
  * machine found a theme.
  */
@@ -319,7 +319,7 @@ function byWindow(segs: readonly Segment[]): Candidate[] {
 
   const flush = () => {
     if (buffer.length === 0) return;
-    out.push(make("", buffer, `An even stretch — ${buffer.length} paragraphs`, out.length));
+    out.push(make("", buffer, `An even stretch, ${buffer.length} paragraphs`, out.length));
     buffer = [];
     size = 0;
   };
@@ -355,7 +355,7 @@ export type BlockOptions = {
  *
  * A long paragraph is divided at sentence ends and never anywhere else; a short
  * one is left whole. When there is more material than slides, trailing
- * paragraphs are MERGED into the last slide rather than dropped — generation's
+ * paragraphs are MERGED into the last slide rather than dropped, generation's
  * own split pass will give an overlong slide another slide if it needs one,
  * whereas material thrown away here is gone without anyone being told.
  */

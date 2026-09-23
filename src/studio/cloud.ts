@@ -4,11 +4,11 @@
  *
  * The cloud is OPTIONAL everywhere. With no environment variables set, every
  * function here reports "not configured" and the app carries on exactly as it did
- * before — localStorage only. That is not politeness, it is how the free tier
+ * before, localStorage only. That is not politeness, it is how the free tier
  * works and how the thing stays developable without a network.
  *
  * On keys: the publishable key is meant to be in the bundle. It is a public
- * identifier, not a secret, and it authorises nothing by itself — the row level
+ * identifier, not a secret, and it authorises nothing by itself, the row level
  * security policies in supabase/01-schema.sql are the boundary. The secret /
  * service role key is the opposite of that and must never appear in this folder.
  */
@@ -22,7 +22,7 @@ import type { Metrics, Platform, Post, Stage } from "./pipeline.js";
 
 const URL = import.meta.env.VITE_SUPABASE_URL?.trim();
 // Supabase is moving projects from the legacy JWT `anon` key to sb_publishable_*.
-// Both authorise the same thing — nothing, on their own — so either is accepted
+// Both authorise the same thing, nothing, on their own, so either is accepted
 // and a key copied from today's dashboard works without renaming anything.
 const ANON =
   import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY?.trim() ??
@@ -43,7 +43,7 @@ export function cloud(): SupabaseClient | null {
        * PKCE, not the implicit flow supabase-js defaults to.
        *
        * The difference is what comes back in the URL. Implicit returns
-       * `#access_token=...&refresh_token=...` — the real, long-lived credential,
+       * `#access_token=...&refresh_token=...`, the real, long-lived credential,
        * sitting in browser history and readable by anything running on the page.
        * The fragment never reaches a server, which is the only reason that was
        * tolerable at all.
@@ -227,7 +227,7 @@ export const rowToDoc = (row: DocRow): Doc => ({
   ...(row.framework ? { framework: row.framework } : {}),
   ...(row.style_id ? { styleId: row.style_id } : {}),
   // The columns arrive with 05-series.sql. Until then `data` still carries it,
-  // which the spread above has already applied — so a project that has not run
+  // which the spread above has already applied, so a project that has not run
   // the migration keeps its series locally and simply cannot query by it.
   ...(row.series_id && row.series_part
     ? { series: { id: row.series_id, part: row.series_part } }
@@ -304,7 +304,7 @@ export const rowToPost = (row: PostRow): Post => ({
  * `impressions` is generated from `metrics` and Postgres rejects any attempt to
  * set it; `server_updated_at` is the sync clock and is stamped by a trigger. Both
  * come back on every select, so a pulled row that gets edited and pushed again
- * would carry them — and the only symptom is a 400 from PostgREST that reads like
+ * would carry them, and the only symptom is a 400 from PostgREST that reads like
  * a schema mismatch. Cheaper to strip once here than to debug at each call site.
  */
 export const forWrite = <T extends object>(row: T): Omit<T, "impressions" | "server_updated_at"> => {

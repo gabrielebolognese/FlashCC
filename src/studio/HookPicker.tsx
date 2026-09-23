@@ -2,9 +2,9 @@
  * Several ways to open, side by side.
  *
  * The screen is a LIST, not a ranking. The loudest complaint in the research is
- * about exactly that — "its virality score and my audience disagree, constantly...
+ * about exactly that, "its virality score and my audience disagree, constantly...
  * I have stopped trusting the ranking and now I scrub the whole thing myself
- * anyway, which defeats the point of paying" — so nothing here is starred,
+ * anyway, which defeats the point of paying", so nothing here is starred,
  * scored, sorted by confidence or marked recommended. Each one names the angle
  * it takes, which is what lets a choice be made on judgement.
  *
@@ -98,7 +98,7 @@ export function HookPicker({
         <div className="scroll-quiet flex-1 overflow-y-auto p-5">
           <p className="text-caption leading-4 text-muted">
             Each one is written against the slides you already have, so it promises something the
-            deck actually delivers. They are not ranked — you know your audience.
+            deck actually delivers. They are not ranked, you know your audience.
           </p>
 
           <div className="mt-3">

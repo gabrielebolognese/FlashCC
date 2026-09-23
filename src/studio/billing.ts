@@ -1,7 +1,7 @@
 /**
  * The browser's half of billing: ask for a link, then go there.
  *
- * Deliberately thin. Nothing here decides or reports what plan someone is on —
+ * Deliberately thin. Nothing here decides or reports what plan someone is on,
  * that comes back from the database, written by a webhook the server verified
  * against Stripe. A client that told us its own plan would be a client that could
  * tell us any plan.

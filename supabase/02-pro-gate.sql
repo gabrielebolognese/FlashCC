@@ -1,16 +1,16 @@
--- FlashCC — turn the paywall on
+-- FlashCC, turn the paywall on
 --
 -- DO NOT RUN THIS YET. Run it when Stripe is wired and something is actually
 -- setting profiles.plan, or every account including yours loses the pipeline.
 --
 -- What it does: makes the cloud copy of the pipeline a Pro feature in the
--- DATABASE rather than in the interface. A client-side check is a suggestion —
+-- DATABASE rather than in the interface. A client-side check is a suggestion,
 -- anyone can flip a boolean in devtools or POST to the REST endpoint directly.
 -- After this, a free account's insert is refused by Postgres.
 --
 -- Free accounts keep working: everything still saves to localStorage, and the
 -- app is built to run with no cloud at all. What they lose is the synced,
--- durable, multi-device copy — which is the thing being sold.
+-- durable, multi-device copy, which is the thing being sold.
 --
 -- Carousels are deliberately NOT gated. Making them is the free tier, and a
 -- paywall on the editor would just make this a worse Canva. The history is

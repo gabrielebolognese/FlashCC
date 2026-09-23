@@ -396,7 +396,7 @@ export function Canvas({ studio }: { studio: Studio }) {
     setGuides([]);
   };
 
-  /** Topmost image layer under the pointer — a drop lands there, sized to its box. */
+  /** Topmost image layer under the pointer, a drop lands there, sized to its box. */
   const imageUnder = (clientX: number, clientY: number): Layer | undefined => {
     const p = toBoard(clientX, clientY);
     return [...layers]
@@ -561,7 +561,7 @@ export function Canvas({ studio }: { studio: Studio }) {
         <button
           type="button"
           onClick={fit}
-          title="Fit to view — scroll to zoom, hold Ctrl or Shift to pan"
+          title="Fit to view, scroll to zoom, hold Ctrl or Shift to pan"
           className="px-1 font-mono text-caption text-tertiary hover:text-primary"
         >
           {Math.round(zoom * 100)}%

@@ -8,7 +8,7 @@
  * filters already express "this week's batch" perfectly well.
  *
  * It is slow and it says so. Each deck is a full headless render of up to ten
- * pages plus an upload each, so twenty carousels is minutes — which is fine, and
+ * pages plus an upload each, so twenty carousels is minutes, which is fine, and
  * is still the fastest anyone has ever got from ten designs to a scheduler-ready
  * sheet. What is not fine is a spinner with no numbers on it, so there are
  * numbers on it.
@@ -49,7 +49,7 @@ export function PublishBatch({ ids, onClose }: { ids: readonly string[]; onClose
 
     // Loaded and resolved up front. A stored document carries asset references
     // rather than files, and the renderer is handed a page that must not need
-    // the network — so the URLs have to exist before the first render starts.
+    // the network, so the URLs have to exist before the first render starts.
     const docs: Doc[] = [];
     for (const id of ids) {
       const doc = loadDoc(id);
@@ -157,7 +157,7 @@ export function PublishBatch({ ids, onClose }: { ids: readonly string[]; onClose
 
           <p className="mt-4 text-caption leading-4 text-muted">
             Slides are hosted at public URLs so the scheduler can fetch them. Anyone with a link can
-            see that slide — which is what publishing means, and what every importer requires.
+            see that slide, which is what publishing means, and what every importer requires.
           </p>
 
           {phase.at === "working" ? (

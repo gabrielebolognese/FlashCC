@@ -1,5 +1,5 @@
 /**
- * The media pool — preparing a file for use, and nothing else.
+ * The media pool, preparing a file for use, and nothing else.
  *
  * Every import is downscaled hard before it is kept. That began as a localStorage
  * quota problem and survives the move to a bucket for a better reason: a 12

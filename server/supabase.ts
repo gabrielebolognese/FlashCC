@@ -3,7 +3,7 @@
  *
  * VERIFYING a caller: the browser sends the access token it already holds, and
  * Supabase says whether it is genuine and whose it is. Never trust a user id sent
- * in a request body — that is just a number the caller typed.
+ * in a request body, that is just a number the caller typed.
  *
  * WRITING the plan: with the service role key, which bypasses row level security
  * entirely. That is the point. The browser deliberately cannot write
@@ -74,7 +74,7 @@ export type PlanName = "free" | "pro" | "agency";
  *
  * The plan is read from `profiles` with the service key rather than by calling
  * `is_pro()`. That function is `security definer` and reads `auth.uid()`, which
- * is null for the service role — so it would answer false for everybody and the
+ * is null for the service role, so it would answer false for everybody and the
  * gate would look like it worked while refusing paying customers.
  */
 export async function requirePro(
@@ -139,7 +139,7 @@ export async function readBilling(
 
 /**
  * Stripe knows a customer, not a user. The mapping is kept on our side so a
- * webhook that arrives with only a customer id can still find whose it is —
+ * webhook that arrives with only a customer id can still find whose it is,
  * Stripe metadata is a convenience, not somewhere to keep the only copy.
  */
 export async function userIdForCustomer(customerId: string): Promise<string | null> {

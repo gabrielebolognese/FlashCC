@@ -2,7 +2,7 @@
  * The two flat views over the same records: what is coming, and what already went.
  *
  * The board is for moving work along; these are for the two jobs that actually happen
- * on a weekday — checking what goes out today, and typing last week's numbers in.
+ * on a weekday, checking what goes out today, and typing last week's numbers in.
  */
 import { CalendarClock, Check, ExternalLink, Send, TrendingUp } from "lucide-react";
 

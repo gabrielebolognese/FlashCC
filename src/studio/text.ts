@@ -3,7 +3,7 @@
  *
  * The old code guessed a slide's text height from character count
  * (`ceil(len / 18) * size`), which is wrong the moment a line breaks early or a word
- * is unusually wide — so long hooks overflowed the artboard. This wraps the text the
+ * is unusually wide, so long hooks overflowed the artboard. This wraps the text the
  * way the browser will, counts the lines that actually result, and derives the height
  * from that.
  *
@@ -36,7 +36,7 @@ const SAFETY = 1.02;
 
 export type Measure = {
   /**
-   * A FONTS id — "sans", "serif", "mono" — NOT a CSS stack.
+   * A FONTS id, "sans", "serif", "mono", NOT a CSS stack.
    *
    * FAMILY_SCALE is keyed by id, so handing this a stack makes every lookup miss
    * and silently measures as sans. That was live in two callers and is exactly

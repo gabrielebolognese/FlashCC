@@ -1,7 +1,7 @@
 /**
  * First-run preferences.
  *
- * Answers here are turned into a real style and two real generation settings — they
+ * Answers here are turned into a real style and two real generation settings, they
  * are not stored and ignored. Skipping is a first-class path: the defaults are the
  * same ones the app would have used anyway.
  */
@@ -144,7 +144,7 @@ export const decorScale = (level: DecorLevel): number =>
 
 export const wantsImages = (use: ImageUse): boolean => use !== "never";
 
-/** Accents offered in the questionnaire — readable on both grounds. */
+/** Accents offered in the questionnaire, readable on both grounds. */
 export const ACCENTS = [
   "#d9a521", "#ef4444", "#f97316", "#22c55e",
   "#3b82f6", "#8b5cf6", "#ec4899", "#14b8a6",

@@ -1,7 +1,7 @@
 /**
  * What this carousel looked like at the moments that mattered.
  *
- * Not an undo list — `useStudio` already has one of those and it covers
+ * Not an undo list, `useStudio` already has one of those and it covers
  * keystrokes. This covers three or four points in a carousel's life: you sent it
  * for approval, you exported it, you rebranded it. Restorable whole, or one
  * slide at a time, which is the case that actually comes up when a client asks
@@ -9,7 +9,7 @@
  *
  * The filmstrip is a DIFF, not a preview. Showing what the version looked like
  * is barely useful; showing which slides are not what you have now is the whole
- * question — *"safeties to ensure that approved images aren't confused with
+ * question, *"safeties to ensure that approved images aren't confused with
  * modified ones."*
  */
 import { History, RotateCcw, Trash2, X } from "lucide-react";
@@ -82,7 +82,7 @@ export function HistoryPanel({
         <div className="scroll-quiet flex-1 overflow-y-auto p-5">
           {off ? (
             <p className="mb-4 rounded-2xl border border-hairline bg-surface-1 px-3.5 py-2.5 text-body leading-5 text-tertiary">
-              History is a Pro feature. Nothing is being kept on this plan — a history that only went
+              History is a Pro feature. Nothing is being kept on this plan, a history that only went
               back two saves would look like a safety net without being one.
             </p>
           ) : null}
@@ -91,7 +91,7 @@ export function HistoryPanel({
             <Empty
               icon={History}
               title="Nothing saved yet"
-              body="A version is kept when you send this for approval, export it, or apply a brand — the moments worth going back to, rather than every keystroke."
+              body="A version is kept when you send this for approval, export it, or apply a brand, the moments worth going back to, rather than every keystroke."
               action={
                 off ? undefined : (
                   <button
@@ -168,7 +168,7 @@ export function HistoryPanel({
                             ].join(" ")}
                           >
                             {/* The version's slide, because that is the thing being
-                                offered — the current one is already on screen behind
+                                offered, the current one is already on screen behind
                                 this dialog. */}
                             {d.before ? (
                               <SlidePreview slide={d.before} />
@@ -211,7 +211,7 @@ export function HistoryPanel({
                     </div>
 
                     <p className="mt-3 text-caption leading-4 text-muted">
-                      The arrow on a slide puts that one back and leaves the rest alone — which is
+                      The arrow on a slide puts that one back and leaves the rest alone, which is
                       usually what is being asked for.
                     </p>
                   </>
@@ -262,7 +262,7 @@ export function HistoryPanel({
                 <button
                   type="button"
                   onClick={() => {
-                    // Snapshotted first, so restoring is itself undoable — going
+                    // Snapshotted first, so restoring is itself undoable, going
                     // back should never be the one move you cannot take back.
                     snapshot(doc, "manual", plan, "Before restoring");
                     onRestore(restoreAll(doc, selected));

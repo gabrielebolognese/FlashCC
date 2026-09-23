@@ -1,5 +1,5 @@
 /**
- * The canvas model. Flat layers on an artboard — the Photoshop/Figma model, not a
+ * The canvas model. Flat layers on an artboard, the Photoshop/Figma model, not a
  * document model.
  *
  * There are no roles, no blocks, no templates at runtime and nothing derived. A slide
@@ -67,7 +67,7 @@ export type Layer = {
   /**
    * The library asset this picture came from, when it came from one.
    *
-   * `src` is the URL currently being painted and goes stale — a signed URL
+   * `src` is the URL currently being painted and goes stale, a signed URL
    * expires, and a document reopened next week would show a broken image. This
    * is the durable half: `assets.resolveDoc` puts a live URL back into `src`
    * from it. Absent means the bytes are inline in `src`, which is still how a
@@ -81,7 +81,7 @@ export type Layer = {
  *
  * `src` is whatever an `<img>` should point at right now: a data URL for a
  * project with no account, a signed URL once the file lives in a bucket.
- * `assetId` is the durable reference — see the note on `Layer.assetId`.
+ * `assetId` is the durable reference, see the note on `Layer.assetId`.
  */
 export type MediaItem = {
   id: string;
@@ -109,12 +109,12 @@ export type Doc = {
   name: string;
   width: number;
   height: number;
-  /** Saved swatches. Not a brand lock — just colours you reach for. */
+  /** Saved swatches. Not a brand lock, just colours you reach for. */
   palette: string[];
   /** Uploaded images, shared across every slide in the project. */
   media: MediaItem[];
   /**
-   * Which client this belongs to. Absent is a real answer — most of anybody's
+   * Which client this belongs to. Absent is a real answer, most of anybody's
    * library is unassigned, and the roll-up shows it either way. See clients.ts.
    */
   clientId?: string | undefined;
@@ -128,7 +128,7 @@ export type Doc = {
   group?: string | undefined;
   /**
    * How this carousel was made. Stamped once at generation and never re-derived,
-   * because it is what analytics attributes performance to — a post cannot tell you
+   * because it is what analytics attributes performance to, a post cannot tell you
    * that Problem → Solution outperforms unless something remembered which one it was.
    */
   framework?: string | undefined;
@@ -139,7 +139,7 @@ export type Doc = {
    * On the document rather than in a table of its own: a series is two fields,
    * every screen that shows a carousel wants them, and a join to find out
    * whether something is part 3 of 6 would be a round trip for a badge. See
-   * series.ts — the shape is declared there because that is where the reasoning
+   * series.ts, the shape is declared there because that is where the reasoning
    * lives, and `Doc` only has to carry it.
    */
   series?: { id: string; part: number } | undefined;
@@ -185,7 +185,7 @@ export const FONTS: FontChoice[] = [
 
 /**
  * Faces the user uploaded. Registered at runtime, so `fontStack` has to consult this
- * before the built-ins — a layer only ever stores the id.
+ * before the built-ins, a layer only ever stores the id.
  */
 const runtime = new Map<string, FontChoice>();
 
@@ -200,7 +200,7 @@ export function unregisterFont(id: string): void {
 /**
  * The built-ins, plus every uploaded face that belongs here.
  *
- * Passing no brand gives you the unscoped faces only — which is the right
+ * Passing no brand gives you the unscoped faces only, which is the right
  * default: an unknown context should not leak one brand's type into another's.
  */
 export const allFonts = (brandId?: string | undefined): FontChoice[] => [

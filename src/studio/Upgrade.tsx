@@ -2,9 +2,9 @@
  * The pricing panel.
  *
  * The tiers are drawn along the line the product actually splits on: making a
- * carousel is the free part, and everything that turns making into a practice —
+ * carousel is the free part, and everything that turns making into a practice,
  * keeping the history, scheduling it, learning from it, running more than one
- * brand — is what a subscription is for. A tool that gated the editor would just
+ * brand, is what a subscription is for. A tool that gated the editor would just
  * be a worse Canva; gating the loop is the only version of this worth money.
  *
  * Nothing here knows what plan you are on. It is told, from a profile the server
@@ -38,15 +38,15 @@ type Tier = {
  * changed into the thing it was built against.
  */
 export const REVIEWER_PROMISE =
-  "Everyone you send a review link to is free. No seats, no per-approver fee, no cap on how many people can comment or approve. Not as an introductory offer — as the point.";
+  "Everyone you send a review link to is free. No seats, no per-approver fee, no cap on how many people can comment or approve. Not as an introductory offer, as the point.";
 
 /**
  * The second commitment on this screen, and the cheapest one in the document.
  *
  * "A rationing system, not a content tool" is how users describe metered
  * competitors, and a rival already uses "no credit limits" as its wedge. There is
- * no credit, quota or usage counter anywhere in this codebase — see CLAUDE.md
- * invariant 7 — so this costs nothing to say and nobody else has said it.
+ * no credit, quota or usage counter anywhere in this codebase, see CLAUDE.md
+ * invariant 7, so this costs nothing to say and nobody else has said it.
  */
 export const UNMETERED_PROMISE =
   "Nothing here is metered. No credits, no generation limits, no counting your exports. Plans differ by what they do, never by how many times you may do it.";
@@ -62,7 +62,7 @@ export const UNMETERED_PROMISE =
  * revoking access the moment you cancel, Later charging $180 four months after a
  * cancellation.
  *
- * FlashCC already behaves this way — `ENTITLED` in server/billing.ts keeps a
+ * FlashCC already behaves this way, `ENTITLED` in server/billing.ts keeps a
  * cancelled subscription entitled until Stripe ends the period, and the billing
  * portal is one click from here. What was missing was saying so, which is the
  * whole of 8.2 and costs nothing.
@@ -111,7 +111,7 @@ export const PLANS: Tier[] = [
     features: [
       "Everything in Free",
       "Up to 5 clients",
-      "Review links — unlimited reviewers, free",
+      "Review links, unlimited reviewers, free",
       "Pipeline board and scheduling",
       "Analytics with structural attribution",
       "Outlier detection on your own baseline",

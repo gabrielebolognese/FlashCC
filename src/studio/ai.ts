@@ -6,7 +6,7 @@ export type DraftedSlide = { role: string; text: string };
 
 /**
  * Ask the drafting server for slide copy. The key lives server-side, so this is a
- * plain fetch to our own origin — nothing secret ever reaches the bundle.
+ * plain fetch to our own origin, nothing secret ever reaches the bundle.
  */
 export async function draftSlides(
   brief: string,

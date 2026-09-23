@@ -3,8 +3,8 @@
  *
  * Without this, sync has no way to tell "you never had this" apart from "this was
  * thrown away", and the two need opposite handling. Delete a project on your
- * laptop, open your phone, and the phone — which still has the row and no idea it
- * was removed — pushes it straight back up. The deletion undoes itself, and it
+ * laptop, open your phone, and the phone, which still has the row and no idea it
+ * was removed, pushes it straight back up. The deletion undoes itself, and it
  * keeps undoing itself every time the two devices meet.
  *
  * A tombstone turns a deletion into an ordinary edit with a timestamp, so the same

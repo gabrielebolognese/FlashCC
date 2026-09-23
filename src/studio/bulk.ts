@@ -2,7 +2,7 @@
  * Bulk creation.
  *
  * One paste, many carousels. Blocks are separated by a line of three or more dashes,
- * and inside a block a blank line is a slide break — the same rule the single-post
+ * and inside a block a blank line is a slide break, the same rule the single-post
  * path already uses, so nothing new has to be learned.
  */
 import { buildSlides, type BuildOptions } from "./compositions.js";
@@ -71,7 +71,7 @@ export function buildDocs(
       ...(group ? { group } : {}),
       // Stamped here as well as on the single-carousel path. Without it a bulk
       // deck is invisible to the framework and style attribution that is the
-      // whole reason the pipeline records structure — and bulk is precisely
+      // whole reason the pipeline records structure, and bulk is precisely
       // where enough posts to attribute anything come from.
       framework: structure.id,
       ...(styleId ? { styleId } : {}),
@@ -136,7 +136,7 @@ export function readBulk(source: string): BulkSource {
   };
 }
 
-/** Slide 1 and slide N — the two the operator writes and AI does not. */
+/** Slide 1 and slide N, the two the operator writes and AI does not. */
 export const hookOf = (block: BulkBlock): string => block.texts[0] ?? "";
 export const payoffOf = (block: BulkBlock): string =>
   block.texts.length > 1 ? (block.texts[block.texts.length - 1] ?? "") : "";
@@ -144,7 +144,7 @@ export const payoffOf = (block: BulkBlock): string =>
 export function setHook(block: BulkBlock, text: string): BulkBlock {
   const texts = [...block.texts];
   texts[0] = text;
-  // The name followed the old hook, so it follows the new one — unless the name
+  // The name followed the old hook, so it follows the new one, unless the name
   // came from a column, which is a choice rather than a derivation.
   return { texts, title: nameFromHook(text) || block.title };
 }

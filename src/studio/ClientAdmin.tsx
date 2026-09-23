@@ -1,12 +1,12 @@
 /**
  * Clients: the switcher in the rail, and the screen that manages them.
  *
- * `ClientAdmin` rather than `Clients` because `clients.ts` is beside it — see
+ * `ClientAdmin` rather than `Clients` because `clients.ts` is beside it, see
  * the naming note in CLAUDE.md.
  *
  * ── The switcher has "All clients" as a first-class option ───────────────────
  *
- * Not as an escape hatch you find when the filter is in your way — as the
+ * Not as an escape hatch you find when the filter is in your way, as the
  * default and the top entry. The evidence asks for both halves at once:
  *
  *   "I can separate each one so that nothing gets mixed"       (Gain, praise)
@@ -212,7 +212,7 @@ export function ClientAdmin({ plan }: { plan: Plan | undefined }) {
         <Empty
           icon={Building2}
           title="No clients yet"
-          body="A client owns their own brands, assets, carousels and posts. Make one and the rail gains a switcher — with an all-clients view that never goes away."
+          body="A client owns their own brands, assets, carousels and posts. Make one and the rail gains a switcher, with an all-clients view that never goes away."
           action={
             <button
               type="button"

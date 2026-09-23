@@ -2,14 +2,14 @@
  * Does the database match the code?
  *
  * Every migration in supabase/ is a file somebody has to remember to run, and
- * nothing in the app notices when one has not been — the client degrades quietly
+ * nothing in the app notices when one has not been, the client degrades quietly
  * by design, so a missing table looks like a feature that is merely unused. This
  * is the thing that says so out loud.
  *
  *   npm run check:schema
  *
- * Read-only. It probes PostgREST with the PUBLISHABLE key — the same one the
- * browser holds, which authorises nothing by itself — so it can tell a missing
+ * Read-only. It probes PostgREST with the PUBLISHABLE key, the same one the
+ * browser holds, which authorises nothing by itself, so it can tell a missing
  * table from an empty one but never sees anybody's rows. An anonymous caller
  * getting 200 with zero rows back from a table that exists is RLS working, and
  * is reported as such.
@@ -85,7 +85,7 @@ for (const { migration, table, column } of EXPECTED) {
     // Zero rows to an anonymous caller is the correct answer. Anything else
     // means a policy is missing and is the single most serious thing this
     // script can find.
-    const note = result.rows === 0 ? "ok" : `RLS LEAK — ${result.rows} row(s) to anon`;
+    const note = result.rows === 0 ? "ok" : `RLS LEAK, ${result.rows} row(s) to anon`;
     if (result.rows > 0) leaked += 1;
     console.log(`  ${what.padEnd(34)} ${note}`);
   } else if (result.missing) {
@@ -112,5 +112,5 @@ if (missing.size > 0) {
 
 console.log("  Everything the code expects is there.\n");
 console.log("  Not checked, because a public key cannot see them:");
-console.log("    02-pro-gate.sql and 09-gates.sql — the paywall policies.");
+console.log("    02-pro-gate.sql and 09-gates.sql, the paywall policies.");
 console.log("    Verify those by signing in on a free account and being refused.\n");

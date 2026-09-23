@@ -1,5 +1,5 @@
 > **Superseded.** This describes the design that the Photoshop-model rewrite replaced. It is kept
-> for history only — nothing in it matches the code. It states the document is semantic and stores no pixel positions; a `Doc` is now flat layers in artboard pixels.
+> for history only, nothing in it matches the code. It states the document is semantic and stores no pixel positions; a `Doc` is now flat layers in artboard pixels.
 >
 > The current reference is [`docs/reference.md`](../reference.md).
 
@@ -25,7 +25,7 @@ type FlashCCDocument = {
   name: string                      // project name, edited in the top bar
   format: FormatId
   granularity: Granularity          // the split setting, part of the doc: it reproduces the split
-  source: string                    // canonical source text — see §4
+  source: string                    // canonical source text, see §4
   brandKit: BrandKit
   slides: Slide[]
   createdAt: IsoDate
@@ -66,7 +66,7 @@ type Block =
   | { id: BlockId; type: "label";     text: string }   // eyebrow / kicker
 ```
 
-Four content types plus a label. All text is **plain strings** — no inline marks, no rich text, no
+Four content types plus a label. All text is **plain strings**, no inline marks, no rich text, no
 spans. The source pane is plain text, and FlashCC never rewrites copy, so there is nothing to
 carry. This also keeps phase-2 conversion trivial: a block maps to one text layer, or in the list
 case to one layer per item.
@@ -86,7 +86,7 @@ type BrandKit = {
     body: TypeRoleSpec              // paragraphs, list items
   }
   logo?: {
-    src: DataUri                    // embedded, not a URL — export must not hit the network
+    src: DataUri                    // embedded, not a URL, export must not hit the network
     placement: Corner | "none"
     scale: number                   // 0.5–2, relative to the role layout's logo slot
   }
@@ -167,13 +167,13 @@ by `serialize(doc)` after any structural mutation (reorder, duplicate, delete, s
 **Round-trip requirement:** `parse(serialize(doc))` yields the same block content and slide
 boundaries as `doc`.
 
-Serialisation format — plain text, nothing invented:
+Serialisation format, plain text, nothing invented:
 
 - Slides separated by a blank line.
 - A slide's blocks separated by a single newline where the role permits multiple blocks.
 - List items keep their `- ` markers.
 - Quote blocks keep a leading `> `.
-- Attribution is the line after a quote, prefixed `— `.
+- Attribution is the line after a quote, prefixed `, `.
 
 No sentinels, no fenced metadata, no HTML comments. If the user pastes the serialised text into a
 new document they get the same carousel back. Anything that requires hidden syntax to survive is a
@@ -186,7 +186,7 @@ single typo from resetting the user's role choices.
 
 ---
 
-## 5. Splitting — deterministic rules
+## 5. Splitting, deterministic rules
 
 Order matters; the first matching rule wins.
 
@@ -196,7 +196,7 @@ Order matters; the first matching rule wins.
 3. Within a group:
    - ≥2 consecutive lines each starting with `-`, `*`, `•`, or `1.` / `1)` → one `list` block
      (`ordered` from the marker type). A single such line is a paragraph, not a list.
-   - Lines starting `>` → `quote` block; a following `— …` line becomes `attribution`.
+   - Lines starting `>` → `quote` block; a following `, …` line becomes `attribution`.
    - Otherwise → `paragraph` block; a single line ending without terminal punctuation and under 60
      characters becomes a `heading`.
 
@@ -239,5 +239,5 @@ load; an unknown or invalid document opens the project list rather than crashing
 editor. No accounts, no sync, no server persistence in v1.
 
 The logo is a data URI inside the document, which makes documents self-contained and exportable
-without the network — at the cost of localStorage headroom. Cap the logo at ~256KB after
+without the network, at the cost of localStorage headroom. Cap the logo at ~256KB after
 downscaling and reject larger uploads with an inline message.

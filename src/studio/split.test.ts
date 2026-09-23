@@ -31,7 +31,7 @@ const LONG =
   "The viewer is already following the movement, so they never notice the edit at all. " +
   "That is the whole trick, and it takes about ten minutes to learn.";
 
-/** Words in, words out — the promise the whole module rests on. */
+/** Words in, words out, the promise the whole module rests on. */
 const words = (s: string): string[] => s.split(/\s+/).filter(Boolean);
 
 describe("fitting within an allowance", () => {
@@ -49,7 +49,7 @@ describe("fitting within an allowance", () => {
    * found a size here. Two steps deliberately does not, so the copy gets another
    * slide instead of being squashed into this one.
    */
-  it("would have accepted it with the whole ladder — which is the point", () => {
+  it("would have accepted it with the whole ladder, which is the point", () => {
     const box = spec(880, 170);
     expect(sizeWithin(LONG, box, 2)).toBeNull();
     expect(sizeWithin(LONG, box, 11)).not.toBeNull();
@@ -80,7 +80,7 @@ describe("splitting copy", () => {
 
   /**
    * Given room to work, every piece starts a sentence. Squeeze the box hard
-   * enough and it has to fall through to word breaks — that is the documented
+   * enough and it has to fall through to word breaks, that is the documented
    * ladder, and better than refusing to split at all.
    */
   it("cuts on sentence boundaries when the box leaves it the choice", () => {

@@ -16,7 +16,7 @@ import {
 import { hasCloudSession, sessionPlan } from "./session.js";
 
 /**
- * Upload a font, and — as importantly — say what a usable font file looks like and
+ * Upload a font, and, as importantly, say what a usable font file looks like and
  * where to get one. Most people have never downloaded a .woff2 and will otherwise
  * drop in a 3MB .ttf and hit the cap with no idea why.
  */

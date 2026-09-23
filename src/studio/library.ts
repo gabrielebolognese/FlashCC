@@ -51,7 +51,7 @@ const urls = new Map<string, string>();
 
 export const forgetUrls = (): void => urls.clear();
 
-/** The address to paint, or nothing — never a broken empty string. */
+/** The address to paint, or nothing, never a broken empty string. */
 export function urlFor(asset: Asset): string | undefined {
   if (asset.data) return asset.data;
   return urls.get(asset.id);
@@ -217,7 +217,7 @@ export async function importImages(
   return error === undefined ? { assets: out } : { assets: out, error };
 }
 
-/** A font, stored the same way — see fonts.ts for the FontFace half. */
+/** A font, stored the same way, see fonts.ts for the FontFace half. */
 export async function importFontAsset(
   file: File,
   dataUrl: string,
@@ -282,7 +282,7 @@ export type Migration = { docs: number; assets: number };
  *
  * Ordered so that nothing can be lost. For each document the references are
  * rewritten in memory, then every new asset is STORED, and only then is the
- * document written back — and `putDoc` is what dehydrates it. If the process
+ * document written back, and `putDoc` is what dehydrates it. If the process
  * dies between the two, the document on disk is the untouched original with its
  * pictures still inline, and the next run finds them again.
  *

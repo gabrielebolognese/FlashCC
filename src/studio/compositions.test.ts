@@ -165,15 +165,15 @@ describe("structures", () => {
   it("gives every slot a note, a placeholder and examples", () => {
     for (const s of STRUCTURES) {
       for (const slot of s.slots) {
-        // the note is a punchline, not a paragraph — it has to fit on one line
+        // the note is a punchline, not a paragraph, it has to fit on one line
         expect(slot.note.length, `${s.name}/${slot.label}`).toBeGreaterThan(10);
         expect(slot.note.length, `${s.name}/${slot.label} too long`).toBeLessThanOrEqual(46);
         expect(slot.note, `${s.name}/${slot.label} has a full stop`).not.toMatch(/[.]$/);
         // no em dashes anywhere the user reads
         for (const field of [slot.note, slot.detail]) {
-          expect(field, `${s.name}/${slot.label} em dash`).not.toContain("—");
+          expect(field, `${s.name}/${slot.label} em dash`).not.toContain("\u2014");
         }
-        expect(s.description, `${s.name} description em dash`).not.toContain("—");
+        expect(s.description, `${s.name} description em dash`).not.toContain("\u2014");
         expect(slot.detail.length, `${s.name}/${slot.label} detail`).toBeGreaterThan(20);
         expect(slot.placeholder.length).toBeGreaterThan(0);
         expect(slot.examples.length).toBeGreaterThan(0);

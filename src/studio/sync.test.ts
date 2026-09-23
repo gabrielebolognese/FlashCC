@@ -64,7 +64,7 @@ describe("deletions", () => {
    * The bug this exists to stop: delete a project on the laptop, then sync the
    * phone, which still holds the row and has never heard otherwise. Without the
    * deletion carrying a timestamp of its own it is indistinguishable from "the
-   * phone has something the server lacks", and the project comes back — every
+   * phone has something the server lacks", and the project comes back, every
    * time the two devices meet.
    */
   it("lets a delete beat the edit it followed", () => {

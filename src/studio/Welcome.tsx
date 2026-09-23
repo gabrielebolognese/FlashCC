@@ -449,7 +449,7 @@ function ConfirmSkip({ onCancel, onSkip }: { onCancel: () => void; onSkip: () =>
           Skip the setup?
         </div>
         <p className="mt-2 text-pretty text-body leading-[21px] text-tertiary">
-          You will start on the default style. Nothing is lost — every one of these
+          You will start on the default style. Nothing is lost, every one of these
           settings is available later, on any slide.
         </p>
         <div className="mt-6 flex gap-2.5">

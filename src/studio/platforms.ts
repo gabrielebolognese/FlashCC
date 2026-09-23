@@ -7,19 +7,19 @@
  *
  * Three of these are worth knowing before reading the table:
  *
- * LinkedIn RASTERISES every PDF you give it — down to 1080px wide, JPEG at around
+ * LinkedIn RASTERISES every PDF you give it, down to 1080px wide, JPEG at around
  * 80-85%. So "keep the text vector" is folk wisdom that does not survive contact
  * with the pipeline. What survives is designing at exactly the target size, in
  * sRGB, with type big enough to still be legible after a lossy pass.
  *
  * Instagram crops EVERY slide to the aspect ratio of the FIRST one. Get slide 1
  * wrong and all ten are ruined. Its grid also shows a centred square crop, which
- * is why the safe zone for a 4:5 slide is the middle 1080×1080 — anything outside
+ * is why the safe zone for a 4:5 slide is the middle 1080×1080, anything outside
  * it is invisible to anyone browsing your profile.
  *
  * And the ceilings differ from what the apps allow. Instagram's Graph API takes
  * ten slides while the app takes twenty, so a twenty-slide deck can never be
- * published by any scheduler, ever — not a FlashCC limitation, and worth saying
+ * published by any scheduler, ever, not a FlashCC limitation, and worth saying
  * out loud before somebody builds one.
  */
 
@@ -55,14 +55,14 @@ export type Platform = {
   /**
    * What the safe box actually IS, which decides what to say about it.
    *
-   * "interface" — platform chrome is drawn on top: an author name, a slide
+   * "interface", platform chrome is drawn on top: an author name, a slide
    * counter, an action rail. Content under it is genuinely obscured.
    *
-   * "crop" — nothing is drawn on top and nothing is obscured. The image is
+   * "crop", nothing is drawn on top and nothing is obscured. The image is
    * CUT, somewhere specific, and only there.
    *
    * These were one thing until a bug report, and the message said "covers with
-   * its own interface" for both — which is simply untrue of Instagram and sent
+   * its own interface" for both, which is simply untrue of Instagram and sent
    * people looking for an overlay that does not exist.
    */
   safeKind: "interface" | "crop";
@@ -71,7 +71,7 @@ export type Platform = {
    *
    * "all" for chrome, because chrome is on every slide. "first" for Instagram,
    * because the thing doing the cropping is the PROFILE GRID and the grid only
-   * ever shows the cover — warning about slides 2 to 10 was reporting a
+   * ever shows the cover, warning about slides 2 to 10 was reporting a
    * consequence that cannot happen.
    */
   safeScope: "all" | "first";
@@ -120,7 +120,7 @@ export const PLATFORMS: Platform[] = [
     // Not UI: the profile grid crops 4:5 to a centred square, so (1350-1080)/2
     // at top and bottom is invisible to anyone browsing your profile.
     safe: { top: 135, right: 0, bottom: 135, left: 0 },
-    // A crop, not an overlay, and only on the cover — see the field docs above.
+    // A crop, not an overlay, and only on the cover, see the field docs above.
     safeKind: "crop",
     safeScope: "first",
     minBodyPt: 18,

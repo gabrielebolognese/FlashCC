@@ -13,7 +13,7 @@
  * already taken, which is what it is.
  *
  * It renders only inside Canvas, never in the print portal. That is not a
- * precaution, it is the reason it can be this loud — an overlay that could leak
+ * precaution, it is the reason it can be this loud, an overlay that could leak
  * into an export would have to be subtle enough to be useless.
  */
 import { safeBox, type Platform } from "./platforms.js";

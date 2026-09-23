@@ -20,7 +20,7 @@ import { hasServiceRole } from "./supabase.js";
 try {
   process.loadEnvFile();
 } catch {
-  /* no .env — fall back to the ambient environment */
+  /* no .env, fall back to the ambient environment */
 }
 
 const PORT = Number(process.env.PORT ?? 8787);

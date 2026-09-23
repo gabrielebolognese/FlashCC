@@ -3,8 +3,8 @@
  *
  * The shape to understand: the browser never says what plan someone is on, and
  * the server never believes it if it does. The browser can only ask for a
- * Checkout link. What a person actually has is decided in one place — a webhook
- * whose signature has been verified against the Stripe secret — and written with
+ * Checkout link. What a person actually has is decided in one place, a webhook
+ * whose signature has been verified against the Stripe secret, and written with
  * the service role key, because the database deliberately refuses that column to
  * everyone else.
  *
@@ -108,7 +108,7 @@ export async function checkout(req: IncomingMessage, res: ServerResponse): Promi
 /* ── customer portal ──────────────────────────────────────────────────────── */
 
 /**
- * Cancelling, changing card, invoices — all of it is Stripe's own screen. Building
+ * Cancelling, changing card, invoices, all of it is Stripe's own screen. Building
  * our own would mean handling card details, which is a compliance burden nobody
  * needs for a feature Stripe hosts for free.
  */
@@ -133,7 +133,7 @@ export async function portal(req: IncomingMessage, res: ServerResponse): Promise
  *
  * Signature verification is not optional and not a nicety: without it this is an
  * open endpoint where anyone who guesses the URL can POST themselves a
- * subscription. The raw bytes matter for the same reason — re-encoding the body
+ * subscription. The raw bytes matter for the same reason, re-encoding the body
  * invalidates the signature.
  */
 export async function webhook(req: IncomingMessage, res: ServerResponse): Promise<void> {
@@ -213,8 +213,8 @@ async function applySubscription(userId: string, sub: Stripe.Subscription): Prom
             (sub as unknown as { current_period_end?: number }).current_period_end,
         )
       : null,
-    // A cancelled subscription stays `active` until Stripe ends the period — see
-    // ENTITLED above — which is how "you keep what you paid for" is already true.
+    // A cancelled subscription stays `active` until Stripe ends the period, see
+    // ENTITLED above, which is how "you keep what you paid for" is already true.
     // This is what lets the app SAY so instead of showing a renewal date for
     // something that is about to stop.
     endsAtPeriodEnd: entitled ? Boolean(sub.cancel_at_period_end) : false,

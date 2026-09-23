@@ -6,7 +6,7 @@
  *
  * "Three people approved the post. None of them approved the same version." A
  * share captures a snapshot; approving stamps that snapshot's fingerprint; and
- * if the deck has moved since, this says so — clearly, and without revoking
+ * if the deck has moved since, this says so, clearly, and without revoking
  * anything. Deciding on somebody's behalf that their approval is void is worse
  * than telling them it is old, because only they know whether the change
  * mattered.
@@ -118,7 +118,7 @@ export function ShareDialog({ doc, onClose }: { doc: Doc; onClose: () => void })
   const create = async () => {
     if (!userId) return;
     // The version somebody is about to be asked to approve. This is the snapshot
-    // that pairs with 7.4 — an approval points at a fingerprint, and this is
+    // that pairs with 7.4, an approval points at a fingerprint, and this is
     // what makes that fingerprint recoverable rather than merely comparable.
     snapshot(doc, "approve", sessionPlan(), "Sent for review");
     setPhase({ at: "working", what: "Rendering the slides and hosting them…" });
@@ -198,7 +198,7 @@ export function ShareDialog({ doc, onClose }: { doc: Doc; onClose: () => void })
                 <p className="text-body text-primary">A review link needs an account.</p>
                 <p className="mt-1 text-caption leading-4 text-tertiary">
                   It is a URL somebody else opens, so there is no version of it that works only on
-                  this machine — this is the one feature in FlashCC with no offline half.
+                  this machine, this is the one feature in FlashCC with no offline half.
                 </p>
               </div>
             </div>
@@ -264,7 +264,7 @@ export function ShareDialog({ doc, onClose }: { doc: Doc; onClose: () => void })
               {selected.decidedAt ? (
                 <p className="mt-2 text-caption leading-4 text-secondary">
                   {STATUS_LABEL[selected.status]} by {authorLabel(selected.decidedBy ?? "")}
-                  {selected.decisionNote ? ` — "${selected.decisionNote}"` : ""}
+                  {selected.decisionNote ? `, "${selected.decisionNote}"` : ""}
                 </p>
               ) : null}
 
@@ -300,7 +300,7 @@ export function ShareDialog({ doc, onClose }: { doc: Doc; onClose: () => void })
             <p className="text-body leading-5 text-tertiary">
               A review link renders this carousel, hosts the slides, and gives you a URL your client
               can open without an account. They comment on a specific slide, then approve or ask for
-              changes — and the approval is pinned to the version they saw.
+              changes, and the approval is pinned to the version they saw.
             </p>
           ) : null}
 

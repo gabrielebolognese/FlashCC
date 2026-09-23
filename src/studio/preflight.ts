@@ -8,7 +8,7 @@
  * bar looks fine to the person who drew it and to nobody else.
  *
  * So the check has to happen against the PLATFORM, not against the artboard, and
- * it has to name the slide — "something is too small" is not actionable at slide
+ * it has to name the slide, "something is too small" is not actionable at slide
  * seventeen.
  *
  * Pure and DOM-free on purpose: this is the kind of logic that is easy to get
@@ -37,7 +37,7 @@ export type Finding = {
 const PLACEHOLDERS = ["type something", "your hook goes here", "the point", "say the thing."];
 
 const measureOf = (l: Layer): Measure => ({
-  // The id, not the stack — see the note on Measure.family.
+  // The id, not the stack, see the note on Measure.family.
   family: l.fontFamily,
   letterSpacing: l.letterSpacing,
   uppercase: l.uppercase,
@@ -241,7 +241,7 @@ export function sizeFinding(bytes: number, platform: Platform): Finding | null {
       severity: "warn",
       code: "file-too-small",
       slide: null,
-      message: `${Math.round(bytes / 1000)}KB is light for ${platform.label} — it may already have been over-compressed.`,
+      message: `${Math.round(bytes / 1000)}KB is light for ${platform.label}, it may already have been over-compressed.`,
     };
   }
   return null;

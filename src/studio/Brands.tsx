@@ -7,7 +7,7 @@
  * derived" invariant goes, and every carousel starts changing under the user
  * when they touch a swatch.
  *
- * The limit is shown here and enforced in Postgres. Both, on purpose — the
+ * The limit is shown here and enforced in Postgres. Both, on purpose, the
  * database is what actually holds, and a paywall that only refuses after a round
  * trip, with an error, is a worse experience than one that explains itself first.
  */
@@ -69,7 +69,7 @@ function Swatches({ theme }: { theme: Theme }) {
  * Three slots, because a logo that only works on white is half a logo.
  *
  * Each one is an ordinary library upload with `brandId` and `role` set, so a
- * mark is a file in the library that a brand happens to point at — never a copy
+ * mark is a file in the library that a brand happens to point at, never a copy
  * living inside the brand. Five brands in an agency account can share one file,
  * which is the whole reason 5.2 waited for 5.1.
  */
@@ -177,7 +177,7 @@ function Logos({ brand, onChange }: { brand: Brand; onChange: (b: Brand) => void
       </div>
       <p className="mt-2 text-caption leading-4 text-muted">
         A mark is used everywhere when there is one. Otherwise the light or dark version is picked
-        from the slide it lands on — which is the only thing an automatic placement has to get
+        from the slide it lands on, which is the only thing an automatic placement has to get
         right.
       </p>
     </div>

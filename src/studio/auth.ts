@@ -3,7 +3,7 @@
  *
  * Email rather than passwords. There is no password to store, no reset flow to
  * build, no "I forgot it" support thread, and no credential for this app to be
- * careless with — the whole category of problem is skipped for the price of one
+ * careless with, the whole category of problem is skipped for the price of one
  * email round trip. For a tool someone opens a few times a week that trade is
  * plainly worth it.
  *
@@ -12,7 +12,7 @@
  * The same email carries both. The CODE is offered first, for two reasons that
  * are not about preference:
  *
- * 1. Corporate mail scanners — Outlook Safe Links, Defender, Proofpoint — fetch
+ * 1. Corporate mail scanners, Outlook Safe Links, Defender, Proofpoint, fetch
  *    every URL in an incoming message to check it. That fetch REDEEMS a one-time
  *    magic link, so the recipient clicks it and is told it has already been
  *    used. It is one of the commonest ways magic-link auth fails in the field
@@ -20,7 +20,7 @@
  *    something that only follows links.
  *
  * 2. PKCE keeps the code verifier in the browser that ASKED. That is what makes
- *    a stolen link worthless — and it also means a link opened on a different
+ *    a stolen link worthless, and it also means a link opened on a different
  *    device cannot complete. Typing six digits into the tab that is already open
  *    sidesteps both.
  *
@@ -58,13 +58,13 @@ export const looksLikeEmail = (email: string): boolean =>
  * "email rate limit exceeded" is the single most likely thing anybody setting
  * this up will see, and on its own it sounds like the user did something wrong.
  * It means the project is still on the built-in mailer, which sends a handful an
- * hour — a configuration fact, and one nobody can act on without being told.
+ * hour, a configuration fact, and one nobody can act on without being told.
  */
 export function explain(message: string): string {
   const text = message.toLowerCase();
 
   if (text.includes("rate limit") || text.includes("too many")) {
-    return "This project is still using Supabase's built-in mailer, which only sends a few messages an hour. Wait a few minutes, or set up an SMTP provider — see supabase/README.md.";
+    return "This project is still using Supabase's built-in mailer, which only sends a few messages an hour. Wait a few minutes, or set up an SMTP provider, see supabase/README.md.";
   }
   if (text.includes("expired") || text.includes("invalid")) {
     return "That code is wrong or has expired. Ask for a new one.";
@@ -110,7 +110,7 @@ export const CODE_LENGTH = 6;
 /**
  * Exchanges the six digits for a session.
  *
- * `type: "email"` covers both a first sign-up and a returning sign-in — Supabase
+ * `type: "email"` covers both a first sign-up and a returning sign-in, Supabase
  * issues the same kind of token for each, and splitting them here would mean
  * guessing which one this person is and being wrong half the time.
  */
@@ -202,7 +202,7 @@ export async function loadProfile(userId: string): Promise<Profile | null> {
  * Makes the profile row if this is the first sign-in.
  *
  * The obvious home for this is a trigger on auth.users, and that is what Supabase
- * documents — but creating one now fails on many projects with "must be owner of
+ * documents, but creating one now fails on many projects with "must be owner of
  * relation users", and because the SQL editor runs a script in a single
  * transaction, that one error rolls the whole schema back. Doing it from here
  * needs no privileged DDL.

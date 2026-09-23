@@ -18,9 +18,9 @@ export const json = (res: ServerResponse, code: number, body: unknown): void => 
 /**
  * The exact bytes, not a decoded string.
  *
- * Stripe signs the raw payload, so anything that re-encodes it — string
+ * Stripe signs the raw payload, so anything that re-encodes it, string
  * concatenation included, the moment a multi-byte character lands on a chunk
- * boundary — can produce a body that no longer matches the signature. Every
+ * boundary, can produce a body that no longer matches the signature. Every
  * webhook then fails verification, which looks exactly like a wrong secret.
  */
 export function readRaw(req: IncomingMessage, limit = 1_000_000): Promise<Buffer> {
@@ -65,7 +65,7 @@ export function bearer(req: IncomingMessage): string | null {
  * further.
  *
  * Its limits are real and worth stating: it resets on every deploy and does not
- * survive a second node. That is the right trade while there is one node — a
+ * survive a second node. That is the right trade while there is one node, a
  * distributed limiter is infrastructure, and this is the thing that stops a
  * single script costing money this afternoon.
  */
@@ -97,7 +97,7 @@ function sweep(now: number): void {
  * Who to count against, for a route with no account behind it.
  *
  * `x-forwarded-for` first because anything deployed sits behind a proxy and the
- * socket address would otherwise be the proxy for every caller on earth — which
+ * socket address would otherwise be the proxy for every caller on earth, which
  * turns a per-caller limit into a global one and takes the whole service down
  * the first time somebody is impatient.
  */

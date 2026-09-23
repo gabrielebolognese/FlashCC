@@ -208,7 +208,7 @@ export function LinkedInImport({
                       </span>
                       <ArrowRight size={12} strokeWidth={2} className="shrink-0 text-muted" />
                       <span className="min-w-0 flex-1 truncate text-caption text-secondary">
-                        {post?.title ?? "—"}
+                        {post?.title ?? "-"}
                       </span>
                       <span className="shrink-0 text-caption text-muted">{HOW_LABEL[m.how]}</span>
                     </div>
@@ -225,7 +225,7 @@ export function LinkedInImport({
                 Nothing claimed these ({auto.unmatched.length})
               </span>
               <p className="mt-1 text-caption leading-4 text-muted">
-                Place them yourself, or leave them — anything left alone is not written anywhere.
+                Place them yourself, or leave them, anything left alone is not written anywhere.
               </p>
               <div className="mt-2 flex flex-col gap-1.5">
                 {auto.unmatched.map((row) => (
@@ -239,7 +239,7 @@ export function LinkedInImport({
                       </div>
                       <div className="text-caption text-muted">
                         {row.postedAt ?? "no date"} ·{" "}
-                        {row.metrics.impressions?.toLocaleString() ?? "—"} impressions
+                        {row.metrics.impressions?.toLocaleString() ?? "-"} impressions
                       </div>
                     </div>
                     <select

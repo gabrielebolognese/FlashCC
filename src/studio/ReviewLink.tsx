@@ -3,10 +3,10 @@
  *
  * Named `ReviewLink` rather than `Review` because `review.ts` sits beside it and
  * TypeScript refuses to hold both on a case-insensitive filesystem. Fourth time
- * in this codebase — see the convention note in CLAUDE.md.
+ * in this codebase, see the convention note in CLAUDE.md.
  *
  * This is the only screen in the product a stranger sees, and the only one that
- * is not painted in the app's own colours — it wears the agency's brand instead
+ * is not painted in the app's own colours, it wears the agency's brand instead
  * (7.5), because the client is reviewing their agency's work and a third party's
  * logo across the top of it is somebody else's advertisement in the middle of a
  * business relationship. Gain charges $199 a month for this. It is one theme and
@@ -23,8 +23,8 @@
  * ── What is deliberately absent ──────────────────────────────────────────────
  *
  * No sign-up prompt, no "powered by", no seat, no invitation, no account
- * creation at any point. A reviewer is free and unlimited — see CLAUDE.md
- * invariant 6 — and a page that nags them to make an account is that promise
+ * creation at any point. A reviewer is free and unlimited, see CLAUDE.md
+ * invariant 6, and a page that nags them to make an account is that promise
  * being broken quietly.
  */
 import { AlertCircle, Check, ChevronLeft, ChevronRight, MessageSquare, Send } from "lucide-react";

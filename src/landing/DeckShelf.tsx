@@ -4,7 +4,7 @@
  * ── These are not pictures of the product ────────────────────────────────────
  *
  * `buildSlides` runs in the browser and the result goes through `LayerView`,
- * which is the only painter in this codebase — so a visitor is looking at the
+ * which is the only painter in this codebase, so a visitor is looking at the
  * same pixels the editor draws and the export renders. If generation changes
  * tomorrow this changes with it, which is the one way a marketing page stays
  * true without anybody maintaining it.
@@ -12,15 +12,15 @@
  * ── Why a shelf and not a phone ──────────────────────────────────────────────
  *
  * A single mockup shows one slide and reads as a screenshot. A row of them with
- * the middle one forward reads, instantly and without a caption, as a CAROUSEL —
+ * the middle one forward reads, instantly and without a caption, as a CAROUSEL,
  * which is the thing being sold. The motion is the demo.
  *
  * ── The layout rule this file exists to obey ─────────────────────────────────
  *
  * Exactly one `position: relative` wrapper, and everything absolute inside it is
  * decorative and empty. Nothing that holds content is taken out of flow. The
- * first version of this page put `.fcc-aurora` — which is `position: absolute;
- * inset: 0` — straight onto the page header, and the whole document stacked on
+ * first version of this page put `.fcc-aurora`, which is `position: absolute;
+ * inset: 0`, straight onto the page header, and the whole document stacked on
  * top of itself.
  */
 import { useEffect, useState } from "react";
@@ -52,7 +52,7 @@ export function DeckShelf({ slides, playing = true }: { slides: readonly Slide[]
 
   return (
     <div className="relative">
-      {/* Decorative only, and empty — see the note at the top of this file. */}
+      {/* Decorative only, and empty, see the note at the top of this file. */}
       <div
         aria-hidden
         className="pointer-events-none absolute inset-x-0 top-8 mx-auto h-[220px] max-w-[520px] rounded-full"

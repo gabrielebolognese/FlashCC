@@ -1,7 +1,7 @@
 /**
  * Visual styles: a palette plus the two typefaces that carry it.
  *
- * A style is applied once, at generation, and then it is gone — every colour and font
+ * A style is applied once, at generation, and then it is gone, every colour and font
  * it chose lands on ordinary layers you can change afterwards. It is a starting
  * point, not a theme the document keeps referring back to.
  */
@@ -28,7 +28,7 @@ const style = (
 ): Style => ({ id, name, note, theme: { bg, fg, accent, muted, displayFont, bodyFont } });
 
 export const STYLES: Style[] = [
-  // The two plain ones first — most people want one of these.
+  // The two plain ones first, most people want one of these.
   style("dark", "Dark", "Plain, high contrast", "#101215", "#f2f4f7", "#ffffff", "#8b93a1"),
   style("light", "Light", "Plain, on white", "#ffffff", "#101215", "#101215", "#6b7280"),
 

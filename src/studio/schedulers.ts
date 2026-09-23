@@ -42,7 +42,7 @@ export type PublishedCarousel = {
   /** Per-slide alt text, in slide order. May be shorter than `urls`. */
   alts: string[];
   platform: PlatformId;
-  /** ISO timestamp, or null for "no date — pick one in the tool". */
+  /** ISO timestamp, or null for "no date, pick one in the tool". */
   scheduledFor: string | null;
   /** A PDF at a public URL, when one was published. Publer ingests these. */
   documentUrl?: string | undefined;
@@ -94,7 +94,7 @@ const metricoolNetwork = (platform: PlatformId): Record<string, string> => ({
 const METRICOOL: Scheduler = {
   id: "metricool",
   label: "Metricool",
-  note: "One column per slide. Its LinkedIn carousel switch builds the PDF from the image URLs for you — the only tool found anywhere that does.",
+  note: "One column per slide. Its LinkedIn carousel switch builds the PDF from the image URLs for you, the only tool found anywhere that does.",
   maxRows: 500,
   maxImages: PICTURE_COLUMNS,
   acceptsAlt: true,
@@ -142,7 +142,7 @@ const PUBLER: Scheduler = {
     const urls = item.urls.slice(0, PICTURE_COLUMNS);
     return [
       // `Post subtype` accepts PDF, so a LinkedIn deck can go as the finished
-      // document rather than as ten pictures — which is the shape LinkedIn
+      // document rather than as ten pictures, which is the shape LinkedIn
       // wanted in the first place.
       item.documentUrl && item.platform === "linkedin" ? "pdf" : "carousel",
       date,
@@ -259,7 +259,7 @@ export function buildSheet(
  *
  * Generated rather than asked for, because an alt field nobody fills is an
  * accessibility feature that does not exist. The headline of a slide IS its
- * description — that is what a carousel slide is — so the largest piece of text
+ * description, that is what a carousel slide is, so the largest piece of text
  * is the honest answer and a better one than "Slide 3".
  */
 export function altFromTexts(texts: readonly string[], index: number, total: number): string {

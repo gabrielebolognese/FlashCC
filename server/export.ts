@@ -1,7 +1,7 @@
 /**
  * The export route.
  *
- * Returns a single file either way — a PDF for LinkedIn document posts, or a zip
+ * Returns a single file either way, a PDF for LinkedIn document posts, or a zip
  * of numbered images for anything you upload slide by slide. Numbered, because
  * every upload dialog sorts by filename and a carousel out of order is worse than
  * no carousel.
@@ -79,7 +79,7 @@ export async function renderDocument(req: IncomingMessage, res: ServerResponse):
  *
  * A ten-slide deck is ten headless screenshots, so this is generous for a person
  * and useless to a script. It exists because this route CANNOT require an
- * account — see below.
+ * account, see below.
  */
 const EXPORTS_PER_MINUTE = 10;
 
@@ -105,7 +105,7 @@ export async function exportDeck(req: IncomingMessage, res: ServerResponse): Pro
   }
 
   // Free is "PDF export"; Pro is "PNG and PDF export". The numbered-image path
-  // is the one that costs money, so it is the one that checks — and it checks on
+  // is the one that costs money, so it is the one that checks, and it checks on
   // the SERVER, because the platform picker is a dropdown anyone can edit.
   if (body.output === "images") {
     await requirePro(bearer(req), "Exporting numbered images");

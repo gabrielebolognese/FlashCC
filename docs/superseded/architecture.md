@@ -1,9 +1,9 @@
 > **Superseded.** This describes the design that the Photoshop-model rewrite replaced. It is kept
-> for history only — nothing in it matches the code. It specifies `computeLayout(role, blocks, brandKit, format)`, `src/doc/**`, `roles.ts`, `typeScale.ts` and `SlideStage.tsx`, none of which exist.
+> for history only, nothing in it matches the code. It specifies `computeLayout(role, blocks, brandKit, format)`, `src/doc/**`, `roles.ts`, `typeScale.ts` and `SlideStage.tsx`, none of which exist.
 >
 > The current reference is [`docs/reference.md`](../reference.md).
 
-# FlashCC — architecture and file plan
+# FlashCC, architecture and file plan
 
 Standalone project. No FlashFX engine dependency: no WebGPU, no compositor, no keyframe system.
 The DOM is the renderer.
@@ -14,7 +14,7 @@ The DOM is the renderer.
 
 Everything else follows from these.
 
-### D1 — One renderer, one coordinate space
+### D1, One renderer, one coordinate space
 
 There is exactly one component tree that draws a slide: `src/render/SlideRenderer.tsx`. It always
 draws at the format's **logical size** (1080×1350 for the 4:5 default) in absolute logical pixels.
@@ -35,10 +35,10 @@ responsive behaviour at all.
 
 Consequence to enforce in review: **no `SlideRenderer` descendant may use a relative unit tied to
 the viewport, a media query, or a container query.** `em`/`rem` are also banned inside the
-renderer — root font size is an environment variable we do not control in the export browser.
+renderer, root font size is an environment variable we do not control in the export browser.
 Everything is unitless-computed logical px.
 
-### D2 — Layout is a pure function; React only paints it
+### D2, Layout is a pure function; React only paints it
 
 ```ts
 computeLayout(role, blocks, brandKit, format) -> LayoutNode[]
@@ -46,7 +46,7 @@ computeLayout(role, blocks, brandKit, format) -> LayoutNode[]
 
 `LayoutNode` is data: a box with `x, y, w, h`, a type, a text run, a resolved font size / weight /
 line-height / colour, alignment. `SlideRenderer` maps that array to absolutely-positioned divs and
-does nothing else — no conditionals about roles, no measuring, no layout maths in JSX.
+does nothing else, no conditionals about roles, no measuring, no layout maths in JSX.
 
 This exists for phase 2. Converting a FlashCC document into a FlashFX scene document (flat layer
 array with `parentId`) is then `LayoutNode[] → Layer[]`, a field rename over data that already has
@@ -57,7 +57,7 @@ missing" requirement would be dead.
 **Build the pure layout function now. Do not build the converter.** The seam is
 `LayoutNode[]` and nothing else needs to exist for it.
 
-### D3 — The document is authoritative; the source text is a projection
+### D3, The document is authoritative; the source text is a projection
 
 This is the subtlest part of the product and the place a naive build breaks.
 
@@ -80,7 +80,7 @@ and slide boundaries as `doc`. The diff on re-parse matches blocks by content an
 carry `id` and `roleOverride` forward, so typing a character in the source pane does not silently
 reset a role the user chose. This is the one algorithm in v1 worth unit-testing exhaustively.
 
-### D4 — Export is the app's own render route in a headless browser
+### D4, Export is the app's own render route in a headless browser
 
 ```
 POST /export { documentId }
@@ -93,15 +93,15 @@ POST /export { documentId }
   → returns ordered files: 01.png … NN.png, carousel.pdf
 ```
 
-The route renders `<SlideRenderer>` — the same component the preview uses, from the same bundle.
+The route renders `<SlideRenderer>`, the same component the preview uses, from the same bundle.
 There is no server-side re-implementation of layout and no HTML template that could drift.
 
 Fonts are self-hosted `woff2` in `public/fonts`, declared with `@font-face`, and the export blocks
-on `document.fonts.ready`. No Google Fonts, no CDN — a network hiccup in the export browser must
+on `document.fonts.ready`. No Google Fonts, no CDN, a network hiccup in the export browser must
 not be able to change the output.
 
 Client-side rasterisation (`html2canvas`, `dom-to-image`) is explicitly rejected: it re-implements
-CSS layout in JavaScript and drifts on exactly the things that matter here — font metrics, line
+CSS layout in JavaScript and drifts on exactly the things that matter here, font metrics, line
 breaking, letter-spacing.
 
 ---
@@ -134,7 +134,7 @@ in Node.
 
 Brand values are injected as CSS custom properties on the `SlideRenderer` root element, scoped to
 that subtree. No app token is legal inside a slide; no brand token is legal outside one. A slide
-may be cream-on-hot-pink inside the navy app — that is correct, not a bug.
+may be cream-on-hot-pink inside the navy app, that is correct, not a bug.
 
 ---
 
@@ -216,7 +216,7 @@ carousel/
 │   │   └── keymap.ts                  the one keyboard source of truth
 │   │
 │   └── routes/
-│       └── RenderRoute.tsx            /render — chrome-free export target, sets ready signal
+│       └── RenderRoute.tsx            /render, chrome-free export target, sets ready signal
 │
 ├── server/
 │   ├── index.ts                       tiny HTTP server, one endpoint
@@ -233,7 +233,7 @@ carousel/
 
 ### Toolchain delta
 
-The repo is currently a bare Node/ESM TypeScript scaffold — no React, no Tailwind, no
+The repo is currently a bare Node/ESM TypeScript scaffold, no React, no Tailwind, no
 `node_modules`. Implementation starts by adding: `react`, `react-dom`, `vite`,
 `@vitejs/plugin-react`, `tailwindcss`, `lucide-react`, `zod`, `playwright`, plus `@types/react`.
 Existing strict tsconfig, ESM-with-`.js`-extensions, colocated `*.test.ts`, and the `typecheck`
@@ -247,7 +247,7 @@ gate all carry over unchanged.
 2. `src/render/layout/**` + tests. Still headless. `computeLayout` for all five roles.
 3. `SlideRenderer` + `ScaledSlide`. First pixels. Verify a slide at k=1 and k=0.4 are identical
    modulo scale.
-4. `/render` route + `server/export.ts`. **Get export correct before building the editor** — it is
+4. `/render` route + `server/export.ts`. **Get export correct before building the editor**, it is
    the piece the brief says to engineer carefully, and it constrains the renderer. Everything after
    this is chrome over a proven pipeline.
 5. `ui/**` primitives on the 28px rhythm.
@@ -259,25 +259,25 @@ gate all carry over unchanged.
 
 ## 6. Open questions for review
 
-**Q1 — Auto-fit determinism.** The fit estimator can be:
-  (a) *pure* — precomputed font-metric tables, deterministic in Node and browser, phase 2 gets
+**Q1, Auto-fit determinism.** The fit estimator can be:
+  (a) *pure*, precomputed font-metric tables, deterministic in Node and browser, phase 2 gets
       exact type sizes for free; costs a metrics extraction step per bundled face; or
-  (b) *DOM-measured* — measure and shrink in the browser. Simpler, still zero preview/export drift
+  (b) *DOM-measured*, measure and shrink in the browser. Simpler, still zero preview/export drift
       (same DOM both sides), but phase 2 would need a browser to learn the final sizes.
 
   Recommendation: **(a)**, because D2's whole purpose is that phase 2 needs no browser. It is
   perhaps a day of extra work and it is the difference between a pure converter and a scraper.
 
-**Q2 — Granularity re-split vs. manual edits.** Changing granularity re-runs the split. Slides the
+**Q2, Granularity re-split vs. manual edits.** Changing granularity re-runs the split. Slides the
 user has since edited, reordered, or deleted cannot all survive that. Proposed rule: re-split is a
 single undoable command that rebuilds from the current source text, carries `roleOverride` forward
 where a slide's content is unchanged, and drops manual reordering. Alternative is to disable
-granularity once the document is edited — worse, because it violates R2 (remove, never disable).
+granularity once the document is edited, worse, because it violates R2 (remove, never disable).
 Confirm the proposed rule.
 
-**Q3 — Export delivery.** PNG sequence + PDF, ordered filenames. Delivered as a zip download, or
+**Q3, Export delivery.** PNG sequence + PDF, ordered filenames. Delivered as a zip download, or
 individual files? Zip is one click but adds a dependency and a "what's in here" moment.
 
-**Q4 — Format presets.** Ship 4:5 portrait only in v1 (fastest, and the correct default for
+**Q4, Format presets.** Ship 4:5 portrait only in v1 (fastest, and the correct default for
 LinkedIn/Instagram carousels), or 4:5 + 1:1 from the start? A format switcher is a ninth control,
 which is inside budget but spends it.

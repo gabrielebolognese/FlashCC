@@ -61,7 +61,7 @@ describe("reading a refusal", () => {
 describe("sweeping version history on sign-out", () => {
   /**
    * `forgetLocal` cleared docs, posts, brands, clients and assets and left whole
-   * documents behind in per-document version keys — for whoever signed in next
+   * documents behind in per-document version keys, for whoever signed in next
    * on a shared machine.
    */
   it("finds every version key and nothing else", () => {

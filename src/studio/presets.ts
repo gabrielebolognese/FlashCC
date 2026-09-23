@@ -2,7 +2,7 @@
  * Starting points, not templates.
  *
  * A preset is a function that returns plain layers. It runs once, when you pick it,
- * and then it is gone — there is no live template to fight with, nothing is re-derived,
+ * and then it is gone, there is no live template to fight with, nothing is re-derived,
  * and every layer it produced is as editable as one you drew yourself.
  */
 import type { Gradient } from "./gradient.js";
@@ -178,7 +178,7 @@ export function buildDoc(preset: Preset, themeId: keyof typeof THEMES, name: str
 
 /**
  * Paste a written post and get one slide per blank-line group, as ordinary text
- * layers. This is an importer, not a layout engine — nothing stays live afterwards.
+ * layers. This is an importer, not a layout engine, nothing stays live afterwards.
  */
 export function slidesFromText(source: string, themeId: keyof typeof THEMES): Slide[] {
   const theme = THEMES[themeId] ?? THEMES.ink!;

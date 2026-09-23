@@ -5,7 +5,7 @@
  *
  * The earlier research passes found no complaints about "version history" and I
  * treated that as a reason to deprioritise it. That was reading the wrong layer.
- * The pain is there, it is just never called versioning — it is called file
+ * The pain is there, it is just never called versioning, it is called file
  * chaos: *"my desktop used to be a graveyard of Canva exports, CapCut drafts,
  * random PNGs and 'final_final' files."* On the incumbent specifically: *"I
  * wanted to keep proper versioning but it seems I have to make copies of the
@@ -23,7 +23,7 @@
  * `useStudio` already has undo, and it covers keystrokes. This covers MOMENTS:
  * you sent it for approval, you exported it, you rebranded it. Three or four
  * meaningful points in a carousel's life, each one restorable whole or one slide
- * at a time — which is what "approved images aren't confused with modified ones"
+ * at a time, which is what "approved images aren't confused with modified ones"
  * actually needs. A general history of every drag would bury those three under a
  * thousand.
  *
@@ -32,7 +32,7 @@
  * Versions do not sync. The stated pain is losing YOUR OWN earlier state on the
  * machine you are working on, and syncing a snapshot of every export across
  * devices would multiply the largest records in the product for a need nobody
- * described. Retention is by plan, enforced here, and free gets none — which is
+ * described. Retention is by plan, enforced here, and free gets none, which is
  * Planable's proven ladder.
  */
 
@@ -93,7 +93,7 @@ const DAY_MS = 86_400_000;
  * What survives, given a plan and a moment.
  *
  * Pure, and applied on WRITE as well as on read. A retention limit enforced only
- * when something is displayed is not a limit, it is a filter — the records go on
+ * when something is displayed is not a limit, it is a filter, the records go on
  * accumulating behind it until the quota runs out.
  */
 export function prune(
@@ -135,7 +135,7 @@ export function makeVersion(doc: Doc, reason: Reason, label = ""): Version {
  *
  * Exporting the same deck three times is one version, not three. Without this,
  * the list fills with identical entries and the three moments worth finding are
- * buried under them — which is the failure this whole file exists to avoid.
+ * buried under them, which is the failure this whole file exists to avoid.
  */
 export function capture(
   versions: readonly Version[],
@@ -247,7 +247,7 @@ export const restoreAll = (doc: Doc, version: Version): Doc => ({
  * The useful case by a distance: a client asked for slide four to go back to
  * what it was, and restoring the whole deck would undo the three other things
  * that were fixed in the meantime. A slide past the end of the current deck is
- * APPENDED rather than refused — the version had it, somebody asked for it, and
+ * APPENDED rather than refused, the version had it, somebody asked for it, and
  * putting it at the end is the answer they can see and move.
  */
 export function restoreSlide(doc: Doc, version: Version, index: number): Doc {
@@ -290,7 +290,7 @@ export function saveVersions(docId: string, versions: Version[]): boolean {
     else localStorage.setItem(KEY(docId), JSON.stringify(versions));
     return true;
   } catch {
-    // A full quota must never fail whatever the user was actually doing — an
+    // A full quota must never fail whatever the user was actually doing, an
     // export that refuses to run because a snapshot would not fit is a worse
     // product than one with a shorter history.
     return false;
@@ -318,7 +318,7 @@ export function removeVersion(docId: string, id: string): Version[] {
 /**
  * Which stored keys are version history.
  *
- * Pure, and separated from the sweep below only so it can be tested — the sweep
+ * Pure, and separated from the sweep below only so it can be tested, the sweep
  * itself is three lines of localStorage and nothing worth asserting about.
  */
 export const versionKeysIn = (keys: readonly string[]): string[] =>
@@ -328,7 +328,7 @@ export const versionKeysIn = (keys: readonly string[]): string[] =>
  * Everything, for sign-out.
  *
  * `forgetLocal` clears docs, posts, brands, clients, assets and tombstones, and
- * used not to clear these — so signing out on a shared machine left whole
+ * used not to clear these, so signing out on a shared machine left whole
  * documents in localStorage for whoever signed in next. The keys are per
  * document, so there is no index to walk: the store has to be swept by prefix.
  */

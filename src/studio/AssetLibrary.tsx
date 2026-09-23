@@ -3,7 +3,7 @@
  *
  * Named `AssetLibrary` rather than `Library` because `library.ts` already exists
  * beside it, and on a case-insensitive filesystem TypeScript refuses to hold
- * both — the same trap `Analytics.tsx` and `insights.ts` hit.
+ * both, the same trap `Analytics.tsx` and `insights.ts` hit.
  *
  * The complaint this answers is remarkably consistent across the whole market:
  * *"I wish the Media Library for my clients would retain the images I upload"*
@@ -164,7 +164,7 @@ export function AssetLibrary() {
       {!cloud ? (
         <p className="mb-4 rounded-2xl border border-hairline bg-surface-1 px-3.5 py-2.5 text-body leading-5 text-tertiary">
           Signed out, your library lives in this browser and has room for a few megabytes. Sign in
-          and every file moves to your account — once, not once per carousel — and follows you to
+          and every file moves to your account, once, not once per carousel, and follows you to
           every device.
         </p>
       ) : null}

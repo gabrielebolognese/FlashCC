@@ -7,8 +7,8 @@
  * threading a user id through four component trees to reach one `upload` call is
  * a lot of prop for one fact that is true globally.
  *
- * So this is one mutable fact, written from exactly one place — `useAccount`,
- * whenever the session changes — and read wherever a module needs to know
+ * So this is one mutable fact, written from exactly one place, `useAccount`,
+ * whenever the session changes, and read wherever a module needs to know
  * whether there is somewhere to put bytes. Deliberately not a store, not a
  * context and not reactive: nothing should RE-RENDER because of it, because
  * anything that should re-render already has the account as a prop.

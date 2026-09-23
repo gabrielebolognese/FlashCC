@@ -2,7 +2,7 @@
  * Colour maths for deriving readable text from an arbitrary background.
  *
  * Note on "inverted": literal RGB inversion does not give contrast. Mid-grey
- * (#808080) inverts to #7f7f7f — a contrast ratio of about 1.0, which is invisible.
+ * (#808080) inverts to #7f7f7f, a contrast ratio of about 1.0, which is invisible.
  * What is wanted is the *maximum-contrast* pole, so this picks near-black or
  * near-white by measured ratio, which is the same thing on the colours where
  * inversion happens to work and correct on the ones where it does not.
@@ -49,7 +49,7 @@ export function mix(a: string, b: string, t: number): string {
   });
 }
 
-/** Softened poles — pure black and white read as harsh against a tinted ground. */
+/** Softened poles, pure black and white read as harsh against a tinted ground. */
 const INK = "#0e1013";
 const PAPER = "#f8fafc";
 
@@ -58,8 +58,8 @@ export const AA = 4.5;
 /**
  * The maximum-contrast pole, softened where it can afford to be.
  *
- * Around the luminance crossover (~0.179) neither softened pole clears 4.5:1 — a
- * mid-blue like #6767e4 tops out at 4.33 — so those backgrounds get the pure pole
+ * Around the luminance crossover (~0.179) neither softened pole clears 4.5:1, a
+ * mid-blue like #6767e4 tops out at 4.33, so those backgrounds get the pure pole
  * instead. Pure black and white guarantee at least 4.58:1 against any colour, which
  * is the real floor for this. Everywhere else keeps the softer ink.
  */

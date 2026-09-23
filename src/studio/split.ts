@@ -5,21 +5,21 @@
  *
  * AUTOMATICALLY, at generation: copy that will not fit gets another slide rather
  * than a smaller font. Shrink-to-fit is the single loudest complaint about every
- * tool in this category — "dense slides get scaled down to fit rather than spread
+ * tool in this category, "dense slides get scaled down to fit rather than spread
  * out, so text ends up small and cramped", and more bluntly, "it just crams
  * everything into the top 5th of each page and then blanks the rest". A couple of
  * steps down the ladder is a reasonable accommodation; falling to the floor is
  * the tool giving up and calling it a feature.
  *
  * BY HAND, in the editor: split a slide, merge two, move the break. This is
- * explicitly unmet in the market — a paying customer of a competitor: "our copy
+ * explicitly unmet in the market, a paying customer of a competitor: "our copy
  * is client-approved and must not be reworded. That leaves us no way to express
  * 'same words, spread across more slides'". Both halves of that matter. The words
  * are never touched here; only where they break.
  *
  * Splits land on sentence boundaries, nearest the middle, so each piece reads as
  * a complete thought. Falling back to a line break, then a word break, then
- * nothing — a piece that cannot be split is returned whole rather than cut
+ * nothing, a piece that cannot be split is returned whole rather than cut
  * mid-word.
  */
 
@@ -29,7 +29,7 @@ import { lineCount, type Measure } from "./text.js";
 /**
  * How far down the ladder shrinking is allowed to go before splitting instead.
  *
- * Two steps is roughly 10-12% on the ladders the compositions use — enough to
+ * Two steps is roughly 10-12% on the ladders the compositions use, enough to
  * absorb a slightly long line, not enough to be visible as "this slide is
  * cramped".
  */
@@ -128,7 +128,7 @@ export function splitToFit(text: string, spec: FitSpec, steps = MAX_SHRINK_STEPS
 
     const at = bestBreak(piece);
     if (at === null) {
-      // Unsplittable — one enormous word. Better whole and small than cut.
+      // Unsplittable, one enormous word. Better whole and small than cut.
       out.push(piece);
       continue;
     }
@@ -166,7 +166,7 @@ export const measureOf = (l: Layer): Measure => ({
  *
  * The second slide is a copy of the first with the other half of the copy, so
  * decoration, background and any hand-drawn shape survive the split. That is
- * occasionally more than someone wanted — a duplicated photo, say — but the
+ * occasionally more than someone wanted, a duplicated photo, say, but the
  * alternative loses work, and undo is one keystroke.
  */
 export function splitSlide(doc: Doc, index: number): Doc {

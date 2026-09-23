@@ -4,14 +4,14 @@
  * Two input shapes, and accepting both is the whole point.
  *
  * LONG is one row per slide, grouped by a post id. It gives variable slide count
- * for free — a six-slide idea and a twelve-slide idea sit in the same file — and
+ * for free, a six-slide idea and a twelve-slide idea sit in the same file, and
  * it is written in the order people actually draft, top to bottom.
  *
  * WIDE is one row per carousel with a column per slide. It is worse in every
  * structural way: it forces a fixed slide count, produces a sheet thirty columns
  * across that nobody can read, and leaves blanks to delete by hand in every
- * output. But it is what every tutorial in this category teaches, verbatim —
- * "each row becomes an entire carousel, each column is one placeholder" — so
+ * output. But it is what every tutorial in this category teaches, verbatim,
+ * "each row becomes an entire carousel, each column is one placeholder", so
  * assuming long format is self-evidently right would be assuming people have
  * been shown something they have not.
  *
@@ -44,7 +44,7 @@ const DELIMITERS = ["\t", ",", ";", "|"] as const;
  * to look.
  *
  * A TAB WINS OUTRIGHT rather than on frequency. Prose is full of commas and
- * never contains tabs, so one tab is stronger evidence than three commas — and
+ * never contains tabs, so one tab is stronger evidence than three commas, and
  * a spreadsheet paste, which is the common real case, is always tab-separated.
  * Counting votes gets `post_id<TAB>text, with commas, here` wrong, which is
  * exactly the header a long-format sheet has.
@@ -137,7 +137,7 @@ const TEXT_KEYS = ["text", "slide", "copy", "content", "body", "headline"];
 const ORDER_KEYS = ["slideindex", "index", "order", "slideno", "slidenumber", "n"];
 const NAME_KEYS = ["name", "title", "filename"];
 
-/** `slide 1`, `slide_2`, `Slide3` — the shape every bulk tutorial teaches. */
+/** `slide 1`, `slide_2`, `Slide3`, the shape every bulk tutorial teaches. */
 const wideSlideColumn = (header: string): number | null => {
   const m = /^slide[\s_-]?(\d+)$/i.exec(header.trim());
   return m?.[1] ? Number(m[1]) : null;
@@ -152,7 +152,7 @@ export function detectShape(headers: string[]): Shape {
 
   if (headers.some((h) => wideSlideColumn(h) !== null)) return "wide";
 
-  // A grouping column with no obvious text column is still long — the copy is
+  // A grouping column with no obvious text column is still long, the copy is
   // whatever else is on the row.
   if (hasGroup) return "long";
 
@@ -186,7 +186,7 @@ function fromLong(headers: string[], rows: Row[]): ParsedCarousel[] {
   );
 
   // Everything that is not structural is copy. That way an unrecognised column
-  // is included rather than silently dropped — losing a user's words is worse
+  // is included rather than silently dropped, losing a user's words is worse
   // than including one they did not mean.
   const structural = new Set([groupCol, orderCol, nameCol].filter(Boolean) as string[]);
   const textCols = headers.filter((h) => !structural.has(h));
@@ -227,7 +227,7 @@ function fromWide(headers: string[], rows: Row[]): ParsedCarousel[] {
 
   const nameCol = findKey(headers, NAME_KEYS);
 
-  // Without `slide N` columns, every non-name column is a slide in file order —
+  // Without `slide N` columns, every non-name column is a slide in file order,
   // which is what a table pasted straight out of a chat window looks like.
   const slideCols = numbered.length > 0 ? numbered : headers.filter((h) => h !== nameCol);
 

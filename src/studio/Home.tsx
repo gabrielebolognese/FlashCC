@@ -306,7 +306,7 @@ export function Home({
           <div className="flex shrink-0 items-center gap-2 border-b border-accent-dim bg-accent-wash px-6 py-2.5">
             <RefreshCw size={13} strokeWidth={2} className="fcc-spin shrink-0 text-accent" />
             <span className="text-body text-primary">
-              Payment received. Turning your plan on — this takes a second.
+              Payment received. Turning your plan on, this takes a second.
             </span>
           </div>
         ) : null}
@@ -322,7 +322,7 @@ export function Home({
             {/*
               Shown on the two screens somebody is already planning on, and
               nowhere else. A banner that follows you into the analytics tab is a
-              banner people learn to look past — and the board is a fixed-height
+              banner people learn to look past, and the board is a fixed-height
               column layout that a banner would squeeze.
             */}
             {view === "projects" || view === "scheduled" ? (

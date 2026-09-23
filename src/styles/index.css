@@ -22,7 +22,7 @@
   }
 
   /* R4: nothing that responds to the pointer animates. No transition on colour,
-     background, or border anywhere — hover and selection are instantaneous. */
+     background, or border anywhere, hover and selection are instantaneous. */
   * {
     transition-property: none;
   }
@@ -44,7 +44,7 @@
 }
 
 @layer utilities {
-  /* Horizontal scroll for the filmstrip — present but quiet. */
+  /* Horizontal scroll for the filmstrip, present but quiet. */
   .scroll-quiet {
     scrollbar-width: thin;
     scrollbar-color: var(--surface-4) transparent;
@@ -82,7 +82,7 @@
   }
 }
 
-/* R3: the only signifier that slide text is editable. Brand-derived, not an app token —
+/* R3: the only signifier that slide text is editable. Brand-derived, not an app token,
    an app colour inside a slide would break the two-colour-systems invariant. */
 .fcc-editable:hover {
   box-shadow: inset 0 0 0 1px currentColor;

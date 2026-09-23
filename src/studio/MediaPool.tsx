@@ -12,7 +12,7 @@ export const MEDIA_DRAG_TYPE = "application/x-flashcc-media";
  * The pool. Upload once, drag onto any placeholder on any slide.
  *
  * Items are shared across the whole project, which is why they live on the
- * document — but the FILE no longer does. Since the asset library, an upload
+ * document, but the FILE no longer does. Since the asset library, an upload
  * goes into the account's library and the pool holds a reference to it, so the
  * same logo dropped into twenty carousels is one object rather than twenty
  * copies. "From library" is the other half of that: a picture you uploaded last

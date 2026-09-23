@@ -8,7 +8,7 @@ import type { Slide } from "./model.js";
  * A slide at whatever size its container happens to be.
  *
  * The scale is measured rather than hardcoded, so this can sit in a fluid column
- * without the contents drifting out of the frame at other widths — which is exactly
+ * without the contents drifting out of the frame at other widths, which is exactly
  * what a fixed `scale(0.2778)` does the moment the layout is responsive.
  */
 export function SlidePreview({

@@ -1,4 +1,4 @@
--- FlashCC — review links and comments
+-- FlashCC, review links and comments
 --
 -- Run this in the Supabase SQL editor after 01-schema.sql and 06-clients.sql.
 -- Safe to re-run.
@@ -13,7 +13,7 @@
 --
 -- ── Why RLS is not the boundary here ────────────────────────────────────────
 --
--- A reviewer has no account, by design — that is the whole feature. So there is
+-- A reviewer has no account, by design, that is the whole feature. So there is
 -- no `auth.uid()` to write a policy against, and the obvious alternative (an
 -- anon policy that trusts a token in the row) means letting the anon key read
 -- the shares table to find out which token matches, which is the same as letting
@@ -21,7 +21,7 @@
 --
 -- So: RLS here allows the OWNER and nobody else, and the reviewer never talks to
 -- PostgREST at all. `server/review.ts` holds the service role key, takes the
--- token, and returns only what that token entitles the caller to — which is a
+-- token, and returns only what that token entitles the caller to, which is a
 -- boundary written once, in one file, that can be read end to end.
 --
 -- That is a deliberate departure from "the RLS policies are the boundary" and it
@@ -69,7 +69,7 @@ create trigger shares_touch before insert or update on public.shares
 
 create table if not exists public.comments (
   -- The owner of the share, not the author of the comment. A reviewer has no
-  -- account, so this is the only user id there is — and it is what RLS gates on.
+  -- account, so this is the only user id there is, and it is what RLS gates on.
   user_id           uuid not null references auth.users (id) on delete cascade,
   id                text not null,
   share_id          text not null,
@@ -146,12 +146,12 @@ create policy comments_delete on public.comments
 -- Gain and Ziflow all give reviewer seats away as an acquisition lever.
 --
 -- There is no reviewer record here, no invitation, and nothing counting them,
--- deliberately — a share link costs nothing and is capped by nothing. If a
+-- deliberately, a share link costs nothing and is capped by nothing. If a
 -- future migration adds a seat count to this file, it is undoing the reason the
 -- feature exists. See CLAUDE.md invariant 6.
 -- ─────────────────────────────────────────────────────────────────────────────
 
 -- To check it: create a share in the app, open its URL in a private window with
 -- no session, and confirm the slides load and a comment posts. Then sign in as a
--- different account and try to select that row from `shares` — it must come back
+-- different account and try to select that row from `shares`, it must come back
 -- empty.

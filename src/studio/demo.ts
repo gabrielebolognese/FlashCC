@@ -2,9 +2,9 @@
  * A sample history, so the insight screens can be judged on what they say rather than
  * on an empty state.
  *
- * The numbers are not random noise. A real pattern is baked in — Problem → Solution
+ * The numbers are not random noise. A real pattern is baked in, Problem → Solution
  * carousels and question hooks genuinely do better here, short Showcase posts
- * genuinely do worse — because a demo whose charts show nothing teaches nothing, and
+ * genuinely do worse, because a demo whose charts show nothing teaches nothing, and
  * because it makes the gates below testable by eye: the story framework appears twice,
  * so however good its numbers look, the app should refuse to draw a conclusion from it.
  *

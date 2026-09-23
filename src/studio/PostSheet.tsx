@@ -107,7 +107,7 @@ export function PostSheet({
   /**
    * Suggestions, not a controlled list.
    *
-   * A pillar is somebody's own vocabulary, so the field stays free text — but
+   * A pillar is somebody's own vocabulary, so the field stays free text, but
    * offering what they have already used is what stops "Education", "education"
    * and "Educational" becoming three buckets in the attribution table.
    */
@@ -274,7 +274,7 @@ export function PostSheet({
               {/*
                 The workflow experienced creators already hand-roll: write the
                 carousel first, then pull the text post out of slides 1 and 2.
-                Deterministic, because those words are already approved — a model
+                Deterministic, because those words are already approved, a model
                 rewriting them here would be answering a question nobody asked.
               */}
               {doc ? (
@@ -313,7 +313,7 @@ export function PostSheet({
 
           {/*
             The evidenced pain is discovery: "My Part 4 has 1M views but Part 1
-            has only 5K — because viewers can't find it." Neither platform lets a
+            has only 5K, because viewers can't find it." Neither platform lets a
             carousel link to another post, so a list in the caption is the only
             surface left.
           */}
@@ -449,7 +449,7 @@ export function PostSheet({
 
             <p className="mt-2 text-caption leading-4 text-muted">
               Pillar and objective are grouped by the insight screens. Campaign and reviewer are
-              proper nouns, so they are recorded but never attributed — one bucket per post is a
+              proper nouns, so they are recorded but never attributed, one bucket per post is a
               list, not a finding.
             </p>
           </div>

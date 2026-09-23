@@ -2,7 +2,7 @@
  * Finding a carousel you made two months ago.
  *
  * The whole design decision here is WHERE the text lives. Searching slide copy
- * means having slide copy, and the project grid only holds summaries — so the
+ * means having slide copy, and the project grid only holds summaries, so the
  * options were to parse every stored document on every keystroke, or to write a
  * flattened blob into the summary once when the document is saved.
  *
@@ -12,7 +12,7 @@
  * to matter.
  *
  * The facets are DERIVED, never entered. Tagging fails in practice and not from
- * laziness — vocabulary drift is real (one asset catalogued as "blazer" by one
+ * laziness, vocabulary drift is real (one asset catalogued as "blazer" by one
  * person and "sportscoat" by the next) and maintaining a taxonomy is a job small
  * teams do not have. Framework, style and format are already known for every
  * document, so the filters populate themselves and cannot rot.
@@ -55,7 +55,7 @@ export function searchBlob(doc: Doc): string {
  * Every word has to appear somewhere, in any order.
  *
  * AND rather than OR because a two-word query that returns everything matching
- * either word is indistinguishable from a broken search box — which is how most
+ * either word is indistinguishable from a broken search box, which is how most
  * people experience it.
  */
 export function matchesQuery(blob: string, query: string): boolean {

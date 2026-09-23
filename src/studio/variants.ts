@@ -2,7 +2,7 @@
  * Hook variants: several ways to open the same carousel.
  *
  * People iterate on the first slide constantly and currently do it by retyping,
- * losing each attempt as they go. The useful unit is not "a better hook" — it is
+ * losing each attempt as they go. The useful unit is not "a better hook", it is
  * *five different angles, side by side, none of them lost until one is chosen*.
  *
  * Two things this deliberately does not do:

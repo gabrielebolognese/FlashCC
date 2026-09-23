@@ -1,4 +1,4 @@
--- FlashCC — clients
+-- FlashCC, clients
 --
 -- Run this in the Supabase SQL editor after 01-schema.sql. Safe to re-run, and
 -- safe to run now: everything it adds is either a new table or a nullable
@@ -10,7 +10,7 @@
 -- has had nothing in it.
 --
 -- `client_id` is a NULLABLE column on four tables and deliberately NOT a foreign
--- key. Deleting a client must not delete a year of carousels — the work becomes
+-- key. Deleting a client must not delete a year of carousels, the work becomes
 -- unassigned, which is recoverable, and an agency losing a client should lose a
 -- label rather than their archive. A cascading FK is exactly the behaviour this
 -- product is built against, and `on delete set null` would need a composite

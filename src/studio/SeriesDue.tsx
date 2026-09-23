@@ -68,7 +68,7 @@ export function SeriesDue({
           ) : (
             <>
               Part {top.part.part} of <span className="text-body-strong">{top.seriesName}</span> is
-              due — the last one went out {top.daysSince} days ago.
+              due, the last one went out {top.daysSince} days ago.
             </>
           )}
         </p>

@@ -5,7 +5,7 @@
  *
  * Per-slide alt text on a carousel is **impossible**, not merely unimplemented.
  * LinkedIn's Documents API carries a `title` and nothing else, and Meta's API
- * excludes `alt_text` from carousel children — so the thing every accessibility
+ * excludes `alt_text` from carousel children, so the thing every accessibility
  * checklist asks for cannot be supplied through the published interface. An audit
  * of LinkedIn found it "will acknowledge the presence of a graphic but fail to
  * provide the corresponding alt text."
@@ -16,7 +16,7 @@
  * ── Why this reads the LAYERS and not the source text ────────────────────────
  *
  * There is no source text. What is stored is what renders (invariant 1), so the
- * words on the slides are the only words there are — which is the right answer
+ * words on the slides are the only words there are, which is the right answer
  * anyway: a transcript that reflected the brief rather than the deck would
  * describe a carousel nobody published.
  *
@@ -30,7 +30,7 @@
  * carousel first, then pull the text post out of slides 1 and 2. You're forced to
  * fix the hook." Mechanising a rearrangement of words the user already approved
  * is honest. Asking a model to rewrite them would reintroduce the exact thing
- * people reject — and the deck is the source of truth, not a prompt.
+ * people reject, and the deck is the source of truth, not a prompt.
  */
 
 import type { Doc, Layer, Slide } from "./model.js";
@@ -45,7 +45,7 @@ const readable = (l: Layer): boolean =>
  *
  * Size order rather than z-order or position: the splitter emits a heading and
  * its body as two layers, and the heading is always the larger. Reading order on
- * a slide IS type hierarchy — that is what a type ladder is for.
+ * a slide IS type hierarchy, that is what a type ladder is for.
  */
 export function slideText(slide: Slide): string {
   const texts = slide.layers.filter(readable);
@@ -60,8 +60,8 @@ export function slideText(slide: Slide): string {
 /**
  * Soft line breaks become spaces; paragraph breaks survive.
  *
- * A break inside a headline is a LAYOUT decision — it is where the line wrapped
- * on a 1080px artboard — and carrying it into a caption produces a ragged post
+ * A break inside a headline is a LAYOUT decision, it is where the line wrapped
+ * on a 1080px artboard, and carrying it into a caption produces a ragged post
  * that looks broken on a phone. Uppercase is undone for the same reason: it is
  * styling, and a screen reader spells out shouted text letter by letter.
  */
@@ -101,7 +101,7 @@ export type TranscriptOptions = {
 /**
  * The whole deck as plain text.
  *
- * Numbered because the artefact IS a sequence — a reader who cannot see the
+ * Numbered because the artefact IS a sequence, a reader who cannot see the
  * slides still needs to know there were nine of them and which one they are in.
  * `1/` rather than `1.` because a full stop starts an ordered list in every
  * editor on both platforms and silently renumbers from 1.

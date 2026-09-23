@@ -1,5 +1,5 @@
 /**
- * Sign in with a code, not a password — and not, if it can be helped, by leaving
+ * Sign in with a code, not a password, and not, if it can be helped, by leaving
  * the app at all.
  *
  * The screen has one field because there is one thing to know, then a second
@@ -9,7 +9,7 @@
  * ── Why the code leads ───────────────────────────────────────────────────────
  *
  * Corporate mail scanners fetch every URL in an incoming message to check it,
- * and that fetch REDEEMS a one-time magic link — so the recipient clicks and is
+ * and that fetch REDEEMS a one-time magic link, so the recipient clicks and is
  * told it has already been used. It is invisible from this side and it is one of
  * the commonest ways this kind of auth fails. A code cannot be spent by
  * something that only follows links.
@@ -104,7 +104,7 @@ export function SignIn({
             </h2>
             <p className="mt-1.5 text-body text-tertiary">
               We sent six digits to <span className="text-secondary">{email}</span>. Type them here
-              and you are in — no need to leave this tab.
+              and you are in, no need to leave this tab.
             </p>
 
             <form onSubmit={(e) => void confirm(e)} className="mt-4">
@@ -137,7 +137,7 @@ export function SignIn({
 
               <p className="mt-2.5 text-caption leading-4 text-muted">
                 The same email has a link in it if you would rather click. Open it in{" "}
-                <span className="text-tertiary">this</span> browser — a link opened somewhere else
+                <span className="text-tertiary">this</span> browser, a link opened somewhere else
                 cannot finish a sign-in started here.
               </p>
 

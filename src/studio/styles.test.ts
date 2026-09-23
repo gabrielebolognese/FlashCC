@@ -50,7 +50,7 @@ describe("styles", () => {
     }
   });
 
-  it("keeps the colour block readable — its text sits on the accent", () => {
+  it("keeps the colour block readable, its text sits on the accent", () => {
     for (const s of STYLES) {
       expect(contrast(s.theme.bg, s.theme.accent), `${s.name} block`).toBeGreaterThanOrEqual(3);
     }

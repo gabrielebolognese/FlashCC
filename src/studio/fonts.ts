@@ -1,11 +1,11 @@
 /**
  * Uploaded fonts.
  *
- * A font is an ASSET — the same record as an uploaded picture, with a `family`
+ * A font is an ASSET, the same record as an uploaded picture, with a `family`
  * and `kind: "font"`. That is not tidiness for its own sake: it is what lifts
  * `MAX_FONTS = 6` out of localStorage. The old cap was not a design decision, it
- * was arithmetic — a single uncompressed TTF can be larger than the whole
- * quota — and it disappears the moment the bytes live in a bucket instead.
+ * was arithmetic, a single uncompressed TTF can be larger than the whole
+ * quota, and it disappears the moment the bytes live in a bucket instead.
  *
  * So the ceiling is now the PLAN rather than the browser. Signed out, the files
  * are still inline and the old, honest limit applies.
@@ -60,8 +60,8 @@ export const MAX_CLOUD_FONT_BYTES = 4_000_000;
 
 /** woff2 first: it is the smallest, and every current browser reads it. */
 export const FONT_FORMATS = [
-  { ext: ".woff2", note: "Best — smallest file, widest support" },
-  { ext: ".woff", note: "Fine — older but universal" },
+  { ext: ".woff2", note: "Best, smallest file, widest support" },
+  { ext: ".woff", note: "Fine, older but universal" },
   { ext: ".ttf", note: "Works, but several times larger" },
   { ext: ".otf", note: "Works, same size caveat as TTF" },
 ];
@@ -95,7 +95,7 @@ const asFont = (a: Asset): CustomFont[] => {
 /**
  * Synchronous on purpose: the export path and `installCustomFonts` both call
  * this, and it reads the URL cache rather than the network. A face whose URL has
- * not been signed yet is simply absent — `installCustomFonts` signs first.
+ * not been signed yet is simply absent, `installCustomFonts` signs first.
  */
 export const listCustomFonts = (): CustomFont[] => assetsOfKind("font").flatMap(asFont);
 
@@ -238,7 +238,7 @@ export async function addCustomFont(file: File, options: AddFontOptions = {}): P
       ok: false,
       error: cloud
         ? `That file is ${Math.round(file.size / 1024)}KB. The limit is ${Math.round(ceiling / 1024)}KB.`
-        : `That file is ${Math.round(file.size / 1024)}KB. Signed out the limit is ${ceiling / 1024}KB — a .woff2 of the same face is usually well under it.`,
+        : `That file is ${Math.round(file.size / 1024)}KB. Signed out the limit is ${ceiling / 1024}KB, a .woff2 of the same face is usually well under it.`,
     };
   }
 

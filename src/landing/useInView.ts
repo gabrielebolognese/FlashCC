@@ -1,8 +1,8 @@
 /**
  * Has this scrolled into view yet?
  *
- * Every demonstration on the landing page costs something to run — a generator
- * pass, a recolour, an interval — and running all of them at once on load means
+ * Every demonstration on the landing page costs something to run, a generator
+ * pass, a recolour, an interval, and running all of them at once on load means
  * a page that stutters before anybody has seen anything. They start when they
  * are looked at.
  *
@@ -52,7 +52,7 @@ export function useInView<T extends HTMLElement = HTMLDivElement>(
  * Read once rather than subscribed to: somebody changing this preference
  * mid-scroll is not a case worth a listener, and the page is built so that
  * "false" shows the finished state of every demonstration rather than an empty
- * frame. Nothing here is load-bearing — the copy says what the product does; the
+ * frame. Nothing here is load-bearing, the copy says what the product does; the
  * motion only shows it.
  */
 export const prefersReducedMotion = (): boolean =>

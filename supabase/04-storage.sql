@@ -1,4 +1,4 @@
--- FlashCC — the asset library
+-- FlashCC, the asset library
 --
 -- Run this in the Supabase SQL editor after 01-schema.sql and 03-brands.sql.
 -- Safe to re-run. Safe to run now: it adds storage and a table nothing else
@@ -19,7 +19,7 @@
 -- of them provides the hosting, which is the gap this feature exists to fill. A
 -- signed URL cannot fill it: the scheduler fetches the picture days later, with
 -- no credentials, long after any signature has expired. So published slides are
--- public by design — and nothing lands in that bucket unless someone presses
+-- public by design, and nothing lands in that bucket unless someone presses
 -- Publish, which is the point at which "anyone with the link" is exactly what
 -- was asked for.
 --
@@ -105,8 +105,8 @@ create policy slides_delete on storage.objects
 -- library; the bucket is only where the bytes sit.
 --
 -- One table for images AND fonts, discriminated by `kind`. They differ in three
--- nullable columns and agree on everything else — owner, path, size, folder,
--- soft delete, sync clock — so two tables would be two of every policy, two
+-- nullable columns and agree on everything else, owner, path, size, folder,
+-- soft delete, sync clock, so two tables would be two of every policy, two
 -- triggers and two branches in the sync for no gain.
 -- ─────────────────────────────────────────────────────────────────────────────
 
@@ -170,7 +170,7 @@ create policy assets_delete on public.assets
 -- BRAND LOGOS
 --
 -- Three asset ids on the brand, not three copies of a file. `{"light": "a_x",
--- "dark": "a_y", "mark": "a_z"}` — jsonb for the same reason `theme` is jsonb:
+-- "dark": "a_y", "mark": "a_z"}`, jsonb for the same reason `theme` is jsonb:
 -- nothing queries inside it and three columns would only be three things to
 -- migrate the next time a variant is added.
 --
@@ -184,7 +184,7 @@ alter table public.brands add column if not exists logos jsonb not null default 
 -- ─────────────────────────────────────────────────────────────────────────────
 -- To check it: sign in, upload an image in the Library, and confirm in Storage →
 -- media that the object sits under your user id. Then sign in as somebody else
--- and try to read that path — it must come back empty, not forbidden-looking-but-
+-- and try to read that path, it must come back empty, not forbidden-looking-but-
 -- readable. Publish a carousel and confirm the URL in the CSV opens in a private
 -- window with no session at all; if it does not, no scheduler will ever fetch it.
 -- ─────────────────────────────────────────────────────────────────────────────

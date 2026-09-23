@@ -1,4 +1,4 @@
--- FlashCC — brands
+-- FlashCC, brands
 --
 -- Run this in the Supabase SQL editor after 01-schema.sql. Safe to re-run.
 --
@@ -8,7 +8,7 @@
 --
 -- ─────────────────────────────────────────────────────────────────────────────
 -- A brand is a named Theme. The same shape the generator already consumes, with
--- a name and an owner — which is why `theme` is jsonb rather than eight columns:
+-- a name and an owner, which is why `theme` is jsonb rather than eight columns:
 -- nothing queries inside it, the client reads it whole, and the flat columns
 -- would only be a second copy to drift.
 --
@@ -73,7 +73,7 @@ create policy brands_select on public.brands
  * The limit lives on INSERT only, and that placement is deliberate.
  *
  * An upsert that lands on an existing row is an UPDATE, so editing a brand is
- * never refused — only creating a new one past the allowance is. And because
+ * never refused, only creating a new one past the allowance is. And because
  * UPDATE is ungated, somebody who downgrades from Pro keeps the brands they
  * made: they simply cannot add another until they are back under the line.
  * Confiscating work on a downgrade is the behaviour this product is built
@@ -97,7 +97,7 @@ create policy brands_delete on public.brands
 -- ─────────────────────────────────────────────────────────────────────────────
 -- To check it: sign in on a free account, make two brands. The second should be
 -- refused by Postgres with "new row violates row-level security policy", not by
--- anything in the interface. If the interface refuses it first that is fine —
+-- anything in the interface. If the interface refuses it first that is fine,
 -- but turn the interface check off once and confirm the database still says no,
 -- because that is the half that actually matters.
 -- ─────────────────────────────────────────────────────────────────────────────

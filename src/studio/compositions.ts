@@ -2,13 +2,13 @@
  * Compositions: one block of text in, one arranged slide out.
  *
  * These run ONCE, at generate time, and return plain layers. Nothing stays live.
- * The point is that consecutive slides do not look the same — a deck where every
+ * The point is that consecutive slides do not look the same, a deck where every
  * slide is the same box of centred text reads as generated, which is the one thing
  * it must not do. Slide 1 is always the title.
  *
  * Every slide reserves an image band, above or below the text. It renders as an empty
  * placeholder until something is dropped on it, and it is an ordinary image layer the
- * whole time — movable, resizable, deletable like anything else.
+ * whole time, movable, resizable, deletable like anything else.
  */
 import { makeLayer, makeSlide, type Layer, type Slide } from "./model.js";
 import type { Theme } from "./presets.js";
@@ -27,14 +27,14 @@ const H = 1350;
  * The margin is split by AXIS, and the vertical one is the larger.
  *
  * It used to be one number, 96, and that number was smaller than Instagram's
- * safe inset — so every generated carousel failed its own pre-flight with
+ * safe inset, so every generated carousel failed its own pre-flight with
  * "reaches into the area Instagram covers", on every slide. A template that
  * cannot pass the check the same product runs on it is not a template.
  *
  * Instagram crops a 4:5 post to a centred square for the profile grid, which
  * takes (1350 - 1080) / 2 = 135 from the top and the bottom and NOTHING from the
  * sides. So the vertical margin has to clear 135 and the horizontal one does
- * not — one constant could only satisfy both by making every slide needlessly
+ * not, one constant could only satisfy both by making every slide needlessly
  * narrow.
  *
  * 140 rather than 135 exactly: a margin equal to the boundary is a rounding
@@ -85,7 +85,7 @@ function fit(
     maxHeight: box.h,
     // The ladder stops well short of its own floor. Below roughly 60% of the
     // top size a slide stops reading as designed and starts reading as crammed
-    // — which is the single loudest complaint about every tool in this
+    //, which is the single loudest complaint about every tool in this
     // category. Copy that needs to go lower does not get a smaller font; it
     // overflows here on purpose, and buildSlides gives it another slide.
     sizes: ladder(range[0], Math.max(range[1], Math.round(range[0] * SHRINK_FLOOR))),
@@ -352,7 +352,7 @@ const BY_ROLE: Record<string, Composition> = {
  * A stable number from the deck's own words.
  *
  * Used to rotate where the composition cycle starts, which is the difference
- * between "four frameworks" and "the same eight-slide layout every time" — the
+ * between "four frameworks" and "the same eight-slide layout every time", the
  * loudest one-star complaint about every tool in this category. Two different
  * carousels get different rhythms; the same carousel twice gets the same one,
  * because the seed is the content rather than a clock or a counter.
@@ -383,7 +383,7 @@ export function compositionFor(
     return CYCLE[(index - 1 + seed + CYCLE.length) % CYCLE.length]!;
   }
   if (index === 0) return TITLE;
-  // A short last slide closes on the colour block — the one loud slide in the deck.
+  // A short last slide closes on the colour block, the one loud slide in the deck.
   if (index === total - 1 && total > 2) return BLOCK;
   return CYCLE[(index - 1 + seed) % CYCLE.length]!;
 }
@@ -442,15 +442,15 @@ export type BuildOptions = {
 /**
  * Copy that does not fit gets ANOTHER SLIDE rather than a smaller font.
  *
- * Built, measured, and rebuilt with the offending entry split — rather than
- * predicted up front — because the region a slide gets depends on which
+ * Built, measured, and rebuilt with the offending entry split, rather than
+ * predicted up front, because the region a slide gets depends on which
  * composition it lands on, which depends on how many slides there are, which is
  * the thing splitting changes. Measuring the real output sidesteps the circle,
  * and each pass strictly shrinks the worst slide, so it converges.
  *
  * The alternative is what every tool in this category does and what its users
- * complain about loudest: shrink until it fits. `fit()` still shrinks — a couple
- * of ladder steps is a reasonable accommodation — but it no longer falls to the
+ * complain about loudest: shrink until it fits. `fit()` still shrinks, a couple
+ * of ladder steps is a reasonable accommodation, but it no longer falls to the
  * floor silently and calls that a layout.
  */
 const MAX_SPLIT_PASSES = 10;

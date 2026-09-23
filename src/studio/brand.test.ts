@@ -193,7 +193,7 @@ describe("applying a brand to an existing carousel", () => {
     expect(out.palette.length).toBeLessThanOrEqual(10);
   });
 
-  it("is idempotent — applying the same brand twice changes nothing the second time", () => {
+  it("is idempotent, applying the same brand twice changes nothing the second time", () => {
     const b = brandOf(PAPER);
     const once = applyBrand(deckIn("ink"), b).doc;
     const twice = applyBrand(once, b);
@@ -203,7 +203,7 @@ describe("applying a brand to an existing carousel", () => {
   /**
    * The CTA block prints theme.bg on theme.accent. A name-based rule that saw
    * "Text" and reached for fg would make that copy invisible against its own
-   * block — which is exactly what the idempotence test caught.
+   * block, which is exactly what the idempotence test caught.
    */
   it("leaves the CTA block's copy on the background colour, not the foreground", () => {
     const out = applyBrand(deckIn("ink"), brandOf(PAPER)).doc;
@@ -305,7 +305,7 @@ describe("stamping a logo onto a deck", () => {
     expect(stampLogo(once, brand, resolves()).placed).toBe(0);
   });
 
-  /** A re-lay must not take it away again — the user asked for it. */
+  /** A re-lay must not take it away again, the user asked for it. */
   it("marks it as the user's, so regeneration keeps it", () => {
     const layer = stampLogo(deckIn("ink"), brand, resolves()).doc.slides[0]?.layers.at(-1);
     expect(layer?.handEdited).toBe(true);

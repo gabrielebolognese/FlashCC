@@ -91,7 +91,7 @@ describe("type size", () => {
 });
 
 describe("overflow", () => {
-  /** The remedy is another slide, never smaller type — so the message says so. */
+  /** The remedy is another slide, never smaller type, so the message says so. */
   it("blocks copy that does not fit its box and says what to do", () => {
     const long = text({ text: "word ".repeat(200), h: 120, fontSize: 40 });
     const hit = preflight(deck([[long]]), LI).find((f) => f.code === "text-overflows");

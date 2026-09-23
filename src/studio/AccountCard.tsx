@@ -3,7 +3,7 @@
  * actually somewhere safe.
  *
  * The sync line is the part that matters. A sync that fails quietly is worse than
- * no sync at all — the whole promise being sold here is "your history is safe", so
+ * no sync at all, the whole promise being sold here is "your history is safe", so
  * a failure has to be visible and retryable rather than swallowed into a console
  * nobody has open.
  */
@@ -116,7 +116,7 @@ export function AccountCard({
       </div>
 
       {/*
-        The renewal date, always, on a paid plan — and whether that date is a
+        The renewal date, always, on a paid plan, and whether that date is a
         charge or an ending, which are not the same and cannot be told apart from
         the date alone. "No surprise renewals" is a promise on the pricing screen;
         this is the thing that makes it true rather than aspirational.
@@ -125,7 +125,7 @@ export function AccountCard({
         <div className="mt-1.5 text-caption text-muted">
           {profile.planEndsAtPeriodEnd ? (
             <span className="text-tertiary">
-              Ends {renewalDate(profile.planRenewsAt)} — everything stays unlocked until then
+              Ends {renewalDate(profile.planRenewsAt)}, everything stays unlocked until then
             </span>
           ) : (
             <>Renews {renewalDate(profile.planRenewsAt)}</>

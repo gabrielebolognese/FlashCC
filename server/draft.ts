@@ -2,7 +2,7 @@
  * Drafting. Lifted out of index.ts unchanged when billing arrived and the server
  * grew a router.
  *
- * The API key lives on this side and never reaches the browser — that is the
+ * The API key lives on this side and never reaches the browser, that is the
  * whole reason this process exists.
  */
 import type { IncomingMessage, ServerResponse } from "node:http";
@@ -39,7 +39,7 @@ Rules:
 - Write finished copy, not instructions or placeholders. Never write "your hook here".
 - One idea per slide. If a slide needs an "and also", it belongs in two slides.
 - Keep each slide short enough to read at a glance: the hook under 90 characters, body slides under 220.
-- Match the job of each slot exactly. The hook decides whether slide 2 is seen, so make it specific — a number, a cost, a consequence — never a category.
+- Match the job of each slot exactly. The hook decides whether slide 2 is seen, so make it specific, a number, a cost, a consequence, never a category.
 - Write in the brief's own voice and vocabulary. Do not add claims, numbers, or results the brief does not contain.
 - No hashtags, no emoji, no "in today's fast-paced world".
 - Return one entry per slot, in order, using the given slot ids.`;
@@ -49,7 +49,7 @@ export const draftConfigured = (): boolean => Boolean(process.env.ANTHROPIC_API_
 async function run(body: DraftRequest) {
   const client = new Anthropic();
   const slotLines = body.structure.slots
-    .map((s, i) => `${i + 1}. id="${s.id}" — ${s.label}: ${s.note}. e.g. "${s.placeholder}"`)
+    .map((s, i) => `${i + 1}. id="${s.id}", ${s.label}: ${s.note}. e.g. "${s.placeholder}"`)
     .join("\n");
 
   const response = await client.messages.parse({
@@ -71,7 +71,7 @@ async function run(body: DraftRequest) {
     ],
   });
 
-  // A policy decline returns 200 with no usable content — check before reading.
+  // A policy decline returns 200 with no usable content, check before reading.
   if (response.stop_reason === "refusal") {
     const why = response.stop_details?.explanation ?? "the request was declined";
     throw new HttpError(422, `Claude declined this brief: ${why}`);
@@ -85,7 +85,7 @@ async function run(body: DraftRequest) {
 /**
  * Drafting, gated.
  *
- * This route spends money — an unauthenticated caller with the URL can run up an
+ * This route spends money, an unauthenticated caller with the URL can run up an
  * Anthropic bill with no ceiling, and until this batch one could. The plan check
  * is second, after the key check, so somebody on a server with no key set gets
  * told that rather than being sold an upgrade that would not help.
@@ -119,7 +119,7 @@ export async function draft(req: IncomingMessage, res: ServerResponse): Promise<
  *
  * `angle` is not decoration. The complaint this answers is that people iterate
  * on hooks by hand; five near-identical rewordings do not help them, five
- * genuinely different approaches do — and naming the approach is what lets
+ * genuinely different approaches do, and naming the approach is what lets
  * someone pick on judgement rather than on vibe.
  */
 const HookSchema = z.object({

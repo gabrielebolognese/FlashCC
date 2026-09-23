@@ -3,15 +3,15 @@
  *
  * This is the missing first half of the bulk pipeline. Every scheduler's CSV
  * importer wants `https://…/03.jpg` and every scheduler expects you to have
- * found that URL somewhere else — a WordPress install, a Drive share, a CDN. The
+ * found that URL somewhere else, a WordPress install, a Drive share, a CDN. The
  * render already happens here, so the hosting may as well.
  *
  * Three steps, in this order, because each one can fail and the failure has to
  * be legible:
  *
- *   1. render  — the same `renderSlides` the download uses, asked for as data
- *   2. host    — each slide to the public `slides` bucket under the owner's id
- *   3. row     — a `PublishedCarousel`, which `schedulers.ts` turns into a line
+ *   1. render , the same `renderSlides` the download uses, asked for as data
+ *   2. host   , each slide to the public `slides` bucket under the owner's id
+ *   3. row    , a `PublishedCarousel`, which `schedulers.ts` turns into a line
  *
  * PUBLIC, deliberately. A signed URL cannot do this job: the scheduler fetches
  * the picture days later with no credentials. Nothing lands in that bucket
@@ -48,9 +48,9 @@ async function postSlides(payload: unknown): Promise<RenderedResponse> {
   const response = await fetch("/api/slides", {
     method: "POST",
     // Publishing already needs an account to upload the result, so the token is
-    // always available here — this closes the route, it does not narrow it.
+    // always available here, this closes the route, it does not narrow it.
     headers: await authHeader(),
-    // `output` is meaningless to this route — it always returns images — but the
+    // `output` is meaningless to this route, it always returns images, but the
     // payload is shared with the download path and trimming it here would mean
     // two shapes to keep in step.
     body: JSON.stringify(payload),
@@ -65,7 +65,7 @@ async function postSlides(payload: unknown): Promise<RenderedResponse> {
  * The deck as one PDF, also hosted.
  *
  * Publer's `Post subtype` accepts a PDF at a URL, which is the shape LinkedIn
- * wanted in the first place — a document post rather than ten pictures. Best
+ * wanted in the first place, a document post rather than ten pictures. Best
  * effort: a failure here loses the document row and keeps the picture row, which
  * is still a working import.
  */
@@ -90,7 +90,7 @@ async function renderDocumentPdf(payload: unknown): Promise<Uint8Array | null> {
  * Padded for the same reason the zip export pads: every listing anywhere sorts
  * by name, and a carousel whose tenth slide sorts after its first is a carousel
  * posted in the wrong order. Deterministic, so republishing a deck REPLACES its
- * slides rather than accumulating a new set beside the old one — a URL already
+ * slides rather than accumulating a new set beside the old one, a URL already
  * pasted into a scheduler keeps working and shows the newer artwork.
  */
 export const slidePath = (userId: string, docId: string, index: number, ext: string): string =>

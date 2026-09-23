@@ -1,4 +1,4 @@
--- FlashCC — initial schema
+-- FlashCC, initial schema
 --
 -- Run this once in the Supabase SQL editor (Dashboard → SQL Editor → New query).
 -- It is idempotent: running it twice is safe.
@@ -21,7 +21,7 @@
 --
 -- 3. DELETES ARE TOMBSTONES. `deleted_at` is set instead of removing the row, and
 --    clients filter it out. Without this, deleting a project on your laptop and
---    then syncing your phone resurrects it — the phone still has the row, the
+--    then syncing your phone resurrects it, the phone still has the row, the
 --    server has no record that it ever went, and the merge dutifully puts it back.
 --    Deletion is just another edit, so LWW settles it like any other conflict.
 --
@@ -29,7 +29,7 @@
 --    privileges narrowed to a column list that excludes it, so a signed-in user
 --    can set their display name but can neither edit their way to Pro nor create
 --    themselves there on first sign-in. Only the service role (your Stripe
---    webhook) can write it. RLS alone would NOT do this — an owner policy on the
+--    webhook) can write it. RLS alone would NOT do this, an owner policy on the
 --    row lets them write every column in it.
 -- ─────────────────────────────────────────────────────────────────────────────
 
@@ -51,7 +51,7 @@ create table if not exists public.profiles (
 );
 
 comment on column public.profiles.plan is
-  'Writable only by the service role. See the revoke below — do not grant it back.';
+  'Writable only by the service role. See the revoke below, do not grant it back.';
 
 -- ── docs (carousels) ────────────────────────────────────────────────────────
 -- `data` holds the whole Doc. The flat columns beside it are exactly the fields
@@ -80,7 +80,7 @@ create table if not exists public.docs (
 -- ── posts (publications) ────────────────────────────────────────────────────
 -- Columns, not a blob: these are what analytics groups and filters by, and a
 -- jsonb blob cannot be indexed usefully for that. The structural fields are
--- copied off the doc at creation and deliberately never re-derived — the doc
+-- copied off the doc at creation and deliberately never re-derived, the doc
 -- keeps being edited, and the version that earned the numbers is the one that
 -- went out.
 
@@ -157,7 +157,7 @@ create trigger profiles_touch before insert or update on public.profiles
 -- ── profiles are made by the client ────────────────────────────────────────
 -- Deliberately NOT a trigger on auth.users. Supabase has tightened ownership of
 -- that table, so `create trigger ... on auth.users` now fails on many projects
--- with "must be owner of relation users" — and because the SQL editor runs the
+-- with "must be owner of relation users", and because the SQL editor runs the
 -- whole script in one transaction, that single error silently rolls back every
 -- table above it. Nothing here needs privileged DDL; auth.ts creates the row on
 -- first sign-in instead.
@@ -166,7 +166,7 @@ create trigger profiles_touch before insert or update on public.profiles
 -- This is the whole security boundary. The anon key in the browser is public by
 -- design and grants nothing on its own; these policies are what stop one account
 -- reading another. `using` gates what a statement may see and delete, `with
--- check` gates what it may leave behind — both are needed, or a user could
+-- check` gates what it may leave behind, both are needed, or a user could
 -- update their own row into someone else's user_id.
 
 alter table public.profiles enable row level security;

@@ -12,7 +12,7 @@
  * Deletion is not a special case. A deleted record becomes an entry whose value is
  * null and whose timestamp is when it went, so it competes on exactly the same
  * terms as an edit. That is the only way a delete on one device survives contact
- * with a second device that still has the row — see tombstones.ts.
+ * with a second device that still has the row, see tombstones.ts.
  *
  * `mergeEntries` is pure and has no idea localStorage or Supabase exist. That is
  * where the reasoning lives, and it is the part worth testing.
@@ -137,7 +137,7 @@ function localBrandEntries(): Entry<Brand>[] {
  * Only assets that have reached the bucket are pushed.
  *
  * An asset still carrying its bytes inline has no `path`, and the table's check
- * constraint refuses a row without one — correctly, because a library entry that
+ * constraint refuses a row without one, correctly, because a library entry that
  * points at nothing is worse than an entry that is not there yet. `library.ts`
  * uploads it on the next sign-in and it joins the sync then.
  */
@@ -184,7 +184,7 @@ function localPostEntries(): Entry<Post>[] {
 /**
  * A remote row carries its own deletion in `deleted_at`. When it is set, the row's
  * timestamp for merge purposes is when it was deleted, not when it was last
- * edited — otherwise an old delete would lose to the edit that preceded it.
+ * edited, otherwise an old delete would lose to the edit that preceded it.
  */
 const docRowToEntry = (row: DocRow): Entry<Doc> =>
   row.deleted_at
@@ -251,7 +251,7 @@ export function clearCursor(): void {
  *
  * The pull is full rather than incremental on purpose. An incremental pull keyed
  * on the server clock is a worthwhile optimisation later, but it can only be
- * correct once every device is known to have seen every tombstone — and getting
+ * correct once every device is known to have seen every tombstone, and getting
  * that wrong resurrects deleted records, which is precisely the bug tombstones
  * exist to prevent. At the scale of one person's carousels the whole set is a
  * cheap read.
@@ -355,7 +355,7 @@ export async function syncAll(userId: string): Promise<SyncResult> {
 
     if (clientRows.length > 0) {
       const { error } = await db.from("clients").upsert(clientRows, { onConflict: "user_id,id" });
-      // Past the plan's allowance is the paywall working, not a sync failure —
+      // Past the plan's allowance is the paywall working, not a sync failure,
       // the same bargain brands strike. The client stays local.
       if (error && error.code !== "42501") throw new Error(error.message);
     }
@@ -363,8 +363,8 @@ export async function syncAll(userId: string): Promise<SyncResult> {
     const assetRows = assetMerge.toPush.flatMap((e) =>
       e.value
         ? [forWrite(assetToRow(e.value, userId))]
-        : // A deleted asset has no row to rebuild from — the record is gone
-          // locally and only the tombstone remains — so the deletion is sent as
+        : // A deleted asset has no row to rebuild from, the record is gone
+          // locally and only the tombstone remains, so the deletion is sent as
           // an UPDATE of the existing row rather than as an upsert of a
           // placeholder. A path is required by the table and a placeholder has
           // none to offer.
@@ -399,7 +399,7 @@ export async function syncAll(userId: string): Promise<SyncResult> {
       const { error } = await db.from("brands").upsert(brandRows, { onConflict: "user_id,id" });
       // A brand past the plan's allowance is refused by the INSERT policy. That
       // is the paywall working, not a sync failure, so it must not take the rest
-      // of the sync down with it — the brand simply stays local.
+      // of the sync down with it, the brand simply stays local.
       if (error && error.code !== "42501") throw new Error(error.message);
     }
 
@@ -478,7 +478,7 @@ const emptyBrand = (id: string, at: string): Brand => ({
   updatedAt: at,
 });
 
-/** Placeholders for a tombstone push. Never read back — deleted_at hides them. */
+/** Placeholders for a tombstone push. Never read back, deleted_at hides them. */
 const emptyDoc = (id: string, at: string): Doc => ({
   version: 3,
   id,
@@ -521,7 +521,7 @@ const emptyPost = (id: string, at: string): Post => ({
 /**
  * The first sign-in. Everything already on this machine becomes the starting
  * point for the account, which is what makes signing up feel like a rescue rather
- * than a reset — and it is the only moment the upgrade prompt is genuinely
+ * than a reset, and it is the only moment the upgrade prompt is genuinely
  * persuasive, because the work is right there.
  */
 export function hasLocalWork(): boolean {

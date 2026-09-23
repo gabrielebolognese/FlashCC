@@ -11,15 +11,15 @@
  *   "it was a downside to have to toggle back and forth between clients
  *    instead of seeing everything under one view"             (CoSchedule, complaint)
  *
- * So both. `ALL_CLIENTS` is a real, first-class selection — not an escape hatch
- * you reach when the filter is in your way — and it is the default, because the
+ * So both. `ALL_CLIENTS` is a real, first-class selection, not an escape hatch
+ * you reach when the filter is in your way, and it is the default, because the
  * roll-up is what somebody wants before they have decided which client they are
  * working on.
  *
  * ── A client is not a folder ─────────────────────────────────────────────────
  *
  * The roadmap said a client *replaces* the flat group string. It sits above it
- * instead. `group` is a folder — "March", "Launch" — and somebody with one
+ * instead. `group` is a folder, "March", "Launch", and somebody with one
  * client still wants folders; Batch 6 also forms a series out of a group's
  * contents, so removing it would take that with it. A client is the owner; a
  * group is a drawer inside.
@@ -42,7 +42,7 @@ export type Client = {
   name: string;
   /** For the rail dot. Assigned at creation so a list is scannable at a glance. */
   colour: string;
-  /** The brand a review page wears. See review.ts — this is 7.5 in one field. */
+  /** The brand a review page wears. See review.ts, this is 7.5 in one field. */
   brandId?: string | undefined;
   /** Out of the way rather than gone, exactly as archiving a project works. */
   archived?: boolean | undefined;
@@ -58,7 +58,7 @@ export type Owned = { clientId?: string | undefined };
  *
  * A sentinel so "show me everything" survives a round trip through a select
  * element and a URL, and so the code never has to decide whether a missing
- * client means "all" or "unassigned" — those are different answers.
+ * client means "all" or "unassigned", those are different answers.
  */
 export const ALL_CLIENTS = "__all__";
 
@@ -86,7 +86,7 @@ export const canAddClient = (count: number, plan: Plan | undefined): boolean =>
 
 /**
  * Enough hues to tell fifteen apart at a glance, chosen for contrast against the
- * app's dark chrome rather than for prettiness — a dot nobody can distinguish is
+ * app's dark chrome rather than for prettiness, a dot nobody can distinguish is
  * decoration.
  */
 export const CLIENT_COLOURS = [
@@ -120,7 +120,7 @@ export function makeClient(name: string, index = 0): Client {
  * Does this record belong in the current view?
  *
  * `ALL_CLIENTS` matches everything including unassigned work, which is the point
- * of the roll-up. `UNASSIGNED` matches only work with no client — a real bucket,
+ * of the roll-up. `UNASSIGNED` matches only work with no client, a real bucket,
  * because most of anybody's library starts there and hiding it would make the
  * first client somebody creates appear to delete their projects.
  */
@@ -214,7 +214,7 @@ export function upsertClient(client: Client): Client[] {
  *
  * Everything it owned becomes unassigned, which is recoverable, rather than
  * disappearing with it, which is not. An agency losing a client should lose a
- * label, not a year of carousels — and the alternative is the single most
+ * label, not a year of carousels, and the alternative is the single most
  * frightening thing a tool like this can do.
  */
 export function removeClient(id: string): Client[] {

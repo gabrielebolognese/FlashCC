@@ -118,7 +118,7 @@ export function Studio({ initial, onHome }: { initial: Doc; onHome: () => void }
           onApply={(brand) => {
             const result = applyBrand(doc, brand, undefined);
             // The logo goes on in the same commit, so applying a brand is one
-            // undo rather than two — and so "it used my brand assets
+            // undo rather than two, and so "it used my brand assets
             // automatically" is true without a second button to find.
             // Snapshot BEFORE the brand lands, not after: the version worth
             // keeping is the one that is about to stop existing.

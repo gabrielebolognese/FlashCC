@@ -149,7 +149,7 @@ describe("whole documents", () => {
   });
 
   /**
-   * "Everything is inside the artboard" passes for the broken version too — it
+   * "Everything is inside the artboard" passes for the broken version too, it
    * strands content at the top and nothing overflows. This is the assertion that
    * actually distinguishes them.
    */

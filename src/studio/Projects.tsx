@@ -2,7 +2,7 @@
  * The library: every carousel you have made, and the two ways to start another.
  *
  * Lifted out of the old home screen when the sidebar arrived. The one new thing is
- * the pipeline bridge on each card — "Add to pipeline" is where a document stops
+ * the pipeline bridge on each card, "Add to pipeline" is where a document stops
  * being a file and becomes something with a date and, eventually, numbers.
  */
 import { Archive, ArchiveRestore, CalendarPlus, Copy, FileText, Folder, Layers, Link2, PenLine, Plus, Send, Table, Trash2 } from "lucide-react";
@@ -75,7 +75,7 @@ export function Projects({
    * Which carousels already went out.
    *
    * Derived from the pipeline rather than stored on the document, so the two can
-   * never disagree about what was posted — there is one fact and one place it
+   * never disagree about what was posted, there is one fact and one place it
    * lives.
    */
   const publishedIds = useMemo(
@@ -94,7 +94,7 @@ export function Projects({
    * The client filter runs BEFORE the facets are counted.
    *
    * Otherwise a facet would offer "3 posted" while the grid shows one, because
-   * the other two belong to somebody else — and a count that does not match what
+   * the other two belong to somebody else, and a count that does not match what
    * clicking it produces is worse than no count.
    */
   const owned = useMemo(() => docs.filter((d) => belongsTo(d, client)), [docs, client]);
@@ -335,7 +335,7 @@ export function Projects({
             {/*
               A series is made from a group because a group is already the set
               somebody gathered on purpose. Numbered in the order on screen, not
-              sorted — guessing from names puts "Part 10" before "Part 2", which
+              sorted, guessing from names puts "Part 10" before "Part 2", which
               is wrong in the one case it would be reached for.
             */}
             {items.length > 1 ? (
@@ -549,7 +549,7 @@ function CardButton({
 /**
  * Where a project lives: which client owns it, and which folder it sits in.
  *
- * Both in one menu because they are the same gesture — "put this somewhere" —
+ * Both in one menu because they are the same gesture, "put this somewhere",
  * and two menus off one card would be two things to find. The client section is
  * absent entirely when there are no clients, so somebody who never uses them
  * never sees the concept.

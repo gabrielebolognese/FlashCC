@@ -54,7 +54,7 @@ describe("baseline", () => {
   /**
    * The reason this is a median and not a mean. With one 100k post among five
    * ordinary ones, a mean baseline lands around 18k and NOTHING is ever an outlier
-   * again — the feature silently switches itself off at the exact moment it becomes
+   * again, the feature silently switches itself off at the exact moment it becomes
    * interesting. The median shrugs the spike off.
    */
   it("is not dragged upward by a single viral post", () => {

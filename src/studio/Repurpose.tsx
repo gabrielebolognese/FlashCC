@@ -2,7 +2,7 @@
  * Paste a long thing, pick the moments, get carousels.
  *
  * Named `Repurpose` rather than `LongForm` because `longform.ts` sits beside it
- * and TypeScript refuses to hold both on a case-insensitive filesystem — the
+ * and TypeScript refuses to hold both on a case-insensitive filesystem, the
  * third time this codebase has walked into that, after `Analytics`/`insights`
  * and `Library`/`library`.
  *
@@ -17,8 +17,8 @@
  *
  * So: candidates, then a choice, then the work. Nothing is scored, nothing is
  * pre-ticked and nothing is called recommended. What each candidate shows is
- * factual — where it came from, how much material it has, how many slides it
- * would make — because those are things a person can actually judge.
+ * factual, where it came from, how much material it has, how many slides it
+ * would make, because those are things a person can actually judge.
  *
  * Everything here is deterministic. It runs with no API key, which matters more
  * than it sounds: the thing people distrust is a model choosing their material,
@@ -44,7 +44,7 @@ const SAMPLE = `## Cut on movement, not on the beat
 Every cut lands on the beat and the edit still feels flat. The reason is that
 attention resets when the frame changes, not when the snare hits.
 
-Cut on movement instead. A hand leaving frame, a head turning, a door closing —
+Cut on movement instead. A hand leaving frame, a head turning, a door closing,
 those are the moments the eye is already travelling, so the cut disappears.
 
 ## Punch in on the second sentence
@@ -82,7 +82,7 @@ export function Repurpose({ onHome, onOpen }: { onHome: () => void; onOpen: (doc
    *
    * The long-form path produces the same `BulkBlock[]` bulk create already
    * consumes, so there is one generation path rather than two that drift. Series
-   * numbering is applied after, in the order the material ran in — which is the
+   * numbering is applied after, in the order the material ran in, which is the
    * order the author wrote it in, and the only order that can be right.
    */
   const build = () => {
@@ -384,7 +384,7 @@ function CandidateRow({
           {candidate.thin ? (
             <>
               <span>·</span>
-              <span className="text-tertiary">short — expect a brief carousel</span>
+              <span className="text-tertiary">short, expect a brief carousel</span>
             </>
           ) : null}
         </span>

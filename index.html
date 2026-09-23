@@ -4,7 +4,35 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <meta name="color-scheme" content="dark" />
-    <title>FlashCC</title>
+
+    <title>FlashCC, carousels end to end</title>
+    <meta
+      name="description"
+      content="Write the words. FlashCC lays out your carousel, checks it against the platform, and hands your scheduler a row that already knows the image URLs."
+    />
+
+    <!--
+      Open Graph and Twitter, because the first place this product will ever be
+      shared is a social feed, and a link with no card in a feed full of cards
+      reads as broken. og:image is deliberately absent rather than pointed at a
+      file that does not exist yet: a 404 image renders worse than none.
+    -->
+    <meta property="og:type" content="website" />
+    <meta property="og:title" content="FlashCC, carousels end to end" />
+    <meta
+      property="og:description"
+      content="Write the words. It lays them out, checks them against the platform, and fills your scheduler's CSV in for you."
+    />
+    <meta name="twitter:card" content="summary_large_image" />
+
+    <meta name="robots" content="index, follow" />
+
+    <!--
+      No canonical link. Vite resolves href attributes in this file as build
+      assets, so a relative "/" fails the build outright, and an absolute one
+      needs a domain this product does not have yet. Add it at deploy time with
+      the real origin.
+    -->
   </head>
   <body>
     <div id="root"></div>

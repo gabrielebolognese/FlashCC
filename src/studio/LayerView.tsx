@@ -4,7 +4,7 @@ import { ICON_PATHS, ICON_VIEWBOX } from "../render/icons.js";
 import { gradientCss } from "./gradient.js";
 import { fontStack, type Layer } from "./model.js";
 
-/** Paints one layer. Pure — no interaction, no selection chrome. */
+/** Paints one layer. Pure, no interaction, no selection chrome. */
 export function LayerView({
   layer,
   editing,
@@ -151,7 +151,7 @@ export function LayerView({
     : { background: layer.fill === "none" ? "transparent" : layer.fill };
 
   if (layer.kind === "triangle") {
-    // The one shape a border cannot follow, so it stays SVG — and SVG needs the ramp
+    // The one shape a border cannot follow, so it stays SVG, and SVG needs the ramp
     // as a paint server rather than as CSS.
     const id = `g-${layer.id}`;
     const g = layer.gradient;
@@ -186,7 +186,7 @@ export function LayerView({
     );
   }
 
-  // rect, line and ellipse are all a box — ellipse is just a fully rounded one,
+  // rect, line and ellipse are all a box, ellipse is just a fully rounded one,
   // which keeps gradients and borders working on it without a paint server.
   return (
     <div

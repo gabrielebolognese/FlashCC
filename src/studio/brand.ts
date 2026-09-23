@@ -11,7 +11,7 @@
  * binding: a document does not remember which brand it came from and does not
  * re-derive anything when the brand changes later.
  *
- * The interesting part is §applyBrand — deciding what an existing layer's colour
+ * The interesting part is §applyBrand, deciding what an existing layer's colour
  * meant so it can be given the equivalent colour from somewhere else.
  */
 
@@ -24,7 +24,7 @@ import type { Theme } from "./presets.js";
 import { DEFAULT_STYLE, styleById, type Style } from "./styles.js";
 
 /**
- * Asset ids by variant — pointers into the library, never copies of a file.
+ * Asset ids by variant, pointers into the library, never copies of a file.
  *
  * Three, because a logo that only works on white is half a logo, and the one
  * thing an automatic placement has to get right is not putting a black mark on
@@ -50,7 +50,7 @@ export type Brand = {
 /* ── tiers ────────────────────────────────────────────────────────────────── */
 
 /**
- * The proven ladder in this market. Enforced in Postgres as well as here — a
+ * The proven ladder in this market. Enforced in Postgres as well as here, a
  * client-side limit is a suggestion, and the RLS policy in 03-brands.sql is what
  * actually holds. This copy exists so the UI can explain itself before the
  * database refuses.
@@ -98,7 +98,7 @@ export const brandIdOf = (styleId: string): string | null =>
 /**
  * Layer names the generator emits, and which theme colour each one wore.
  *
- * This is the fallback, not the primary rule — see the comment on `applyBrand`.
+ * This is the fallback, not the primary rule, see the comment on `applyBrand`.
  */
 const ROLE_BY_NAME: Record<string, keyof Pick<Theme, "fg" | "muted" | "accent" | "bg">> = {
   Title: "fg",
@@ -158,7 +158,7 @@ function applyToLayer(
   }
 
   // Fallback: a layer the generator made, wearing a colour the old theme no longer
-  // explains — because the style was changed, or the theme could not be
+  // explains, because the style was changed, or the theme could not be
   // reconstructed. Guessing from the name is better than leaving it behind on a
   // deck that is otherwise rebranded, and undo covers the case where it guesses
   // wrong. A layer with an unrecognised name is never touched: silently
@@ -167,7 +167,7 @@ function applyToLayer(
   // It is skipped entirely when the layer already wears one of the target
   // theme's own colours, and that guard is load-bearing rather than an
   // optimisation. Several compositions emit a layer called "Text" meaning
-  // different things — the CTA block's copy is deliberately `theme.bg`, because
+  // different things, the CTA block's copy is deliberately `theme.bg`, because
   // it sits ON the accent block. Without this check a second application would
   // "correct" it to `fg` and make it invisible against its own background.
   if (!changed && !wearsTheme(layer.fill, to)) {
@@ -301,7 +301,7 @@ function paletteFor(theme: Theme, existing: string[]): string[] {
 /**
  * The variant to wear on a given ground.
  *
- * A mark — the square, standalone one — wins when there is one, because it is
+ * A mark, the square, standalone one, wins when there is one, because it is
  * the version drawn to work anywhere. Otherwise the choice is made from the
  * background's luminance, which is the entire reason for keeping two.
  * `undefined` when the brand has no logo at all, which is the common case and
@@ -333,7 +333,7 @@ export type LogoPlacement = { doc: Doc; placed: number };
  * Put the brand's mark on the slides that carry it.
  *
  * This is the one thing in the corpus that no competitor has review evidence of
- * — "I scheduled a post and it used my brand assets automatically" — and it is
+ *, "I scheduled a post and it used my brand assets automatically", and it is
  * cheap here precisely because a placed logo is an ORDINARY IMAGE LAYER. It runs
  * once and leaves plain layers behind, exactly as a preset does. Nothing is
  * derived, nothing re-runs when the brand changes, and the layer has the same
@@ -343,7 +343,7 @@ export type LogoPlacement = { doc: Doc; placed: number };
  * the closer is where it is acted on, and a mark on all ten reads as a watermark
  * rather than as a signature.
  *
- * Idempotent per slide — a slide already carrying this asset is left exactly as
+ * Idempotent per slide, a slide already carrying this asset is left exactly as
  * it is, including wherever the user dragged it to.
  */
 export function stampLogo(
@@ -413,7 +413,7 @@ export function logosOf(brand: Brand, assets: readonly Asset[]): Partial<Record<
 
 /**
  * One key for the lot. Brands are a handful of small records always read as a
- * set — the gallery needs all of them, the limit check needs a count — so
+ * set, the gallery needs all of them, the limit check needs a count, so
  * per-record keys would add a fan-out read and buy nothing.
  */
 const KEY = "flashcc:v1:brands";

@@ -2,7 +2,7 @@
 
 Fast and easy carousel creator website.
 
-Describe a post and get a drafted, editable carousel — or write every slide yourself. Pick one of
+Describe a post and get a drafted, editable carousel, or write every slide yourself. Pick one of
 four frameworks, draft it with Claude or by hand, then arrange it on a real canvas where every
 element is a layer you can drag, resize and restyle.
 
@@ -39,19 +39,19 @@ drafting server and never reaches the browser.
    consecutive list markers group into one list slide, the first block becomes the cover, a short
    trailing block becomes the CTA. A three-step granularity control is the only tuning exposed.
 2. **Roles, not layouts.** Every slide is one of `cover`, `body`, `list`, `quote`, `cta`. The role
-   is inferred from the block's shape and determines the layout completely — you never position
+   is inferred from the block's shape and determines the layout completely, you never position
    anything. Override it from a control that appears on the slide itself.
 3. **Brand lock.** One brand kit for the whole document: palette, type roles, handle, background
    treatment. It applies to every slide and cannot be overridden per slide. That absence is the
    feature.
 4. **Direct editing.** Click text on the slide and edit it there. The source pane stays in sync
    both ways.
-5. **Export.** The DOM is the renderer, so the preview and the export are the same markup — there
+5. **Export.** The DOM is the renderer, so the preview and the export are the same markup, there
    is no second rendering path and no WYSIWYG drift.
 
 ## Architecture
 
-The document is semantic and renderer-agnostic — it stores what a slide *means*, never pixel
+The document is semantic and renderer-agnostic, it stores what a slide *means*, never pixel
 positions. Layout is derived from `role + brandKit + format` by a pure function that returns data,
 which is what lets a future phase render the same document as animated video without a browser.
 
@@ -73,5 +73,5 @@ live canvas with in-place editing, filmstrip with reorder/duplicate/delete, bran
 keyboard shortcuts, PDF export.
 
 Not built yet: server-side headless-browser export (PNG sequence), logo upload, format switcher,
-accounts. Animated vertical export is a deliberate phase-2 seam — the document model is designed
+accounts. Animated vertical export is a deliberate phase-2 seam, the document model is designed
 for it, but none of it is built.

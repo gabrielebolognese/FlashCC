@@ -2,13 +2,13 @@
  * Re-running generation without losing what you changed by hand.
  *
  * The batch job stays OUTSIDE the document. A re-run is a fresh one-shot
- * generation that happens to skip layers you have touched — not a live binding,
+ * generation that happens to skip layers you have touched, not a live binding,
  * not a template the document keeps referring back to. That distinction is the
  * whole "nothing is derived" invariant: what is stored is what renders, and a
  * regenerated layer is as ordinary as one you drew.
  *
  * A layer counts as yours the moment you edit it. Nothing infers intent from the
- * content — inferring would mean a layer you deliberately restored to its
+ * content, inferring would mean a layer you deliberately restored to its
  * original colour silently loses its protection.
  */
 
@@ -21,7 +21,7 @@ export function textsOf(doc: Doc): string[] {
   return doc.slides.map((slide) => {
     const texts = slide.layers.filter((l) => l.kind === "text" && (l.text ?? "").trim() !== "");
     if (texts.length === 0) return "";
-    // Biggest first, then the rest — which reassembles "heading. body" the way
+    // Biggest first, then the rest, which reassembles "heading. body" the way
     // the splitter produced it.
     const sorted = [...texts].sort((a, b) => (b.fontSize ?? 0) - (a.fontSize ?? 0));
     return sorted.map((l) => (l.text ?? "").trim()).join("\n");
@@ -79,7 +79,7 @@ export function regenerate(
  *
  * Used by hook variants, where only slide 1 changes. It goes back through
  * `buildSlides` rather than writing the new text onto the existing layer,
- * because a layer's box and font size were chosen for the OLD words — a longer
+ * because a layer's box and font size were chosen for the OLD words, a longer
  * hook on a box measured for a shorter one is the "text too small to read"
  * complaint, arriving by a different door.
  *
@@ -90,7 +90,7 @@ export function regenerate(
  *
  * When the rewrite is long enough to need splitting, the slide count changes and
  * there is no longer a single slide to swap in. That is a genuinely different
- * deck, so the whole merged regeneration is returned instead — and `replaced`
+ * deck, so the whole merged regeneration is returned instead, and `replaced`
  * tells the caller which happened.
  */
 export function restateSlide(

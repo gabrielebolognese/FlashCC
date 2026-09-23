@@ -4,7 +4,7 @@ Style rules for this app. It shares the visual language of **FlashFX**, a profes
 browser-based motion-graphics/video editor. Treat this file as the source of truth for all UI
 decisions.
 
-**Aesthetic:** a dark, dense, precise "pro tool" — a calm deep-navy control room with a single
+**Aesthetic:** a dark, dense, precise "pro tool", a calm deep-navy control room with a single
 warm gold accent. Engineered, quiet, high-density (DaVinci Resolve / Linear / a pro DAW), never
 bubbly or consumer-playful. **Dark theme only.**
 
@@ -19,15 +19,15 @@ depth by surface-step, fast ease-out motion, glass only where things float.
 
 1. **Depth comes from a lighter surface step, not shadows.** Stack UI by moving up the surface
    ladder (darker → lighter navy). Shadows are reserved almost exclusively for floating overlays.
-2. **Gold is used sparingly** — it marks the one primary action, the current selection, focus, and
+2. **Gold is used sparingly**, it marks the one primary action, the current selection, focus, and
    active state. Most of the UI is navy + grey text. If everything is gold, nothing is.
-3. **Lines are white-alpha hairlines, not solid grey** — so they adapt to whatever surface they
+3. **Lines are white-alpha hairlines, not solid grey**, so they adapt to whatever surface they
    sit on.
 4. **Type is small, tight, and quiet.** UI text lives at 10–13px, weights 400–600, with slightly
    negative tracking on titles. Density over generosity.
-5. **Blur is a privilege of floating things** (menus, the dynamic island, modal scrims) — never on
+5. **Blur is a privilege of floating things** (menus, the dynamic island, modal scrims), never on
    static panels (it's a compositor cost and visual noise).
-6. **Motion is fast and physical** — 80–200ms, ease-out; spring only for the "island" expand.
+6. **Motion is fast and physical**, 80–200ms, ease-out; spring only for the "island" expand.
 
 ---
 
@@ -37,8 +37,8 @@ The source of truth. Reuse these `:root` vars verbatim.
 
 ```css
 :root {
-  /* Surface ladder — depth via a lighter step, never a shadow */
-  --bg-sunken:  #070f1c;  /* deepest — app backdrop, timeline well */
+  /* Surface ladder, depth via a lighter step, never a shadow */
+  --bg-sunken:  #070f1c;  /* deepest, app backdrop, timeline well */
   --bg:         #0a1424;  /* base canvas / page */
   --surface-1:  #0e1b2e;  /* cards, inputs, sidebars */
   --surface-2:  #142338;  /* panels, modals */
@@ -46,18 +46,18 @@ The source of truth. Reuse these `:root` vars verbatim.
   --surface-4:  #21344e;  /* controls, chips */
   --surface-5:  #2a3f5c;  /* strongest edge / hover top */
 
-  /* Lines — white-alpha, adapt to any surface */
+  /* Lines, white-alpha, adapt to any surface */
   --hairline:   rgba(255,255,255,0.08);  /* default divider/border */
   --border:     rgba(255,255,255,0.14);  /* stronger input border */
 
-  /* Accent — the gold, used sparingly */
+  /* Accent, the gold, used sparingly */
   --accent:       #d9a521;               /* primary action, selection, active */
   --accent-hover: #f0bd45;
   --accent-wash:  rgba(217,165,33,0.12); /* accent background tint */
   --accent-dim:   #a87d18;               /* accent border */
   --on-accent:    #12161c;               /* text/icon ON gold */
 
-  /* Text — hierarchy via value step, not color */
+  /* Text, hierarchy via value step, not color */
   --text-primary:   #e6edf6;  /* headings, key values */
   --text-secondary: #94a3b8;  /* body, labels */
   --text-tertiary:  #64748b;  /* captions, meta */
@@ -67,7 +67,7 @@ The source of truth. Reuse these `:root` vars verbatim.
   --success: #3dbe7a;
   --danger:  #e5545a;
   --info:    #4c86d6;
-  --live:    #ff3b5c;  /* "recording"/scrub red — distinct from selection gold */
+  --live:    #ff3b5c;  /* "recording"/scrub red, distinct from selection gold */
 }
 ```
 
@@ -77,7 +77,7 @@ The logo mark and top-priority CTAs (primary "New", "Upgrade") use a brighter go
 
 ```css
 background: linear-gradient(135deg, #f7b500, #e09000);
-/* hover: #ffc83d — text: #0a0f16 (near-black) */
+/* hover: #ffc83d, text: #0a0f16 (near-black) */
 ```
 
 Use this for the brand mark and **one hero button per screen**. Use `--accent` (`#d9a521`) for
@@ -87,9 +87,9 @@ everything else gold.
 
 ## Typography
 
-- **Font:** system UI stack — `-apple-system, BlinkMacSystemFont, "SF Pro Text", "SF Pro Display",
+- **Font:** system UI stack, `-apple-system, BlinkMacSystemFont, "SF Pro Text", "SF Pro Display",
   "Segoe UI", Roboto, sans-serif`
-- **Mono:** `"SF Mono", ui-monospace, "Cascadia Code", monospace` — numbers, timecodes, IDs.
+- **Mono:** `"SF Mono", ui-monospace, "Cascadia Code", monospace`, numbers, timecodes, IDs.
 
 7-step scale (each token bakes in line-height + tracking + weight):
 
@@ -103,7 +103,7 @@ everything else gold.
 | `stat` | 15 / 20 | −0.2 | 600 | numeric values |
 | `display` | 22 / 26 | −0.4 | 600 | rare hero text |
 
-Weights only ever **400 / 450 / 500 / 600** — no bold/700+. Titles use slightly negative
+Weights only ever **400 / 450 / 500 / 600**, no bold/700+. Titles use slightly negative
 letter-spacing.
 
 ---
@@ -113,7 +113,7 @@ letter-spacing.
 - **Radii:** `sm` 4px (inputs, chips), `md` 6px (buttons, default), `lg` 8px (cards), `xl` 12px
   (modals), `island` 14px (floating pill), `pill` 999px.
 - **Control heights:** compact 24px, default 28px, comfortable 32px. Toolbars/headers ~36–44px.
-  **This app runs dense** — default to 28px controls, 11–12px text, tight gaps (`gap-1`–`gap-2`,
+  **This app runs dense**, default to 28px controls, 11–12px text, tight gaps (`gap-1`–`gap-2`,
   `px-2`–`px-3`).
 - **Borders:** 1px hairline everywhere; inputs get the stronger `--border`.
 
@@ -121,7 +121,7 @@ letter-spacing.
 
 ## Elevation, shadow, material
 
-Shadows — **floating only**:
+Shadows, **floating only**:
 
 ```css
 /* overlay */
@@ -138,7 +138,7 @@ box-shadow: inset 0 1px 0 rgba(255,255,255,.05);
 box-shadow: 0 0 0 2px rgba(217,165,33,.55), 0 0 0 4px rgba(217,165,33,.15);
 ```
 
-**Material (glass) — floating surfaces only:**
+**Material (glass), floating surfaces only:**
 
 - Menus: `rgba(26,42,66,.85)` + `blur(24px) saturate(1.8)`
 - Island: `rgba(20,35,57,.78)` + `blur(20px) saturate(1.8)`
@@ -154,10 +154,10 @@ subtle "lit from above" feel.
 
 - **Durations:** instant 80ms, micro 120ms, standard 200ms, large 300ms.
 - **Easings:**
-  - `out` — `cubic-bezier(.2,0,0,1)` (default)
-  - `in` — `cubic-bezier(.4,0,1,1)`
-  - `move` — `cubic-bezier(.4,0,.2,1)`
-  - `spring` — `cubic-bezier(.34,1.3,.64,1)` — **reserve for the island expand**
+  - `out`, `cubic-bezier(.2,0,0,1)` (default)
+  - `in`, `cubic-bezier(.4,0,1,1)`
+  - `move`, `cubic-bezier(.4,0,.2,1)`
+  - `spring`, `cubic-bezier(.34,1.3,.64,1)`, **reserve for the island expand**
 - Hovers/state changes: 120–200ms ease-out. No long or bouncy transitions on ordinary controls.
 
 ---
@@ -198,7 +198,7 @@ mark (gold-gradient square, 5×5, bold letter) at top, nav rows (11–12px, icon
 primary CTA + a round avatar.
 
 **Dynamic Island.** A floating rounded-14px pill (material glass) for transient status/toasts,
-entering with the `spring` easing — the app's one "delightful" motion moment.
+entering with the `spring` easing, the app's one "delightful" motion moment.
 
 **Avatar.** Small round; photo, else a gold-gradient circle with a bold uppercase initial in
 near-black.

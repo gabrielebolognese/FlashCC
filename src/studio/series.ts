@@ -5,12 +5,12 @@
  * research says numbering is the least of it, and the three real problems are
  * these:
  *
- * **Discovery.** *"My Part 4 has 1M views but Part 1 has only 5K — because
+ * **Discovery.** *"My Part 4 has 1M views but Part 1 has only 5K, because
  * viewers can't find it."* *"It's tiresome for the audience to look for other
  * parts in the profile section... So they just scroll to the next video."* There
  * is no cross-linking primitive on either platform, so the only fix available is
- * a block of text listing the parts — with real URLs for the ones already
- * posted — pasted into every part's caption. That is `seriesCaption`, and it is
+ * a block of text listing the parts, with real URLs for the ones already
+ * posted, pasted into every part's caption. That is `seriesCaption`, and it is
  * the most valuable thing in this file.
  *
  * **Momentum.** *"the last thing you want is for a piece of content to finally go
@@ -34,7 +34,7 @@ import type { Post } from "./pipeline.js";
 /** Which series a carousel belongs to, and where in it. */
 export type Series = {
   id: string;
-  /** 1-based. Gaps and duplicates are survivable — see `renumber`. */
+  /** 1-based. Gaps and duplicates are survivable, see `renumber`. */
   part: number;
 };
 
@@ -123,7 +123,7 @@ export type SeriesView = {
  * Joins carousels to whatever the pipeline knows about them.
  *
  * A post is matched by `docId`, and the most recently updated one wins when a
- * carousel has been queued twice — which happens, and silently picking the first
+ * carousel has been queued twice, which happens, and silently picking the first
  * would show a stale URL.
  */
 export function collectSeries(
@@ -173,7 +173,7 @@ export type CaptionOptions = {
  *
  * Neither platform offers a way to link one post to another from inside a
  * carousel, so the caption is the only surface left. A part already live gets its
- * real URL; one that is not yet live is listed by name anyway — an audience that
+ * real URL; one that is not yet live is listed by name anyway, an audience that
  * can see part 5 is coming will wait for it, and a list that only shows the past
  * hides the reason to follow.
  *
@@ -197,9 +197,9 @@ export function seriesCaption(view: SeriesView, options: CaptionOptions = {}): s
 /** What the cross-reference slide says. Short, because it is one line on artwork. */
 export function crossReferenceText(part: number, total: number): string {
   if (total <= 1) return "";
-  if (part === 1) return `Part 1 of ${total} — the rest is in the caption`;
-  if (part === total) return `Part ${part} of ${total} — parts 1–${total - 1} are in the caption`;
-  return `Part ${part} of ${total} — the others are in the caption`;
+  if (part === 1) return `Part 1 of ${total}, the rest is in the caption`;
+  if (part === total) return `Part ${part} of ${total}, parts 1–${total - 1} are in the caption`;
+  return `Part ${part} of ${total}, the others are in the caption`;
 }
 
 /** "Name (2/5)", for a project card or a post title. */
@@ -229,7 +229,7 @@ const DAY_MS = 86_400_000;
  *
  * Only series with something ALREADY LIVE qualify. A series nobody has published
  * yet is not losing momentum, it is unstarted, and nagging about it would make
- * this banner noise within a week — at which point it stops being read at all.
+ * this banner noise within a week, at which point it stops being read at all.
  *
  * A next part that is already scheduled is not due either. The decision has been
  * made; repeating it is not a reminder, it is a complaint.
@@ -267,7 +267,7 @@ export function dueParts(views: readonly SeriesView[], at: Date = new Date()): D
  * The question people ask out loud: *"Drop them all at once? One per day? Spread
  * them out more?"*
  *
- * There is no evidenced right answer, so this does not pretend to one — it offers
+ * There is no evidenced right answer, so this does not pretend to one, it offers
  * the three cadences people actually describe and lets the choice be made. What
  * it does guarantee is that whichever is chosen is applied consistently, which is
  * the part that goes wrong by hand.
@@ -288,7 +288,7 @@ export const cadenceById = (id: string): (typeof CADENCES)[number] =>
  *
  * The time of day is carried from `from` rather than reset, because whoever
  * picked 09:00 for part 1 meant it for the whole series. Parts already posted are
- * skipped — rescheduling the past is meaningless and would rewrite history in the
+ * skipped, rescheduling the past is meaningless and would rewrite history in the
  * pipeline.
  */
 export function spread(

@@ -60,7 +60,7 @@ describe("what can be moved", () => {
 
   /**
    * Including a full-bleed band would report a span of the whole artboard and
-   * conclude nothing fits — shrinking a slide that needed no correction.
+   * conclude nothing fits, shrinking a slide that needed no correction.
    */
   it("ignores a full-width band on the axis it bleeds on", () => {
     const bounds = movableBounds(slide([rect(0, 800, 1080, 200, "Block"), rect(96, 200, 400, 100)]), W, H);
@@ -194,7 +194,7 @@ describe("Instagram's crop only reaches the cover", () => {
  * The guard this whole change exists for.
  *
  * Every carousel this product generates used to fail the check this product runs
- * on it — "Image reaches into the area Instagram covers with its own interface",
+ * on it, "Image reaches into the area Instagram covers with its own interface",
  * on every slide of every deck. A template that cannot pass its own pre-flight
  * is not a template, and nothing was asserting it did.
  */

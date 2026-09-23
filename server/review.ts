@@ -5,8 +5,8 @@
  * ── Why this is a server route and not row level security ────────────────────
  *
  * Everywhere else in FlashCC, RLS is the boundary and the browser talks to
- * PostgREST directly. That cannot work here. A reviewer has no `auth.uid()` — by
- * design, because a login is the thing this feature exists to avoid — and the
+ * PostgREST directly. That cannot work here. A reviewer has no `auth.uid()`, by
+ * design, because a login is the thing this feature exists to avoid, and the
  * obvious alternative, an anon policy that trusts a token in the row, requires
  * letting the anon key read `shares` to find the matching row, which is the same
  * as letting it read every share.
@@ -21,13 +21,13 @@
  * Exactly one share, its snapshot of rendered slides, and its CLIENT-SCOPED
  * comments. Never the document, never the internal notes, never the owner's
  * identity, never another share. `strip()` below is the single place that
- * decides, and it builds a fresh object rather than deleting keys — an allow
+ * decides, and it builds a fresh object rather than deleting keys, an allow
  * list cannot leak a column somebody adds later, and a deny list can.
  *
  * ── Abuse ────────────────────────────────────────────────────────────────────
  *
  * This is an open write endpoint. Nothing stops somebody who has the link from
- * filling it with rubbish, and that is acceptable — they could equally email the
+ * filling it with rubbish, and that is acceptable, they could equally email the
  * client. What is not acceptable is unbounded writes, so length, count and rate
  * are all capped, and a revoked link answers 404 rather than explaining itself.
  */
@@ -174,7 +174,7 @@ const LOGO_TTL_SECONDS = 60 * 60;
  * The agency's paint, and only the paint.
  *
  * 7.5 is their logo across the top of the page, not a licence to hand a stranger
- * their whole brand record — so this returns a name, four colours and up to
+ * their whole brand record, so this returns a name, four colours and up to
  * three images, built as a new object like `strip` above.
  *
  * `brands.logos` holds ASSET IDS, and those assets live in the private `media`
@@ -269,7 +269,7 @@ export async function addComment(req: IncomingMessage, res: ServerResponse): Pro
 
   const row = {
     // The SHARE's owner. A reviewer has no account, so there is no other user id
-    // — and this is what the owner's RLS policy gates their own reads on.
+    //, and this is what the owner's RLS policy gates their own reads on.
     user_id: share.user_id,
     id: `cm_${randomUUID()}`,
     share_id: share.id,
@@ -300,7 +300,7 @@ type DecisionBody = {
  * Approve, or ask for changes.
  *
  * Approving stamps `approved_version` from the snapshot the reviewer was
- * actually looking at, which is the entire point of 7.4 — an approval that
+ * actually looking at, which is the entire point of 7.4, an approval that
  * pointed at "the current document" would answer the wrong question the moment
  * anybody touched it.
  *

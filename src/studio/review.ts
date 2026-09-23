@@ -44,7 +44,7 @@ import type { Doc } from "./model.js";
  * A fingerprint of everything a reviewer could see.
  *
  * Words AND geometry AND colour, because "the version I approved" has to change
- * when the design moves, not only when the copy does — an agency asking for
+ * when the design moves, not only when the copy does, an agency asking for
  * "safeties to ensure that approved images aren't confused with modified ones"
  * is asking about a nudged headline as much as a rewritten one.
  *
@@ -150,7 +150,7 @@ export type Comment = {
  * "The ability to show the feed to the clients externally so that they're able
  * to view only what's needed and not all our comments" (Planable). The filter
  * lives here rather than in the query so that it is one function with one test,
- * and so a future caller cannot forget it — a server route that leaked internal
+ * and so a future caller cannot forget it, a server route that leaked internal
  * notes to a client would be the single worst bug this product could ship.
  */
 export const visibleTo = (comments: readonly Comment[], who: "owner" | "client"): Comment[] =>
@@ -187,8 +187,8 @@ export type Staleness =
  * Has the deck moved since somebody approved it?
  *
  * This is 7.4, and it is the answer to "three people approved the post, none of
- * them approved the same version". A stale approval is not revoked — deciding
- * that for somebody is worse than telling them — it is reported, and what they
+ * them approved the same version". A stale approval is not revoked, deciding
+ * that for somebody is worse than telling them, it is reported, and what they
  * do about it is theirs.
  */
 export function stalenessOf(share: Share, doc: Doc): Staleness {

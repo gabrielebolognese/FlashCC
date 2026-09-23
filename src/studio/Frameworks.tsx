@@ -112,7 +112,7 @@ export function Frameworks({
                 <span className="min-w-0">
                   <span className="block text-[15px] font-semibold text-primary">Not sure</span>
                   <span className="mt-0.5 block text-caption text-tertiary">
-                    Start on {DEFAULT_STRUCTURE.name} — it works on people who have never
+                    Start on {DEFAULT_STRUCTURE.name}, it works on people who have never
                     heard of you
                   </span>
                 </span>

@@ -38,7 +38,7 @@ describe("reading numbers", () => {
    */
   it("returns null rather than zero for anything it cannot read", () => {
     expect(readNumber("")).toBeNull();
-    expect(readNumber("—")).toBeNull();
+    expect(readNumber("\u2014")).toBeNull();
     expect(readNumber("n/a")).toBeNull();
   });
 
@@ -97,7 +97,7 @@ describe("parsing an export", () => {
     expect(parseAnalytics(withPreamble).rows).toHaveLength(1);
   });
 
-  /** Reported, never silently ignored — see D21 for why that matters here. */
+  /** Reported, never silently ignored, see D21 for why that matters here. */
   it("says which columns it did not understand", () => {
     const parsedOdd = parseAnalytics("Post URL,Impressions,Engagement rate\nhttps://x/1,50,0.04");
     expect(parsedOdd.ignored).toContain("Engagement rate");

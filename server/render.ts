@@ -1,8 +1,8 @@
 /**
  * Turning slides into files people can actually upload.
  *
- * The browser sends the markup it is already showing — LayerView's own output,
- * serialised — and this renders it in a real Chromium at exact pixel size. That
+ * The browser sends the markup it is already showing, LayerView's own output,
+ * serialised, and this renders it in a real Chromium at exact pixel size. That
  * is the whole design: there is one painter in this codebase, and a second
  * renderer here would drift from it the first week and nobody would notice until
  * a customer's gradient text came out as a black box.
@@ -139,7 +139,7 @@ export async function renderSlides(req: RenderRequest): Promise<RenderedSlide[]>
  *
  * Built from rendered JPEGs rather than from live HTML on purpose. LinkedIn
  * rasterises whatever it is given anyway, and PNG pages have been observed
- * converting into a PDF that renders blank — a failure nobody sees until the
+ * converting into a PDF that renders blank, a failure nobody sees until the
  * post is live.
  */
 export async function renderPdf(req: RenderRequest): Promise<Buffer> {

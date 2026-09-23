@@ -16,8 +16,8 @@
  *
  * The first version of this page put `.fcc-aurora` on the `<header>` and
  * `.fcc-halo` on the hero's deck wrapper. Both are `position: absolute` with an
- * `inset` — they are written to be applied to a bare decorative `<div>`, which
- * is how every other screen uses them — so the header and the deck came out of
+ * `inset`, they are written to be applied to a bare decorative `<div>`, which
+ * is how every other screen uses them, so the header and the deck came out of
  * flow and the whole document stacked on top of itself. That is why those
  * classes do not appear in this file at all.
  *
@@ -59,7 +59,7 @@ const PITCH = [
 ];
 
 const SPLIT_SOURCE =
-  "Every cut lands on the beat and the edit still feels flat. Attention resets when the frame changes, not when the snare hits. Cut on movement instead — a hand leaving frame, a head turning, a door closing.";
+  "Every cut lands on the beat and the edit still feels flat. Attention resets when the frame changes, not when the snare hits. Cut on movement instead, a hand leaving frame, a head turning, a door closing.";
 
 const deckFrom = (texts: string[], styleId: string): Doc => ({
   ...makeDoc("Demo"),
@@ -172,7 +172,7 @@ function Hero({ onStart }: { onStart: () => void }) {
 
   return (
     <header className="relative overflow-hidden border-b border-hairline">
-      {/* Decorative, empty, out of flow — and the ONLY thing here that is. */}
+      {/* Decorative, empty, out of flow, and the ONLY thing here that is. */}
       <div
         aria-hidden
         className="pointer-events-none absolute inset-0"
@@ -188,7 +188,7 @@ function Hero({ onStart }: { onStart: () => void }) {
           For people who post every week
         </Eyebrow>
 
-        <h1 className="mx-auto mt-6 max-w-[16ch] text-[44px] font-semibold leading-[0.96] tracking-[-1.8px] text-primary md:text-[68px] md:tracking-[-3px]">
+        <h1 className="mx-auto mt-6 max-w-[16ch] text-[32px] font-semibold leading-[1.02] tracking-[-1px] text-primary sm:text-[44px] sm:leading-[0.98] sm:tracking-[-1.8px] md:text-[68px] md:tracking-[-3px]">
           Carousels are easy.
           <br />
           <span style={{ color: "var(--brand-gold)" }}>Posting them isn&rsquo;t.</span>
@@ -405,7 +405,7 @@ function ReviewDemo() {
   ];
 
   return (
-    <div ref={ref} className="grid grid-cols-[minmax(0,1fr)_minmax(0,1.2fr)] items-start gap-4">
+    <div ref={ref} className="grid grid-cols-1 items-start gap-4 sm:grid-cols-[minmax(0,1fr)_minmax(0,1.2fr)]">
       <div className="overflow-hidden rounded-xl border border-hairline">
         <SlidePreview slide={deck.slides[0]} />
       </div>
@@ -431,7 +431,7 @@ function ReviewDemo() {
           style={{ opacity: seen ? 1 : 0, transition: "opacity 500ms ease 1900ms" }}
         >
           <Check size={12} strokeWidth={2.4} className="shrink-0 text-success" />
-          Approved — pinned to this exact version
+          Approved, pinned to this exact version
         </div>
       </div>
     </div>
@@ -536,7 +536,7 @@ export function Landing({ onStart }: { onStart: () => void }) {
       {/*
         Opaque, and set inline rather than with `bg-surface-1/90`.
         CLAUDE.md: the `/opacity` suffix does NOT work on these var-based
-        colours, so that class produces NO background — and a sticky bar with no
+        colours, so that class produces NO background, and a sticky bar with no
         background lets every demo below scroll straight through it.
       */}
       <nav
@@ -552,7 +552,7 @@ export function Landing({ onStart }: { onStart: () => void }) {
           </span>
           <span className="text-title text-primary">FlashCC</span>
           <div className="flex-1" />
-          <a href="#pricing" className="text-caption text-tertiary hover:text-primary">
+          <a href="#pricing" className="hidden text-caption text-tertiary hover:text-primary sm:block">
             Pricing
           </a>
           <button
@@ -596,7 +596,7 @@ export function Landing({ onStart }: { onStart: () => void }) {
         <Section
           eyebrow="Brand"
           title="One brand. Every deck."
-          line="Colours and typefaces saved once, applied to one carousel or thirty — and your logo lands on the cover by itself."
+          line="Colours and typefaces saved once, applied to one carousel or thirty, and your logo lands on the cover by itself."
           flip
         >
           <BrandDemo />
@@ -613,7 +613,7 @@ export function Landing({ onStart }: { onStart: () => void }) {
         <Section
           eyebrow="Approve"
           title="Send a link. No account."
-          line="Your client comments on the slide they mean, then approves — and the approval is pinned to that exact version, so nobody signs off on something that has changed since."
+          line="Your client comments on the slide they mean, then approves, and the approval is pinned to that exact version, so nobody signs off on something that has changed since."
           flip
         >
           <ReviewDemo />
@@ -632,7 +632,7 @@ export function Landing({ onStart }: { onStart: () => void }) {
 
       <footer className="border-t border-hairline">
         <div className="mx-auto flex max-w-[1080px] flex-wrap items-center gap-3 px-6 py-8">
-          <span className="text-caption text-muted">FlashCC — carousels, end to end.</span>
+          <span className="text-caption text-muted">FlashCC, carousels, end to end.</span>
           <div className="flex-1" />
           <a href="#pricing" className="text-caption text-tertiary hover:text-primary">
             Pricing

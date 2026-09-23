@@ -1,4 +1,4 @@
--- FlashCC — series
+-- FlashCC, series
 --
 -- Run this in the Supabase SQL editor after 01-schema.sql. Safe to re-run, and
 -- safe to run now: it only adds nullable columns, and the app works without it
@@ -20,7 +20,7 @@
 --
 -- On `posts`, the same two fields are a COPY rather than a projection, and that
 -- difference is deliberate. A post is the record of what went out. Renumbering a
--- series afterwards — because part 3 was deleted — must not silently rewrite
+-- series afterwards, because part 3 was deleted, must not silently rewrite
 -- what "part 2" meant on the day it was published.
 -- ─────────────────────────────────────────────────────────────────────────────
 
@@ -50,7 +50,7 @@ create index if not exists posts_series_idx
 -- ─────────────────────────────────────────────────────────────────────────────
 -- No RLS changes. Both tables already restrict every verb to `auth.uid() =
 -- user_id`, and a new column on a table whose policies are row-scoped is covered
--- by them — which is the advantage of gating on the row rather than per column.
+-- by them, which is the advantage of gating on the row rather than per column.
 --
 -- To check it: make three carousels a series in the app, sync, and confirm in
 -- Table Editor that `docs` shows series_id repeated with series_part 1, 2, 3.

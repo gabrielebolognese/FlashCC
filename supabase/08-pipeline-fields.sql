@@ -1,4 +1,4 @@
--- FlashCC — pipeline fields, and honest billing
+-- FlashCC, pipeline fields, and honest billing
 --
 -- Run this in the Supabase SQL editor after 01-schema.sql. Safe to re-run, and
 -- safe to run now: every line adds a nullable column with a default, and the app
@@ -15,7 +15,7 @@
 -- Four are free text, because a pillar is somebody's own vocabulary and an enum
 -- would either be wrong for most people or grow until it is a text field with
 -- extra steps. `objective` is the exception and is constrained, because it is
--- the one the insight screens GROUP BY — and an open set there turns every typo
+-- the one the insight screens GROUP BY, and an open set there turns every typo
 -- into its own bucket, which is how an attribution table stops meaning anything.
 --
 -- Columns rather than a jsonb bag, unlike `docs.data`: these are exactly what
@@ -46,13 +46,13 @@ create index if not exists posts_campaign_idx on public.posts (user_id, campaign
 --
 -- FlashCC already behaves correctly here. `ENTITLED` in server/billing.ts treats
 -- `active` as entitled, and Stripe keeps a cancelled subscription active until
--- the period it was paid for ends — so "you keep what you paid for" has been
+-- the period it was paid for ends, so "you keep what you paid for" has been
 -- true since billing shipped.
 --
 -- What was missing was the app being able to SAY so. `plan_renews_at` alone
 -- cannot distinguish "renews on the 3rd" from "ends on the 3rd", and showing a
 -- renewal date for something about to stop is precisely the surprise this
--- feature exists to prevent — Taplio's "they were charging me over 60€ per
+-- feature exists to prevent, Taplio's "they were charging me over 60€ per
 -- month" with "no emails, no reminders", Later charging $180 four months after a
 -- cancellation.
 --
@@ -64,7 +64,7 @@ alter table public.profiles
   add column if not exists plan_ends_at_period_end boolean not null default false;
 
 -- The column-level grant from 01-schema.sql already restricts what the browser
--- may write to `profiles`, and a column added afterwards is not in that grant —
+-- may write to `profiles`, and a column added afterwards is not in that grant,
 -- so this is read-only to the client by default, which is what it should be.
 -- Re-stated rather than assumed, because "it was already safe" is how a schema
 -- acquires a hole.
@@ -75,5 +75,5 @@ grant update (display_name) on public.profiles to authenticated;
 -- To check it: set a post's objective to something not in the list and confirm
 -- Postgres refuses it. Then cancel a subscription in the Stripe portal and
 -- confirm the account card changes from "Renews" to "Ends" WITHOUT the plan
--- dropping — access runs to the end of the period, which is the promise.
+-- dropping, access runs to the end of the period, which is the promise.
 -- ─────────────────────────────────────────────────────────────────────────────

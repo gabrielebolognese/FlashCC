@@ -21,7 +21,7 @@ import {
 } from "./assets.js";
 import { makeDoc, makeLayer, makeSlide, type Doc, type Layer } from "./model.js";
 
-/** "hello" — eight bytes of base64 for five bytes of file. */
+/** "hello", eight bytes of base64 for five bytes of file. */
 const PNG = "data:image/png;base64,aGVsbG8=";
 const OTHER = "data:image/jpeg;base64,d29ybGQ=";
 
@@ -207,7 +207,7 @@ describe("resolving on the way back in", () => {
 
   /**
    * Returned unchanged when nothing moved, so a resolve on every open does not
-   * register as an edit — which would restamp the document and win every
+   * register as an edit, which would restamp the document and win every
    * subsequent merge.
    */
   it("returns the same object when there is nothing to do", () => {

@@ -1,8 +1,8 @@
 /**
  * Moving an existing slide onto a different artboard.
  *
- * The naive version — keep every layer's pixel position and just change the
- * canvas size — is what ships today, and it is the thing people describe as
+ * The naive version, keep every layer's pixel position and just change the
+ * canvas size, is what ships today, and it is the thing people describe as
  * "the spacing never survives the resize". Go from 1080×1350 to 1080×1920 and
  * the content strands in the top two-thirds with 570px of dead space beneath it.
  *
@@ -20,7 +20,7 @@
  *
  * And it re-lays the LAYERS THAT ARE THERE rather than regenerating from the
  * source text. Regenerating would be easier and would silently delete every
- * hand-drawn shape, every moved block and every placed image — a far worse bug
+ * hand-drawn shape, every moved block and every placed image, a far worse bug
  * than the one it fixes.
  */
 
@@ -77,7 +77,7 @@ export function reflowLayer(layer: Layer, from: Size, to: Size): Layer {
   }
 
   // Text keeps its size and gets re-wrapped to the new column. The box is then
-  // whatever the copy actually needs — measured, not guessed.
+  // whatever the copy actually needs, measured, not guessed.
   const size = layer.fontSize ?? 40;
   const lineHeight = layer.lineHeight ?? 1.2;
   const lines = lineCount(layer.text ?? "", size, w, measureOf(layer));
@@ -118,7 +118,7 @@ export function reflowDoc<T extends Doclike>(doc: T, w: number, h: number): T {
  *
  * Exists for the tests rather than the app: the failure this module is built to
  * prevent is content clumping in part of a taller board, and "every layer is
- * inside the artboard" does not catch that — the broken version passes it too.
+ * inside the artboard" does not catch that, the broken version passes it too.
  */
 export function verticalFill(slide: Slide, board: Size): number {
   const content = slide.layers.filter((l) => l.visible && !isFullBleed(l, board));
