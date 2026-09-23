@@ -1162,6 +1162,146 @@ test asserts it for every style and framework so it cannot regress.
 
 ---
 
+## Batch 10 — The AI pipeline
+
+**Status:** next
+**Size:** medium
+**Why here:** the key is empty, so none of it runs; and when it does run, every
+call goes to the most expensive model there is on a plan that promises not to
+meter anything. Both of those are decisions nobody made.
+
+### What is there today
+
+Two routes, both `claude-opus-5`, both structured output through
+`messages.parse()` with a zod format, both gated on Pro since Batch 9:
+
+| Route | Job | max_tokens | Shape of the work |
+| --- | --- | --- | --- |
+| `/api/draft` | brief + framework to slide copy | 16,000 | genuine reasoning, about fifteen seconds |
+| `/api/hooks` | deck to five opening lines | 4,000 | short generation, one line each |
+
+And three facts that shape everything below: **`ANTHROPIC_API_KEY` is empty**, so
+nothing works at all right now. **Not one token is counted anywhere.** And
+`Brand` carries colours, typefaces and logos but nothing about how anybody
+*sounds*.
+
+### 10.1 A model per task, and cache the part that never changes
+
+Five one-line rewrites is not a reasoning task. Drafting seven slides from a
+brief is. One `MODEL` constant serving both is the easiest real money in this
+document.
+
+**Drafting moves to `claude-sonnet-5`. Hooks move to `claude-haiku-4-5`.** Each
+route names its own, because the next route added will have its own answer too.
+
+The system prompts are static and the framework slot lines come from a fixed set
+of four, so both belong in a **cached prompt block**. At one user it saves
+nothing; at a hundred it is most of the bill.
+
+**Done when:** each route declares its own model, the system block is cached, and
+a drafted carousel is visibly cheaper in the usage log than it is today.
+
+**Worth doing before committing:** run the same brief through Sonnet and Opus and
+read both. The recommendation is that Sonnet is enough for this job, and it is a
+recommendation rather than a measurement.
+
+### 10.2 Know what it costs, without metering anybody
+
+**This is the constraint invariant 7 creates.** "Nothing here is metered" is a
+real wedge and it should stay, but it means unit economics are a DESIGN problem
+rather than an afterthought: an unmetered AI feature on a $29 plan has to be
+cheap enough that heavy use is still profitable, because there is no meter to
+stop it.
+
+Three things, and none of them is a credit:
+
+- **Log `usage` on every call.** Input tokens, output tokens, cached tokens,
+  model, route, duration. To the console now, and structured enough to move into
+  a table later.
+- **An abuse ceiling per account.** The same `rateLimit` the export route
+  already uses. A limiter stops one script; a credit system taxes ordinary use.
+  They look similar and are opposites, and the comment on it should say so.
+- **A ceiling on input.** A brief is currently unbounded, so a paste of a whole
+  book is billed as a whole book.
+
+**Done when:** one line per AI call in the log says what it cost, and a loop
+hitting `/api/draft` is refused by the limiter rather than by the invoice.
+
+### 10.3 Fail in a way that does not bill twice
+
+Refusals are handled. Nothing else is.
+
+- `overloaded_error` and Anthropic rate limits are not mapped and surface as
+  "Drafting failed (500)".
+- There is no timeout, so a hung request holds a browser tab forever.
+- **Retry policy is the one with teeth.** A retry on a 5xx is correct. A retry
+  on a refusal or a 400 is not, and a retry after the model has already answered
+  charges twice for one draft. Retry exactly once, only on transport and 5xx.
+
+**Done when:** every documented Anthropic failure has a sentence somebody can act
+on, and no failure path can spend twice.
+
+### 10.4 Brand voice
+
+**The highest-value item here, and the cheapest to run.**
+
+Every AI carousel tool produces competent, generic copy, and that is the
+complaint underneath most of the research in this document. `Brand` is already
+the right object: it is per client, it syncs, it is applied once.
+
+`Brand.voice` gains three fields, all optional:
+
+- **a tone line** in the user's own words
+- **up to three of their own posts**, as the examples the model matches
+- **words they never use**
+
+Fed into `/api/draft` and `/api/hooks` inside the cached block, so it costs
+almost nothing per call.
+
+Examples beat adjectives. "Write like this" with three real posts attached does
+more than any number of instructions about being punchy, and it is the one thing
+a competitor cannot copy because it is the customer's own writing.
+
+**Done when:** the same brief drafted under two different brands comes back
+sounding like two different people.
+
+### 10.5 Prove the prompts
+
+A model's output cannot be unit tested. Everything around it can, and this
+codebase already treats tests as design guards:
+
+- **Prompt assembly as golden files.** The assembled system and user messages are
+  deterministic given a framework and a brief, so a careless edit shows up in a
+  diff instead of in somebody's carousel.
+- **A small eval harness**, run by hand rather than in CI because it costs money:
+  a handful of briefs through each framework, asserting structural properties
+  only. Slide count matches the slots. Hook under 90 characters. No placeholder
+  text. Nothing past the body limit. It cannot tell you the copy is good; it can
+  tell you the copy is broken, which is the failure that actually ships.
+
+**Done when:** `npm run eval:draft` exists, is not part of `npm test`, and says
+plainly which framework failed which property.
+
+### Explicitly out of scope
+
+- **Streaming the draft.** The best-feeling option and real complexity against
+  structured output, including what to do with a half-parsed response. Fifteen
+  seconds behind an honest progress state is tolerable. Revisit once the rest is
+  solid.
+- **AI anywhere near layout.** Invariant 5. Not negotiable.
+- **AI picking long-form candidates.** `longform.ts` is deterministic because the
+  research is unambiguous that people distrust machine selection of their own
+  material. Refining the copy of a moment somebody chose is a different question,
+  and a later one.
+- **AI captions and transcripts.** Those rearrange words already approved.
+- **Credits, of any kind.** Invariant 7.
+
+### Not code, and blocking
+
+`ANTHROPIC_API_KEY` is empty. Nothing in this batch is testable until it is set.
+
+---
+
 ## Explicitly not building
 
 Each of these was considered and rejected on evidence.
@@ -1290,5 +1430,5 @@ is worth remembering when the next one is written.
 effort. That list is the other half of the plan and should be re-read before
 anything is added to it.
 
-The open work is Batch 9, and `docs/reference.md` §29, the defect list, which is
+The open work is Batch 10, and `docs/reference.md` §29, the defect list, which is
 deliberately not a roadmap item and should not be folded into one.
