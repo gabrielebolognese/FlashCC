@@ -129,6 +129,16 @@ export type Slide = {
   gradient?: Gradient | undefined;
   /** Painted over both of the above, under every layer, when set. */
   image?: SlideImage | undefined;
+  /**
+   * What this slide says, for somebody using a screen reader.
+   *
+   * On the slide rather than beside the export, because it belongs to the slide:
+   * it survives reordering, duplication, sync and version history for free, and
+   * `docs.data` is a single jsonb blob so it needs no migration. A parallel
+   * array kept next to the deck would go out of step the first time anybody
+   * dragged a thumbnail.
+   */
+  alt?: string | undefined;
   layers: Layer[];
 };
 

@@ -18,6 +18,14 @@ type ExportBody = RenderRequest & {
   /** Used for the download filename. */
   name?: string;
   output: "pdf" | "images";
+  /**
+   * One description per slide, for `alt.txt` alongside the images.
+   *
+   * Not part of `RenderRequest`, because nothing about rendering reads it: the
+   * pictures are identical whether it is present or not. It rides on the export
+   * request because that is the only journey it can take.
+   */
+  alt?: string[];
 };
 
 /** Filesystem-safe, and recognisable a week later in a downloads folder. */
@@ -127,6 +135,24 @@ export async function exportDeck(req: IncomingMessage, res: ServerResponse): Pro
     // Zero-padded so 10 sorts after 9 rather than after 1.
     const n = String(slide.index + 1).padStart(2, "0");
     zip.file(`${n}.${ext}`, slide.bytes);
+  }
+
+  /*
+   * Alt text travels as a file because it has nowhere else to go.
+   *
+   * It cannot be embedded in a JPEG in a way Instagram or TikTok reads, and
+   * neither has an API to push it to: a person types it into the upload form,
+   * one image at a time. Numbered to match the image files so the pairing needs
+   * no explaining.
+   *
+   * Only when something was actually written. An `alt.txt` full of blank lines
+   * is worse than no file, because it looks like the feature ran.
+   */
+  if (Array.isArray(body.alt) && body.alt.some((t) => t?.trim())) {
+    const lines = body.alt.map(
+      (t, i) => `${String(i + 1).padStart(2, "0")}.${ext}  ${t?.trim() || "(no description)"}`,
+    );
+    zip.file("alt.txt", lines.join("\n") + "\n");
   }
 
   // Store, not deflate: PNG and JPEG are already compressed, so deflating them

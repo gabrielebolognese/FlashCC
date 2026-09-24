@@ -688,6 +688,75 @@ words deterministically.
 A route that returned a size, a position, a colour or a composition would break this, and the
 breakage is invisible until somebody's deck ships looking wrong.
 
+### The caption (`/api/caption`, `caption.ts`, `PostSheet.tsx`)
+
+**Beside `captionOf`, never instead of it.** `transcript.ts` already builds a caption
+deterministically from slide 1, slide 2 and the closer. That is the right answer when the deck's
+own words are what you want to say: free, no key, no account, and the copy is already approved.
+This writes something new. Both buttons are on the screen.
+
+**Three platforms, three prompts, and that is the whole reason it is not one.** The rules live in
+`PLATFORM_CAPTION` in the user message, not the cached system block, because three of them above
+the cache breakpoint would split the shared prefix three ways.
+
+| | Ceiling | The rule that matters |
+| --- | --- | --- |
+| LinkedIn | 3,000 | **only the first 210 characters show before "see more"** |
+| Instagram | 2,200 | the deck is already visible, so the caption adds rather than summarises |
+| TikTok | 2,200 | must make sense to somebody who never swipes |
+
+`LINKEDIN_FOLD = 210` is the single load-bearing fact and the one a generic caption writer always
+gets wrong. It is a prompt rule and a marker drawn into the option card, so what gets truncated is
+visible before the caption is chosen rather than after it is posted.
+
+The server returns `limit` and `fold` with the answer rather than the browser keeping a second copy
+of the same numbers.
+
+### Hashtags are grounded in the deck, and the check took three attempts
+
+Generic hashtags are the fabrication problem in a different costume: words asserted about somebody's
+post that the post does not contain. Left alone a model returns #marketing and #videoediting every
+time.
+
+| Attempt | What it broke on |
+| --- | --- |
+| exact substring | rejected `#editing` on a deck saying "edits" |
+| plus single-word stemming | rejected `#cuttingonmovement`, LinkedIn got zero tags |
+| plus segmentation, one word ≥ 5 letters | rejected `#cutonthebeat`, a real phrase whose longest word is four |
+
+**Adjacency is what works.** `phraseIn` walks the deck's own word sequence and asks whether any run
+of *consecutive* words closes up to the tag, stemmed on the deck side. "cut on the beat" is in the
+deck; "the and not" is not; nothing has to be measured. The length rule existed only to separate
+those two cases and could not, because they are identical by length.
+
+A tag merging two separate phrases is dropped, correctly: the deck never said it.
+
+### Alt text (`/api/alt`, `Slide.alt`, `ExportDialog.tsx`)
+
+**It has no automatic destination, and pretending otherwise would be the dishonest part.** It cannot
+be embedded in a JPEG any of these platforms reads, and none has an API to push it to. A person
+types it into the upload form.
+
+| Platform | Export | Where alt text goes |
+| --- | --- | --- |
+| Instagram, TikTok | zip | `alt.txt`, numbered to match the images |
+| LinkedIn | one PDF | **nowhere.** A document post has no per-page alt field |
+
+On LinkedIn the accessible answer is the transcript in the first comment, which `PostSheet` already
+offered. The dialog says which applies.
+
+Stored as `Slide.alt`, on the slide rather than beside the deck: `docs.data` is one `jsonb` blob so
+it needs no migration, and it survives reordering, duplication, sync and history for free. A
+parallel array would go out of step the first time anybody dragged a thumbnail.
+
+The response is **padded and truncated to the slide count**, because it is read positionally. Eight
+descriptions for nine slides would otherwise put every later slide's alt text on the wrong slide,
+and nothing about the result would look wrong.
+
+**For a slide that is only words, the alt text IS those words.** Banning "Image of" and "Slide
+showing" produced "Text saying" on all five slides instead, which is most of a 125 character budget
+spent saying nothing five times.
+
 ### Rewriting one line (`/api/rewrite`, `rewrite.ts`, `RewritePicker.tsx`)
 
 The thing that sat between the two routes. Drafting was one shot, so a slide four that was nearly

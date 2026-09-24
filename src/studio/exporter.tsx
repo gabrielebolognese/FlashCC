@@ -63,6 +63,11 @@ export type RenderPayload = {
   height: number;
   css: string;
   slides: { html: string }[];
+  /**
+   * One line per slide, for `alt.txt` in the zip. Omitted when nothing has
+   * been written, so a deck with no alt text gets no empty file.
+   */
+  alt?: string[] | undefined;
 };
 
 /**
@@ -83,6 +88,11 @@ export async function renderPayload(doc: Doc, platform: Platform): Promise<Rende
     height: doc.height,
     css,
     slides: carried.slides.map((s) => ({ html: slideHtml(s) })),
+    // Read from `carried`, not `doc`: that is the version the pictures were
+    // inlined into, and the two have to describe the same slides.
+    ...(carried.slides.some((s) => (s.alt ?? "").trim())
+      ? { alt: carried.slides.map((s) => s.alt ?? "") }
+      : {}),
   };
 }
 

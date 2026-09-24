@@ -6,14 +6,26 @@
  * integration for it. The fields are laid out in the order the platforms show them so
  * it can be done by copying straight down the page.
  */
-import { Check, Copy, ExternalLink, Sparkles, Trash2, X } from "lucide-react";
+import {
+  AlertCircle,
+  Check,
+  Copy,
+  ExternalLink,
+  PenLine,
+  RefreshCw,
+  Sparkles,
+  Trash2,
+  X,
+} from "lucide-react";
 import { useMemo, useState } from "react";
 
 import { Chip } from "./Dash.js";
 import { listPosts } from "./pipeline.js";
 import { collectSeries, seriesCaption, seriesTitle } from "./series.js";
 import { listDocs, loadDoc } from "./storage.js";
-import { captionFit, captionOf, firstCommentOf } from "./transcript.js";
+import { captionFit, captionOf, deckTexts, firstCommentOf } from "./transcript.js";
+import { isCaptionPlatform, writeCaption, type CaptionResult } from "./caption.js";
+import { listBrands, voiceOf } from "./brand.js";
 import {
   EMPTY_METRICS,
   METRIC_FIELDS,
@@ -37,6 +49,117 @@ const field =
 
 /** A blank line between two blocks of caption text. */
 const BREAK = "\n\n";
+
+
+/**
+ * The written captions, as a list to choose from.
+ *
+ * Inline rather than a modal: the thing you are comparing them against is the
+ * textarea directly above, and a dialog would cover it.
+ *
+ * **The fold marker is the point of this panel.** On LinkedIn only the first 210
+ * characters show before "see more", so a caption is really two things: the part
+ * that has to earn the expand, and the part nobody reads unless it did. Showing
+ * where that line falls before the caption is chosen is the difference between
+ * knowing and finding out after posting.
+ */
+function CaptionOptions({
+  state,
+  onPick,
+  onClose,
+  onCopyTags,
+  copiedTags,
+}: {
+  state: { at: "loading" } | { at: "ready"; result: CaptionResult } | { at: "failed"; error: string };
+  onPick: (text: string) => void;
+  onClose: () => void;
+  onCopyTags: (tags: string[]) => void;
+  copiedTags: boolean;
+}) {
+  if (state.at === "loading") {
+    return (
+      <div className="mt-2 flex items-center gap-2 rounded-xl border border-hairline bg-surface-2 px-3 py-2.5">
+        <RefreshCw size={13} strokeWidth={2} className="fcc-spin shrink-0 text-accent" />
+        <span className="text-caption text-secondary">Reading the deck…</span>
+      </div>
+    );
+  }
+
+  if (state.at === "failed") {
+    return (
+      <div className="mt-2 flex items-start gap-2 rounded-xl border border-danger-dim bg-danger-wash p-2.5">
+        <AlertCircle size={14} strokeWidth={2} className="mt-0.5 shrink-0 text-danger" />
+        <p className="flex-1 text-caption leading-4 text-secondary">{state.error}</p>
+        <button type="button" onClick={onClose} className="text-caption text-tertiary hover:text-primary">
+          Close
+        </button>
+      </div>
+    );
+  }
+
+  const { captions, hashtags, limit, fold } = state.result;
+
+  return (
+    <div className="mt-2 flex flex-col gap-2">
+      {captions.map((c, i) => (
+        <button
+          key={i}
+          type="button"
+          onClick={() => onPick(c.text)}
+          className="rounded-xl border border-hairline bg-surface-2 p-2.5 text-left hover:border-accent-dim hover:bg-accent-wash"
+        >
+          <div className="whitespace-pre-wrap text-caption leading-[17px] text-primary">
+            {fold && c.text.length > fold ? (
+              <>
+                {c.text.slice(0, fold)}
+                <span className="mx-1 rounded border border-accent-dim px-1 text-[10px] uppercase tracking-[0.4px] text-accent">
+                  see more
+                </span>
+                <span className="text-tertiary">{c.text.slice(fold)}</span>
+              </>
+            ) : (
+              c.text
+            )}
+          </div>
+          <div className="mt-1.5 flex items-center gap-2">
+            <span className="text-caption text-accent">{c.note}</span>
+            <span className={c.chars > limit ? "text-caption text-danger" : "text-caption text-muted"}>
+              {c.chars} / {limit}
+            </span>
+          </div>
+        </button>
+      ))}
+
+      {hashtags.length > 0 ? (
+        <div className="flex flex-wrap items-center gap-1">
+          {/*
+            Never appended to the caption automatically. Half of people put tags
+            in a first comment instead, and a caption that silently contains
+            them is one somebody has to unpick.
+          */}
+          {hashtags.map((t) => (
+            <span key={t} className="rounded-md border border-hairline px-1.5 py-0.5 text-caption text-tertiary">
+              #{t}
+            </span>
+          ))}
+          <SmallButton
+            icon={copiedTags ? Check : Copy}
+            label={copiedTags ? "Copied" : "Copy tags"}
+            onClick={() => onCopyTags(hashtags)}
+          />
+        </div>
+      ) : null}
+
+      <div className="flex items-center gap-2">
+        <span className="text-caption text-muted">Not ranked. Pick the one that sounds like you.</span>
+        <div className="flex-1" />
+        <button type="button" onClick={onClose} className="text-caption text-tertiary hover:text-primary">
+          Close
+        </button>
+      </div>
+    </div>
+  );
+}
 
 function SmallButton({
   icon: Icon,
@@ -86,6 +209,10 @@ export function PostSheet({
   const [draft, setDraft] = useState<Post>(post);
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [copied, setCopied] = useState<string | null>(null);
+  /** The AI caption panel: null when closed, so opening costs one model call. */
+  const [written, setWritten] = useState<
+    { at: "loading" } | { at: "ready"; result: CaptionResult } | { at: "failed"; error: string } | null
+  >(null);
 
   /**
    * The carousel this publishes, loaded once.
@@ -103,6 +230,13 @@ export function PostSheet({
   }, [draft]);
 
   const fit = captionFit(draft.caption, draft.platform);
+  // What the deck actually asks for, so a written caption does not contradict
+  // the closing slide.
+  const lastSlide = doc ? deckTexts(doc).filter((t) => t.trim()).slice(-1)[0] : undefined;
+  // Narrowed once, here, rather than inside a callback where the guard on the
+  // surrounding JSX cannot reach. `x` has a 280 character ceiling and no
+  // carousel, so it is not one of the three the caption prompt knows.
+  const captionPlatform = isCaptionPlatform(draft.platform) ? draft.platform : null;
 
   /**
    * Suggestions, not a controlled list.
@@ -282,12 +416,42 @@ export function PostSheet({
                   <SmallButton
                     icon={Sparkles}
                     label="Pull from the deck"
+                    title="Slides 1 and 2 and the closer, rearranged. No model, no key, and the words are already yours."
                     onClick={() => set({ caption: captionOf(doc, { platform: draft.platform }) })}
                   />
+                  {/*
+                    Beside the deterministic one, never instead of it. Pulling
+                    from the deck rearranges copy that is already approved and
+                    costs nothing; this writes something new. They answer
+                    different questions and the screen has to show both.
+                  */}
+                  {captionPlatform ? (
+                    <SmallButton
+                      icon={PenLine}
+                      label="Write one"
+                      title={`A caption written for ${draft.platform}, from the whole deck.`}
+                      onClick={() => {
+                        setWritten({ at: "loading" });
+                        writeCaption({
+                          deck: deckTexts(doc),
+                          platform: captionPlatform,
+                          ...(lastSlide ? { cta: lastSlide } : {}),
+                          voice: voiceOf(doc, listBrands()),
+                        })
+                          .then((result) => setWritten({ at: "ready", result }))
+                          .catch((e: unknown) =>
+                            setWritten({
+                              at: "failed",
+                              error: e instanceof Error ? e.message : "Could not write a caption",
+                            }),
+                          );
+                      }}
+                    />
+                  ) : null}
                   <SmallButton
                     icon={copied === "transcript" ? Check : Copy}
                     label={copied === "transcript" ? "Copied" : "Copy transcript"}
-                    title="The whole deck as plain text, for the first comment. Per-slide alt text is impossible on both platforms, so this is the only fix there is."
+                    title="The whole deck as plain text, for the first comment. On LinkedIn a document post is one PDF with no per-page alt field, so this is the accessible answer there. Instagram and TikTok take per-image alt text, which the export dialog writes."
                     onClick={() =>
                       copy("transcript", firstCommentOf(doc, { platform: draft.platform }))
                     }
@@ -308,6 +472,19 @@ export function PostSheet({
                 Over the limit for {draft.platform}. It will be cut off live rather than rejected,
                 which is worse, because nothing will say so.
               </p>
+            ) : null}
+
+            {written ? (
+              <CaptionOptions
+                state={written}
+                onPick={(text) => {
+                  set({ caption: text });
+                  setWritten(null);
+                }}
+                onClose={() => setWritten(null)}
+                onCopyTags={(tags) => copy("tags", tags.map((t) => `#${t}`).join(" "))}
+                copiedTags={copied === "tags"}
+              />
             ) : null}
           </Row>
 

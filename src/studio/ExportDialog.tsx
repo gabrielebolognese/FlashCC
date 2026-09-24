@@ -15,9 +15,22 @@
  * you a CSV row that already knows their URLs, which is the half of the bulk
  * pipeline no scheduler provides and every scheduler requires.
  */
-import { AlertTriangle, Check, Download, FileDown, Images, Link2, Table, X } from "lucide-react";
+import {
+  AlertTriangle,
+  Check,
+  Copy,
+  Download,
+  FileDown,
+  Images,
+  Link2,
+  RefreshCw,
+  Sparkles,
+  Table,
+  X,
+} from "lucide-react";
 import { useMemo, useState } from "react";
 
+import { altFile, writeAlt } from "./caption.js";
 import { Chip } from "./Dash.js";
 import { exportDeck } from "./exporter.js";
 import type { Doc } from "./model.js";
@@ -26,6 +39,7 @@ import { blockers, canExport, preflight, sizeFinding, type Finding } from "./pre
 import { downloadText, publishDeck } from "./publish.js";
 import { buildSheet, SCHEDULERS, type PublishedCarousel, type Scheduler } from "./schedulers.js";
 import { hasCloudSession, sessionPlan, sessionUserId } from "./session.js";
+import { deckTexts } from "./transcript.js";
 import { snapshot } from "./versions.js";
 
 type Phase =
@@ -40,7 +54,15 @@ type PublishPhase =
   | { at: "done"; carousel: PublishedCarousel; warnings: string[]; filename: string }
   | { at: "failed"; error: string };
 
-export function ExportDialog({ doc, onClose }: { doc: Doc; onClose: () => void }) {
+export function ExportDialog({
+  doc,
+  onAlt,
+  onClose,
+}: {
+  doc: Doc;
+  onAlt: (index: number, text: string) => void;
+  onClose: () => void;
+}) {
   // Default to whatever matches the artboard, so the common case needs no choice.
   const [platform, setPlatform] = useState<Platform>(
     () => platformForSize(doc.width, doc.height) ?? PLATFORMS[0]!,
@@ -314,6 +336,8 @@ export function ExportDialog({ doc, onClose }: { doc: Doc; onClose: () => void }
               {phase.error}
             </p>
           ) : null}
+
+          <AltText doc={doc} platform={platform} onChange={onAlt} />
         </div>
 
         <footer className="flex h-16 shrink-0 items-center gap-2 border-t border-hairline px-5">
@@ -351,3 +375,136 @@ export function ExportDialog({ doc, onClose }: { doc: Doc; onClose: () => void }
     </>
   );
 }
+
+/**
+ * Alt text, and an honest account of where it can actually go.
+ *
+ * **It has no automatic destination and pretending otherwise would be the
+ * dishonest part of this feature.** It cannot be embedded in a JPEG in a way any
+ * of these platforms reads, and none of them has an API to push it to. A person
+ * types it into the upload form.
+ *
+ * What differs is whether there is a form at all:
+ *
+ * - Instagram takes per-image alt text on a carousel, under Advanced Settings.
+ *   The export is a zip, so the text travels with the images as `alt.txt`,
+ *   numbered to match.
+ * - TikTok is the same shape of export and the same file.
+ * - **LinkedIn is a document post: one PDF, no per-page alt field.** There is
+ *   nowhere to put it, and the accessible answer there is the transcript in the
+ *   first comment, which `PostSheet` already offers. This says so rather than
+ *   offering a list that leads nowhere.
+ *
+ * (An older comment in `PostSheet` claimed per-slide alt text was impossible on
+ * both platforms. That is right about LinkedIn and wrong about Instagram, which
+ * is why this exists at all.)
+ */
+function AltText({
+  doc,
+  platform,
+  onChange,
+}: {
+  doc: Doc;
+  platform: Platform;
+  onChange: (index: number, text: string) => void;
+}) {
+  const [phase, setPhase] = useState<"idle" | "working" | "failed">("idle");
+  const [error, setError] = useState("");
+  const [copied, setCopied] = useState(false);
+
+  const written = doc.slides.filter((s) => (s.alt ?? "").trim()).length;
+  const usable = platform.output === "images";
+
+  const write = () => {
+    setPhase("working");
+    writeAlt(deckTexts(doc))
+      .then((result) => {
+        result.alt.forEach((t, i) => onChange(i, t));
+        setPhase("idle");
+      })
+      .catch((e: unknown) => {
+        setError(e instanceof Error ? e.message : "Could not write alt text");
+        setPhase("failed");
+      });
+  };
+
+  return (
+    <div className="mt-4 rounded-2xl border border-hairline bg-surface-1 p-3.5">
+      <div className="flex items-center gap-2">
+        <span className="text-body-strong text-secondary">Alt text</span>
+        <span className="text-caption text-muted">
+          {written}/{doc.slides.length} written
+        </span>
+        <div className="flex-1" />
+        {written > 0 ? (
+          <button
+            type="button"
+            onClick={() => {
+              void navigator.clipboard.writeText(altFile(doc.slides.map((s) => s.alt ?? "")));
+              setCopied(true);
+              window.setTimeout(() => setCopied(false), 1400);
+            }}
+            className="flex h-7 items-center gap-1.5 rounded-lg border border-hairline px-2.5 text-caption text-tertiary hover:border-accent-dim hover:text-accent"
+          >
+            {copied ? <Check size={12} strokeWidth={2.4} /> : <Copy size={12} strokeWidth={2} />}
+            {copied ? "Copied" : "Copy all"}
+          </button>
+        ) : null}
+        <button
+          type="button"
+          disabled={phase === "working"}
+          onClick={write}
+          className="flex h-7 items-center gap-1.5 rounded-lg border border-hairline px-2.5 text-caption text-tertiary hover:border-accent-dim hover:text-accent disabled:pointer-events-none disabled:opacity-40"
+        >
+          {phase === "working" ? (
+            <RefreshCw size={12} strokeWidth={2} className="fcc-spin" />
+          ) : (
+            <Sparkles size={12} strokeWidth={2} />
+          )}
+          {written > 0 ? "Rewrite all" : "Write it"}
+        </button>
+      </div>
+
+      <p className="mt-1.5 text-caption leading-4 text-muted">
+        {usable
+          ? `Ships as alt.txt inside the zip, numbered to match the images. ${platform.label} takes it per image when you upload.`
+          : "A document post is one PDF and has no per-page alt field, so this is for your own reference. The accessible answer on LinkedIn is the transcript in the first comment."}
+      </p>
+
+      {phase === "failed" ? (
+        <p className="mt-2 text-caption leading-4 text-danger">{error}</p>
+      ) : null}
+
+      {written > 0 ? (
+        <div className="mt-2.5 flex flex-col gap-1.5">
+          {doc.slides.map((slide, i) => (
+            <label key={slide.id} className="flex items-start gap-2">
+              <span className="mt-1.5 w-5 shrink-0 text-right font-mono text-caption text-muted">
+                {i + 1}
+              </span>
+              <input
+                value={slide.alt ?? ""}
+                onChange={(e) => onChange(i, e.target.value)}
+                maxLength={ALT_LIMIT}
+                placeholder="What this slide shows"
+                className="h-7 flex-1 rounded-md border border-hairline bg-surface-2 px-2 text-caption text-primary outline-none placeholder:text-muted focus:border-accent-dim"
+              />
+              <span
+                className={
+                  (slide.alt ?? "").length > ALT_LIMIT
+                    ? "mt-1.5 w-8 shrink-0 text-right font-mono text-caption text-danger"
+                    : "mt-1.5 w-8 shrink-0 text-right font-mono text-caption text-muted"
+                }
+              >
+                {(slide.alt ?? "").length}
+              </span>
+            </label>
+          ))}
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
+/** Where most screen readers cut off. Mirrored from the server's own ceiling. */
+const ALT_LIMIT = 125;

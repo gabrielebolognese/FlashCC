@@ -4,6 +4,7 @@
  *   npm run eval:draft              every framework, the default model
  *   npm run eval:draft -- --compare claude-sonnet-5 vs claude-opus-5, side by side
  *   npm run eval:draft -- --rewrite every rewrite intent, on one line
+ *   npm run eval:draft -- --caption every platform's caption, and alt text
  *
  * ── What this can and cannot tell you ────────────────────────────────────────
  *
@@ -29,7 +30,17 @@ import Anthropic from "@anthropic-ai/sdk";
 import { zodOutputFormat } from "@anthropic-ai/sdk/helpers/zod";
 import { z } from "zod";
 
-import { assembleDraft, assembleRewrite, REWRITE_INTENTS } from "../server/prompts.ts";
+import {
+  assembleAlt,
+  assembleCaption,
+  assembleDraft,
+  assembleRewrite,
+  CAPTION_PLATFORMS,
+  MAX_ALT_CHARS,
+  PLATFORM_CAPTION,
+  REWRITE_INTENTS,
+} from "../server/prompts.ts";
+import { groundedTags } from "../server/caption.ts";
 import { STRUCTURES } from "../src/studio/structures.ts";
 
 /* ── config ───────────────────────────────────────────────────────────────── */
@@ -48,6 +59,7 @@ if (!process.env.ANTHROPIC_API_KEY) {
 
 const compare = process.argv.includes("--compare");
 const rewriteOnly = process.argv.includes("--rewrite");
+const captionOnly = process.argv.includes("--caption");
 const MODELS = compare ? ["claude-sonnet-5", "claude-opus-5"] : ["claude-sonnet-5"];
 
 /**
@@ -225,6 +237,138 @@ async function evalRewrites() {
   return bad;
 }
 
+/* ── captions and alt text ───────────────────────────────────────────────── */
+
+/**
+ * Both routes, against every platform, printed for a person to read.
+ *
+ * The automated half is narrow on purpose: whether a caption is GOOD is not
+ * checkable, but whether it overshot its ceiling, buried the point past
+ * LinkedIn's fold, or came back with generic hashtags all are. The last one
+ * matters most: a caption writer left alone returns #marketing every time.
+ */
+const CaptionSchema = z.object({
+  captions: z.array(z.object({ note: z.string(), text: z.string() })),
+  hashtags: z.array(z.string()),
+});
+
+const AltSchema = z.object({ alt: z.array(z.string()) });
+
+const CAP_DECK = [
+  "Cutting on the beat makes your edits feel mechanical.",
+  "Attention resets when the frame changes, not when the snare hits.",
+  "Cut on movement instead: a hand leaving frame, a head turning, a door closing.",
+  "Same footage, same music. The cuts disappear.",
+  "Save this for your next edit.",
+];
+
+async function evalCaptions() {
+  console.log(`\n${"=".repeat(64)}\ncaptions and alt text\n${"=".repeat(64)}`);
+  let bad = 0;
+
+  for (const platform of CAPTION_PLATFORMS) {
+    const spec = PLATFORM_CAPTION[platform];
+    const { system, user } = assembleCaption({
+      deck: CAP_DECK,
+      platform,
+      cta: CAP_DECK[CAP_DECK.length - 1],
+      count: 2,
+    });
+
+    const started = Date.now();
+    let parsed;
+    try {
+      const response = await client.messages.parse({
+        model: "claude-sonnet-5",
+        max_tokens: 4000,
+        system: [{ type: "text", text: system, cache_control: { type: "ephemeral" } }],
+        output_config: { effort: "medium", format: zodOutputFormat(CaptionSchema) },
+        messages: [{ role: "user", content: user }],
+      });
+      parsed = response.parsed_output;
+      calls += 1;
+      inTokens += response.usage?.input_tokens ?? 0;
+      outTokens += response.usage?.output_tokens ?? 0;
+    } catch (error) {
+      bad += 1;
+      console.log(`  FAIL ${platform}  CALL FAILED: ${error.message}`);
+      continue;
+    }
+
+    const captions = parsed?.captions ?? [];
+    const tags = parsed?.hashtags ?? [];
+    const kept = groundedTags(tags, CAP_DECK, spec.hashtags);
+    const problems = [];
+
+    if (captions.length === 0) problems.push("no captions");
+    for (const c of captions) {
+      if (c.text.length > spec.limit) problems.push(`over ${spec.limit} chars`);
+      if (/#\w/.test(c.text)) problems.push("a hashtag ended up inside the caption");
+      if (/^(swipe|read on|here is a thread)/i.test(c.text.trim())) {
+        problems.push("opened with an instruction to swipe");
+      }
+    }
+    if (tags.length > 0 && kept.length === 0) {
+      problems.push(`every hashtag was generic: ${tags.slice(0, 4).join(", ")}`);
+    }
+
+    if (problems.length > 0) bad += 1;
+    console.log(`\n  ${problems.length === 0 ? "ok  " : "FAIL"} ${platform}  ${Date.now() - started}ms`);
+    for (const p of problems) console.log(`       ! ${p}`);
+
+    for (const c of captions) {
+      console.log(`\n       ${c.note}  [${c.text.length}/${spec.limit}]`);
+      if (spec.fold && c.text.length > spec.fold) {
+        console.log(`       ${c.text.slice(0, spec.fold)}`);
+        console.log(`       ---- see more ----`);
+        console.log(`       ${c.text.slice(spec.fold)}`);
+      } else {
+        console.log(`       ${c.text.replace(/\n/g, "\n       ")}`);
+      }
+    }
+    console.log(`\n       tags kept    ${kept.map((t) => `#${t}`).join(" ") || "(none)"}`);
+    const dropped = tags.filter((t) => !kept.some((k) => k.toLowerCase() === String(t).replace(/^#/, "").toLowerCase()));
+    console.log(`       tags dropped ${dropped.map((t) => `#${String(t).replace(/^#/, "")}`).join(" ") || "(none)"}`);
+  }
+
+  // Alt text, once. It does not vary by platform.
+  const { system, user } = assembleAlt(CAP_DECK);
+  const started = Date.now();
+  try {
+    const response = await client.messages.parse({
+      model: "claude-haiku-4-5-20251001",
+      max_tokens: 4000,
+      system: [{ type: "text", text: system, cache_control: { type: "ephemeral" } }],
+      output_config: { format: zodOutputFormat(AltSchema) },
+      messages: [{ role: "user", content: user }],
+    });
+    calls += 1;
+    inTokens += response.usage?.input_tokens ?? 0;
+    outTokens += response.usage?.output_tokens ?? 0;
+
+    const alt = response.parsed_output?.alt ?? [];
+    const problems = [];
+    if (alt.length !== CAP_DECK.length) problems.push(`${alt.length} entries for ${CAP_DECK.length} slides`);
+    for (const a of alt) {
+      if (a.length > MAX_ALT_CHARS) problems.push(`over ${MAX_ALT_CHARS} chars`);
+      if (/^(image of|slide showing|text (saying|reading)|a graphic|this slide)/i.test(a.trim())) {
+        problems.push(`wasted the budget on a preamble: "${a.slice(0, 24)}"`);
+      }
+    }
+
+    if (problems.length > 0) bad += 1;
+    console.log(`\n  ${problems.length === 0 ? "ok  " : "FAIL"} alt text  ${Date.now() - started}ms`);
+    for (const p of problems) console.log(`       ! ${p}`);
+    alt.forEach((a, i) => console.log(`       ${i + 1}. ${a}  [${a.length}]`));
+  } catch (error) {
+    bad += 1;
+    console.log(`  FAIL alt text  CALL FAILED: ${error.message}`);
+  }
+
+  console.log("");
+  return bad;
+}
+
 /* ── run ──────────────────────────────────────────────────────────────────── */
 
 const client = new Anthropic({ maxRetries: 1, timeout: 120_000 });
@@ -234,7 +378,7 @@ let calls = 0;
 let inTokens = 0;
 let outTokens = 0;
 
-for (const model of rewriteOnly ? [] : MODELS) {
+for (const model of rewriteOnly || captionOnly ? [] : MODELS) {
   console.log(`\n${"=".repeat(64)}\n${model}\n${"=".repeat(64)}`);
 
   for (const structure of STRUCTURES) {
@@ -278,7 +422,8 @@ for (const model of rewriteOnly ? [] : MODELS) {
   }
 }
 
-if (rewriteOnly || !compare) failures += await evalRewrites();
+if (rewriteOnly || (!compare && !captionOnly)) failures += await evalRewrites();
+if (captionOnly) failures += await evalCaptions();
 
 console.log(
   `\n${"=".repeat(64)}\n${calls} calls, ${inTokens} in, ${outTokens} out, ${failures} failing\n`,

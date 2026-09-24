@@ -231,7 +231,9 @@ export function Studio({ initial, onHome }: { initial: Doc; onHome: () => void }
         </div>
       ) : null}
 
-      {exporting ? <ExportDialog doc={doc} onClose={() => setExporting(false)} /> : null}
+      {exporting ? (
+        <ExportDialog doc={doc} onAlt={studio.setSlideAlt} onClose={() => setExporting(false)} />
+      ) : null}
 
       {sharing ? <ShareDialog doc={doc} onClose={() => setSharing(false)} /> : null}
 

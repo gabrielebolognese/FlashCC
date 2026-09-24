@@ -260,6 +260,19 @@ export function useStudio(initial: Doc) {
     [index, patchSlide],
   );
 
+  /**
+   * Alt text for any slide, not only the current one.
+   *
+   * Takes an index because the export dialog writes all of them at once, and
+   * coalesced under one key so writing nine of them is one undo rather than
+   * nine.
+   */
+  const setSlideAlt = useCallback(
+    (at: number, alt: string) =>
+      patchSlide(at, (s) => ({ ...s, alt: alt.trim() ? alt : undefined }), "alt"),
+    [patchSlide],
+  );
+
   const setBackgroundImage = useCallback(
     (image: SlideImage | undefined) => patchSlide(index, (s) => ({ ...s, image }), "bgimg"),
     [index, patchSlide],
@@ -387,6 +400,7 @@ export function useStudio(initial: Doc) {
     setBackground,
     setBackgroundGradient,
     setBackgroundImage,
+    setSlideAlt,
     setFormat,
     setName,
     replaceDoc,

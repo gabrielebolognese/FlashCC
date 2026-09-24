@@ -8,8 +8,16 @@ import {
   HOOK_SYSTEM,
   MAX_BRIEF_CHARS,
   MAX_SAMPLES,
+  ALT_SYSTEM,
+  assembleAlt,
+  assembleCaption,
   assembleRewrite,
   BODY_CHARS,
+  CAPTION_PLATFORMS,
+  CAPTION_SYSTEM,
+  LINKEDIN_FOLD,
+  MAX_ALT_CHARS,
+  PLATFORM_CAPTION,
   HOOK_CHARS,
   INTENT_RULES,
   limitFor,
@@ -426,5 +434,176 @@ describe("the note is a label, not a sentence", () => {
   /** One very long word has no boundary to cut at, so it is cut anyway. */
   it("still bounds a note with no spaces in it", () => {
     expect(shortNote("x".repeat(80)).length).toBeLessThanOrEqual(MAX_NOTE_CHARS);
+  });
+});
+
+/* ── captions ─────────────────────────────────────────────────────── */
+
+const DECK = ["Cutting on the beat feels mechanical.", "Cut on movement instead.", "Save this."];
+
+describe("the caption system block", () => {
+  it("is byte identical whatever the platform", () => {
+    const a = assembleCaption({ deck: DECK, platform: "linkedin", count: 2 });
+    const b = assembleCaption({ deck: DECK, platform: "tiktok", count: 1 });
+    expect(a.system).toBe(b.system);
+    expect(a.system).toBe(CAPTION_SYSTEM);
+  });
+
+  /**
+   * Three platforms in the cached prefix would split the shared cache three
+   * ways, so the rules that differ have to be below the breakpoint.
+   */
+  it("keeps the per-platform rules out of the cached block", () => {
+    expect(CAPTION_SYSTEM).not.toContain("LinkedIn");
+    expect(CAPTION_SYSTEM).not.toContain(String(LINKEDIN_FOLD));
+  });
+
+  /** Generic tags are the fabrication problem wearing a different costume. */
+  it("refuses generic hashtags in the rules", () => {
+    expect(CAPTION_SYSTEM).toContain("#marketing");
+    expect(CAPTION_SYSTEM).toContain("own words");
+  });
+
+  it("keeps hashtags out of the caption text", () => {
+    expect(CAPTION_SYSTEM).toContain("never appear inside the caption text");
+  });
+
+  it("bans the punctuation the house style bans", () => {
+    expect(CAPTION_SYSTEM).toContain("No em dashes");
+  });
+});
+
+describe("every platform is genuinely different", () => {
+  it("has a spec for each one", () => {
+    for (const p of CAPTION_PLATFORMS) expect(PLATFORM_CAPTION).toHaveProperty(p);
+  });
+
+  it("gives no two platforms the same rules", () => {
+    const joined = CAPTION_PLATFORMS.map((p) => PLATFORM_CAPTION[p].rules.join("|"));
+    expect(new Set(joined).size).toBe(joined.length);
+  });
+
+  /** The one fact a generic caption writer always gets wrong. */
+  it("states the LinkedIn fold in the request, with the number", () => {
+    const { user } = assembleCaption({ deck: DECK, platform: "linkedin", count: 2 });
+    expect(user).toContain(String(LINKEDIN_FOLD));
+    expect(user).toContain("see more");
+  });
+
+  it("does not mention the fold for platforms that do not fold", () => {
+    for (const p of ["instagram", "tiktok"] as const) {
+      expect(assembleCaption({ deck: DECK, platform: p, count: 2 }).user).not.toContain("see more");
+    }
+  });
+
+  it("states each platform's own ceiling", () => {
+    expect(assembleCaption({ deck: DECK, platform: "linkedin", count: 1 }).user).toContain("3000 characters");
+    expect(assembleCaption({ deck: DECK, platform: "instagram", count: 1 }).user).toContain("2200 characters");
+  });
+
+  it("states each platform's own hashtag allowance", () => {
+    expect(assembleCaption({ deck: DECK, platform: "instagram", count: 1 }).user).toContain("at most 10 hashtags");
+    expect(assembleCaption({ deck: DECK, platform: "tiktok", count: 1 }).user).toContain("at most 5 hashtags");
+  });
+});
+
+describe("what a caption request carries", () => {
+  it("names the framework and the closing ask when it has them", () => {
+    const { user } = assembleCaption({
+      deck: DECK,
+      platform: "linkedin",
+      framework: "Problem and solve",
+      cta: "Save this for your next edit",
+      count: 2,
+    });
+    expect(user).toContain("Problem and solve");
+    expect(user).toContain("Save this for your next edit");
+  });
+
+  it("says nothing about either when it has neither", () => {
+    const { user } = assembleCaption({ deck: DECK, platform: "linkedin", count: 2 });
+    expect(user).not.toContain("framework:");
+    expect(user).not.toContain("last slide asks");
+  });
+
+  it("drops blank slides", () => {
+    const { user } = assembleCaption({ deck: ["One", "  ", "Two"], platform: "tiktok", count: 1 });
+    expect(user).toContain("1. One");
+    expect(user).toContain("2. Two");
+  });
+
+  it("asks for the count it was given", () => {
+    expect(assembleCaption({ deck: DECK, platform: "tiktok", count: 1 }).user).toContain("Write 1 caption.");
+    expect(assembleCaption({ deck: DECK, platform: "tiktok", count: 3 }).user).toContain("Write 3 captions.");
+  });
+
+  it("carries voice in the user message, never the system block", () => {
+    const { system, user } = assembleCaption({
+      deck: DECK,
+      platform: "linkedin",
+      count: 2,
+      voice: { tone: "Blunt, no throat-clearing" },
+    });
+    expect(user).toContain("Blunt, no throat-clearing");
+    expect(system).not.toContain("Blunt");
+  });
+
+  it("clips an enormous deck rather than billing for it", () => {
+    const huge = Array.from({ length: 400 }, () => "x".repeat(200));
+    const { user } = assembleCaption({ deck: huge, platform: "linkedin", count: 2 });
+    expect(user.length).toBeLessThan(20000);
+  });
+});
+
+/* ── alt text ────────────────────────────────────────────────────── */
+
+describe("alt text", () => {
+  it("states the ceiling screen readers actually truncate at", () => {
+    expect(ALT_SYSTEM).toContain(String(MAX_ALT_CHARS));
+  });
+
+  /**
+   * A preamble is wasted characters inside a 125 character budget, and a live
+   * run put "Text saying" in front of all five slides, which is most of the
+   * budget spent saying nothing five times.
+   */
+  it("bans the openings that waste the budget", () => {
+    for (const bad of ["Image of", "Slide showing", "Text saying", "This slide"]) {
+      expect(ALT_SYSTEM).toContain(bad);
+    }
+  });
+
+  /** For a text-only slide, the words themselves are the description. */
+  it("says the words are the alt text when a slide is only words", () => {
+    expect(ALT_SYSTEM).toContain("alt text IS those words");
+  });
+
+  /**
+   * The entries are consumed positionally, so a model that returns eight
+   * descriptions for nine slides shifts every later slide's alt text onto the
+   * wrong slide. Saying the number twice is cheap insurance.
+   */
+  it("states the slide count twice, because the answer is read by position", () => {
+    const { user } = assembleAlt(["One", "Two", "Three"]);
+    expect(user).toContain("has 3 slides");
+    expect(user).toContain("Write exactly 3 descriptions");
+  });
+
+  it("numbers every slide, blank ones included", () => {
+    const { user } = assembleAlt(["One", "   ", "Three"]);
+    expect(user).toContain("1. One");
+    expect(user).toContain("2. (no text on this slide)");
+    expect(user).toContain("3. Three");
+  });
+
+  it("gets the singular right for a one-slide deck", () => {
+    const { user } = assembleAlt(["Only one"]);
+    expect(user).toContain("has 1 slide.");
+    expect(user).toContain("Write exactly 1 description");
+  });
+
+  it("uses its own system block, not the caption one", () => {
+    expect(assembleAlt(["One"]).system).toBe(ALT_SYSTEM);
+    expect(ALT_SYSTEM).not.toBe(CAPTION_SYSTEM);
   });
 });

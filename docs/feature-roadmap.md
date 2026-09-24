@@ -1564,7 +1564,7 @@ identical, nothing over the ceiling. This is what found the `effort` bug.
 
 ## Batch 12, The caption, and the words around the deck
 
-**Status:** next
+**Status:** done
 **Size:** medium
 **Why here:** `posts.caption` has existed since Batch 8 and is filled in by hand
 every single time. The carousel is the hard part and the product does it; the
@@ -1672,11 +1672,85 @@ captions, which is writing that has to hold up next to the deck.
 - **No scheduling suggestions.** Best-time-to-post claims are the least
   defensible number in this category.
 
+### What the build found
+
+**1. "Nothing writes it but a person" was wrong.** `captionOf` in `transcript.ts`
+already builds a caption deterministically, from slide 1, slide 2 and the
+closer, clamped to the platform ceiling, and `PostSheet` already had a button
+for it. This is the `longform.ts` situation arriving early: a deterministic path
+exists, works, is free and needs no key, and the model path has to sit **beside**
+it rather than replace it. Both buttons are on the screen, labelled for what they
+actually do.
+
+**2. `chars` was redundant and its stated reason was wrong.** The ceilings do not
+live in `platforms.ts`, they live in `transcript.ts` as `CAPTION_LIMIT`, and only
+on the client. The server had none. So the server now reports the ceiling and the
+fold it enforced, the same pattern Batch 11 used for `limit`, and `captionFit`
+stays for the user's own typing.
+
+**3. Alt text had no stated destination, and the answer differs per platform.**
+It cannot be embedded in a JPEG that any of these platforms reads, and none has
+an API to push it to: a person types it into the upload form. What differs is
+whether there is a form at all. Instagram and TikTok take per-image alt text and
+export a zip, so it travels as `alt.txt` numbered to match the images. **LinkedIn
+is a document post, one PDF, with no per-page alt field**, and the accessible
+answer there is the transcript in the first comment, which `PostSheet` already
+offered. The dialog says which applies rather than implying the export carries
+it everywhere.
+
+An older tooltip in `PostSheet` claimed per-slide alt text was impossible on
+**both** platforms. That is right about LinkedIn and wrong about Instagram, and
+it has been corrected. **Worth confirming against the current apps before
+treating either half as settled.**
+
+**4. Alt text needed nowhere new to live.** `docs.data` is a single `jsonb` blob,
+so `Slide.alt` needs no migration and gets reordering, duplication, sync and
+version history for free. A parallel array beside the deck would go out of step
+the first time anybody dragged a thumbnail.
+
+### The hashtag filter took three attempts, and the third is the right one
+
+Generic hashtags are the fabrication problem in a different costume: words
+asserted about somebody's post that the post does not contain. A caption writer
+left alone returns #marketing, #contentcreation and #videoediting every time.
+
+- **Exact substring** rejected `#editing` on a deck that says "edits".
+- **Substring plus single-word stemming** still rejected `#cuttingonmovement`,
+  and a live LinkedIn run came back with no hashtags at all.
+- **Segmentation with a "one word of five letters" rule** accepted that one, and
+  rejected `#cutonthebeat`, whose longest word is four letters and which is a
+  real phrase from the deck. The length rule existed to stop a deck containing
+  "the", "and" and "not" grounding `#theandnot`, and it could not separate the
+  two cases because they look identical by length.
+
+What works is **adjacency**: a tag is grounded when it closes up a run of
+consecutive words from the deck, stemmed on the deck side. "cut on the beat" is
+in the deck, "the and not" is not, and nothing has to be measured. A tag that
+merges two separate phrases is dropped, which is correct, because the deck never
+said it.
+
+A live run now keeps `#cuttingonthebeat` and `#cutonmovement` and drops
+`#videoediting`, `#editingtips`, `#filmediting`, `#videoproduction`,
+`#invisiblecuts` and `#editingtricks`.
+
+### Also found by the eval
+
+**Alt text opened every entry with "Text saying".** Banned "Image of" and "Slide
+showing" and got the same waste under a different phrase, five times, inside a
+125 character budget. The rule is now that **for a slide which is only words, the
+alt text IS those words**, given as they appear. Entries went from 40 to 89
+characters down to 29 to 78, and stopped being repetitive.
+
+`npm run eval:draft -- --caption` runs every platform and the alt route, prints
+them with the LinkedIn fold drawn in, and checks what can be checked: over the
+ceiling, a hashtag inside the caption text, an opening instruction to swipe,
+every tag generic, a wrong number of alt entries, a wasted preamble.
+
 ---
 
 ## Batch 13, Bring your own source
 
-**Status:** queued
+**Status:** next
 **Size:** large
 **Why here:** the brief is the only way in. Everybody making carousels regularly
 is making them FROM something: a newsletter, a transcript, a talk, a post that

@@ -259,6 +259,155 @@ export function assembleHooks(input: HookInput): Assembled {
   return { system: HOOK_SYSTEM, user };
 }
 
+/* ── the caption, and the words around the deck ───────────────────────────── */
+
+/**
+ * Where LinkedIn folds a post behind "see more".
+ *
+ * The single load-bearing fact about a LinkedIn caption, and the one thing a
+ * generic caption writer always gets wrong. Everything after this is invisible
+ * until somebody chooses to expand, so the first 210 characters are not the
+ * opening of the caption, they ARE the caption as far as the feed is concerned.
+ */
+export const LINKEDIN_FOLD = 210;
+
+export type CaptionPlatform = "linkedin" | "instagram" | "tiktok";
+
+export const CAPTION_PLATFORMS: readonly CaptionPlatform[] = ["linkedin", "instagram", "tiktok"];
+
+/**
+ * What each destination actually wants.
+ *
+ * This is the whole reason there is not one caption prompt. The three want
+ * genuinely different things and a single generic caption is worse than none:
+ * the reader's situation is different in each, and on LinkedIn most of the text
+ * is not even shown.
+ */
+export const PLATFORM_CAPTION: Record<
+  CaptionPlatform,
+  { name: string; limit: number; fold?: number; hashtags: number; rules: string[] }
+> = {
+  linkedin: {
+    name: "LinkedIn",
+    limit: 3000,
+    fold: LINKEDIN_FOLD,
+    hashtags: 5,
+    rules: [
+      `Only the first ${LINKEDIN_FOLD} characters are shown before the post is folded behind "see more". Everything you want a scroller to read has to be inside them, and the ${LINKEDIN_FOLD}th character must land somewhere that makes a person want to expand it.`,
+      "Never open with an instruction to swipe. The carousel is visible; telling somebody to look at it wastes the only line they will read.",
+      "Write for a professional feed: plain, specific, no hype.",
+      "Hashtags go at the very end, never inside a sentence.",
+    ],
+  },
+  instagram: {
+    name: "Instagram",
+    limit: 2200,
+    hashtags: 10,
+    rules: [
+      "The carousel is already on screen and already legible, so the caption is not a summary of it. It earns a stop and adds what the slides could not fit.",
+      "Short paragraphs with blank lines between them. A wall of text is scrolled past.",
+      "Hashtags belong in their own block at the end, never mid-sentence.",
+    ],
+  },
+  tiktok: {
+    name: "TikTok",
+    limit: 2200,
+    hashtags: 5,
+    rules: [
+      "Assume a video-first audience who may never swipe through the slides at all. The caption has to make sense on its own.",
+      "Conversational, direct, second person. Closer to how somebody talks than how they write.",
+      "Hashtags may sit inline here if they read naturally.",
+    ],
+  },
+};
+
+export const MAX_ALT_CHARS = 125;
+
+export const CAPTION_SYSTEM = `You write the text post that goes underneath a social carousel.
+
+The carousel does the work. The caption is what makes somebody open it, and what the post says to the people who never swipe at all.
+
+Rules:
+- Write finished copy, ready to post. Not a description of a caption.
+- Open with the line that earns attention. Never "Swipe to learn more", never "Here is a thread", never "Read on".
+- Use only what the carousel contains. Add no claim, number, name or result that is not in it.
+- Match the deck's own vocabulary and register. You are writing as the person who wrote the slides.
+- Stay inside the character limit you are given.
+- No em dashes, ever. A comma or a full stop, never a dash.
+- No emoji.
+- Hashtags are returned separately and must never appear inside the caption text.
+- Every hashtag has to come from what the carousel is actually about, using its own words. Generic tags like #marketing, #contentcreation or #growth are worthless to everybody and are not wanted.
+- Name what each caption did in at most four words: "opens on the cost", "plainer, shorter". Not a sentence.`;
+
+export const ALT_SYSTEM = `You write alt text for the slides of a social carousel, read aloud to people using a screen reader.
+
+You are given each slide's copy, in order. You return one description per slide.
+
+Rules:
+- One entry per slide, in the order given. Never merge two slides or skip one.
+- Under ${MAX_ALT_CHARS} characters each. Most screen readers cut off around there.
+- Say what the slide SHOWS. Somebody who cannot see it should come away with the same information a sighted reader gets.
+- **When a slide is only words, the alt text IS those words.** Give them as they appear and stop. Do not introduce them.
+- Never begin with "Image of", "Slide showing", "Text saying", "A graphic that", "This slide". The reader already knows it is a slide, and on a 125 character budget a preamble repeated nine times is most of the budget.
+- Add how the words are presented only when it carries meaning a reader would otherwise miss, such as one word set much larger than the rest, or a picture behind them.
+- Do not editorialise, do not interpret, and do not add anything the slide does not contain.
+- Plain sentences. No em dashes, no emoji, no hashtags, no markup.`;
+
+export type CaptionInput = {
+  deck: string[];
+  platform: CaptionPlatform;
+  framework?: string | undefined;
+  cta?: string | undefined;
+  count: number;
+  voice?: Voice | undefined;
+};
+
+export function assembleCaption(input: CaptionInput): Assembled {
+  const spec = PLATFORM_CAPTION[input.platform];
+  const voice = voiceBlock(input.voice);
+
+  const deck = clip(
+    input.deck.map((t) => t.trim()).filter(Boolean).map((t, i) => `${i + 1}. ${t}`).join("\n"),
+    MAX_DECK_CHARS,
+  );
+
+  // Platform rules go in the USER message, not the cached system block. There
+  // are three of them, so putting them above the cache breakpoint would split
+  // the shared prefix three ways and the cache would be worth a third as much.
+  const user = [
+    `Platform: ${spec.name}`,
+    "",
+    spec.rules.map((r) => `- ${r}`).join("\n"),
+    "",
+    `Hard limit: ${spec.limit} characters.`,
+    `Return at most ${spec.hashtags} hashtags.`,
+    ...(input.framework ? ["", `The carousel's framework: ${input.framework}`] : []),
+    ...(input.cta ? ["", `What the last slide asks for: ${input.cta.trim()}`] : []),
+    ...(voice ? ["", voice] : []),
+    "",
+    `The carousel, slide by slide:\n${deck}`,
+    "",
+    `Write ${input.count} caption${input.count === 1 ? "" : "s"}.`,
+  ].join("\n");
+
+  return { system: CAPTION_SYSTEM, user };
+}
+
+export function assembleAlt(deck: readonly string[]): Assembled {
+  const slides = clip(
+    deck.map((t, i) => `${i + 1}. ${t.trim() || "(no text on this slide)"}`).join("\n"),
+    MAX_DECK_CHARS,
+  );
+
+  return {
+    system: ALT_SYSTEM,
+    // The count is stated as well as implied. A model given nine slides and no
+    // number returns eight often enough to matter, and the entries are consumed
+    // positionally, so a short answer silently shifts every later slide's alt.
+    user: `The carousel has ${deck.length} slide${deck.length === 1 ? "" : "s"}.\n\n${slides}\n\nWrite exactly ${deck.length} description${deck.length === 1 ? "" : "s"}, one per slide, in order.`,
+  };
+}
+
 /* ── rewriting one line ───────────────────────────────────────────────────── */
 
 export type RewriteIntent = "shorter" | "punchier" | "simpler" | "angle" | "expand" | "free";
