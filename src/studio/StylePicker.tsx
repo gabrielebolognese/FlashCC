@@ -6,6 +6,7 @@ import { slidePaint } from "./paint.js";
 import { LayerView } from "./LayerView.js";
 import { allFonts } from "./model.js";
 import type { BuildOptions } from "./compositions.js";
+import { PREVIEW_COUNT, previewDeck } from "./preview.js";
 import { StepGuide, Strong } from "./StepGuide.js";
 import { customFrom, DEFAULT_STYLE, type Style } from "./styles.js";
 
@@ -225,6 +226,8 @@ export function StylePicker({
 
 /* ── the custom editor ─────────────────────────────────────────────────── */
 
+const PREVIEW_W = 206;
+
 function CustomStyle({
   style,
   texts,
@@ -245,11 +248,24 @@ function CustomStyle({
   const set = (patch: Partial<Style["theme"]>) =>
     onChange({ ...style, theme: { ...style.theme, ...patch } });
 
-  const slide = useMemo(
-    () => buildSlides(texts.slice(0, 1), style.theme, roles.slice(0, 1), build)[0],
-    [style, texts, roles, build],
+  /**
+   * Their own deck first, padded only if it is too short.
+   *
+   * Built as one run of six rather than six separate one-slide builds, because
+   * the composition cycle is a function of position within a deck. Building them
+   * individually would hand every preview index 0 and print the title layout six
+   * times, which is the bug this is fixing.
+   */
+  const deck = useMemo(() => previewDeck(texts, roles), [texts, roles]);
+
+  const slides = useMemo(
+    () =>
+      buildSlides(deck.texts, style.theme, deck.roles as string[], build).slice(0, PREVIEW_COUNT),
+    [deck, style, build],
   );
-  const scale = 460 / H;
+
+  const borrowed = deck.borrowed;
+  const scale = PREVIEW_W / W;
 
   return (
     <div className="flex h-full flex-col overflow-hidden bg-base">
@@ -275,19 +291,27 @@ function CustomStyle({
       </header>
 
       <div className="scroll-quiet min-h-0 flex-1 overflow-y-auto">
-        <div className="mx-auto flex max-w-[880px] flex-col items-center gap-8 px-6 py-10 md:flex-row md:items-start">
+        <div className="mx-auto flex max-w-[1060px] flex-col items-center gap-10 px-6 py-10 md:flex-row md:items-start">
           <div
-            className="shrink-0 overflow-hidden rounded-2xl border border-hairline shadow-overlay"
-            style={{ width: W * scale, height: 460, ...slidePaint(slide) }}
+            className="grid shrink-0 grid-cols-2 gap-3"
+            style={{ width: PREVIEW_W * 2 + 12 }}
           >
-            <div
-              className="pointer-events-none relative origin-top-left"
-              style={{ width: W, height: H, transform: `scale(${scale})` }}
-            >
-              {slide?.layers.map((l) => (
-                <LayerView key={l.id} layer={l} />
-              ))}
-            </div>
+            {slides.map((s, i) => (
+              <div
+                key={i}
+                className="overflow-hidden rounded-xl border border-hairline shadow-overlay"
+                style={{ width: PREVIEW_W, height: H * scale, ...slidePaint(s) }}
+              >
+                <div
+                  className="pointer-events-none relative origin-top-left"
+                  style={{ width: W, height: H, transform: `scale(${scale})` }}
+                >
+                  {s.layers.map((l) => (
+                    <LayerView key={l.id} layer={l} />
+                  ))}
+                </div>
+              </div>
+            ))}
           </div>
 
           <div className="w-full min-w-0 flex-1">
@@ -312,8 +336,12 @@ function CustomStyle({
             </Section>
 
             <p className="mt-5 text-caption leading-[17px] text-muted">
-              The preview is your real first slide. Everything here lands on ordinary layers, so
-              you can still change any of it once you are in the editor.
+              {borrowed > 0
+                ? `The previews are your own slides, plus ${borrowed} sample${borrowed === 1 ? "" : "s"} to show the layouts your deck is too short to reach.`
+                : "Every preview is one of your own slides, in the layout it will really get."}{" "}
+              A style has to hold up across all of them, not just the opener. Everything here
+              lands on ordinary layers, so you can still change any of it once you are in the
+              editor.
             </p>
           </div>
         </div>
