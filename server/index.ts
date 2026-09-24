@@ -24,7 +24,7 @@ import { draft, draftConfigured, draftStatus, hooks } from "./draft.js";
 import { exportDeck, renderDocument, renderImages } from "./export.js";
 import { HttpError, json } from "./http.js";
 import { addComment, decide, readShare } from "./review.js";
-import { hasSecretKey } from "./supabase.js";
+import { devPro, hasSecretKey } from "./supabase.js";
 
 const PORT = Number(process.env.PORT ?? 8787);
 
@@ -69,6 +69,8 @@ const server = createServer((req, res) => {
       // Counts of which checks fired since this process started. Codes, not
       // customers. See tally.ts for why this is not in the database.
       checks: tally(),
+      // Loud on purpose. A paywall that is off should be impossible to miss.
+      ...(devPro() ? { devPro: true } : {}),
     });
   }
 
@@ -93,4 +95,11 @@ server.listen(PORT, () => {
     hasSecretKey() ? "secret key" : "NO SUPABASE SECRET KEY",
   ];
   console.log(`server on http://localhost:${PORT} (${bits.join(" · ")})`);
+
+  // Its own line, not a word in a list, because this one turns the paywall
+  // off and somebody has to notice it is on.
+  if (devPro()) {
+    console.warn("  DEV_PRO is on. Every signed-in account is treated as Pro.");
+    console.warn("  Remove DEV_PRO from .env before this is anywhere real.");
+  }
 });

@@ -88,11 +88,39 @@ export type PlanName = "free" | "pro" | "agency";
  * is null for the service role, so it would answer false for everybody and the
  * gate would look like it worked while refusing paying customers.
  */
+/**
+ * Treat any signed-in caller as Pro. **Testing only.**
+ *
+ * Batch 9 exists because every feature the pricing screen sold was free, so a
+ * switch that makes them free again needs to be hard to leave on by accident:
+ *
+ * - It **refuses to engage when `NODE_ENV` is production**, so shipping with the
+ *   variable set does nothing.
+ * - It still requires a real, signed-in caller. It lifts the PLAN check, never
+ *   the identity check, so the routes are not open to the internet.
+ * - It warns on every single request that uses it, and appears on
+ *   `/api/health`, because a paywall that is off should be impossible to miss.
+ *
+ * Read as a function rather than a module constant, so it is unaffected by when
+ * `.env` loads. See `env.ts`.
+ */
+export const devPro = (): boolean =>
+  process.env.DEV_PRO === "1" && process.env.NODE_ENV !== "production";
+
 export async function requirePro(
   token: string | null,
   feature: string,
 ): Promise<Caller & { plan: PlanName }> {
   const caller = await requireCaller(token);
+
+  if (devPro()) {
+    console.warn(`[dev] DEV_PRO is on: ${caller.email ?? caller.id} treated as Pro for ${feature}`);
+    // Returns before `readBilling`, deliberately. That call needs the secret
+    // key, and the whole point of this switch is to try the AI before any of
+    // the billing plumbing exists.
+    return { ...caller, plan: "pro" };
+  }
+
   const { plan } = await readBilling(caller.id);
 
   if (plan === "free") {
