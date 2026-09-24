@@ -16,7 +16,10 @@ a client that reports its own plan can report any plan.
 
 **Dashboard → Project Settings → API → `service_role`** (click to reveal).
 
-Put it in `.env` as `SUPABASE_SERVICE_ROLE_KEY`. This key bypasses row level security entirely.
+Put it in `.env` as `SUPABASE_SECRET_KEY`. This key bypasses row level security entirely.
+Use a **secret key** (`sb_secret_...`) from Settings, API Keys, not the legacy `service_role`
+JWT: Supabase is deprecating that one by the end of 2026. The old variable name still works as a
+fallback.
 It never gets a `VITE_` prefix, never goes in the browser, never gets logged.
 
 ## 2. Stripe products
@@ -68,7 +71,7 @@ In production instead: **Developers → Webhooks → Add endpoint**, pointed at
 
 ## 5. Check it
 
-`curl localhost:8787/api/health` should report `"billing":true` and `"serviceRole":true`.
+`curl localhost:8787/api/health` should report `"billing":true` and `"secretKey":true`.
 
 Then in the app: sign in → **See Pro** → **Choose Pro** → pay with Stripe's test card
 `4242 4242 4242 4242`, any future expiry, any CVC.

@@ -27,6 +27,11 @@ const EM_DASH = String.fromCharCode(0x2014);
 
 const SOURCE = ["src", "server", "scripts", "docs", "supabase"];
 const EXTENSIONS = [".ts", ".tsx", ".css", ".mjs", ".md", ".sql"];
+
+// Checked by name rather than by extension, and at the repo root, where the
+// walk above never goes. `.env.example` is the first file a new contributor
+// opens and it had carried an em dash through two cleanups unnoticed.
+const ROOT_FILES = ["index.html", ".env.example"];
 const SKIP = new Set(["node_modules", "dist", ".git", ".vite"]);
 
 function walk(dir: string, out: string[] = []): string[] {
@@ -57,8 +62,9 @@ describe("punctuation", () => {
     expect(offenders).toEqual([]);
   });
 
-  /** The HTML shell is the first thing a visitor and a crawler both read. */
-  it("has none in index.html either", () => {
-    expect(readFileSync("index.html", "utf8")).not.toContain(EM_DASH);
+  /** The HTML shell a visitor reads, and the env file a contributor reads. */
+  it("has none in the root files the walk does not reach", () => {
+    const offenders = ROOT_FILES.filter((f) => readFileSync(f, "utf8").includes(EM_DASH));
+    expect(offenders).toEqual([]);
   });
 });

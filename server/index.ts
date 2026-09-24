@@ -14,7 +14,7 @@ import { draft, draftConfigured, draftStatus, hooks } from "./draft.js";
 import { exportDeck, renderDocument, renderImages } from "./export.js";
 import { HttpError, json } from "./http.js";
 import { addComment, decide, readShare } from "./review.js";
-import { hasServiceRole } from "./supabase.js";
+import { hasSecretKey } from "./supabase.js";
 
 // Node reads .env itself; absent is fine, each route reports its own gap.
 try {
@@ -57,7 +57,7 @@ const server = createServer((req, res) => {
       export: true,
       draft: draftConfigured(),
       billing: billingConfigured(),
-      serviceRole: hasServiceRole(),
+      secretKey: hasSecretKey(),
     });
   }
 
@@ -79,7 +79,7 @@ server.listen(PORT, () => {
   const bits = [
     draftConfigured() ? "drafting" : "NO ANTHROPIC_API_KEY",
     billingConfigured() ? "billing" : "no billing",
-    hasServiceRole() ? "service role" : "NO SERVICE ROLE KEY",
+    hasSecretKey() ? "secret key" : "NO SUPABASE SECRET KEY",
   ];
   console.log(`server on http://localhost:${PORT} (${bits.join(" · ")})`);
 });

@@ -5,38 +5,46 @@
  * Supabase says whether it is genuine and whose it is. Never trust a user id sent
  * in a request body, that is just a number the caller typed.
  *
- * WRITING the plan: with the service role key, which bypasses row level security
- * entirely. That is the point. The browser deliberately cannot write
+ * READING AND WRITING the plan: with the secret key, which bypasses row level
+ * security entirely. That is the point. The browser deliberately cannot write
  * profiles.plan, so the only thing that may is a process holding this key, acting
- * on a Stripe webhook it has cryptographically verified.
+ * on a webhook it has cryptographically verified.
  *
  * This key must never be sent to the browser, logged, or given a VITE_ prefix.
+ *
+ * SUPABASE_SECRET_KEY (`sb_secret_...`) is the current name for it. Supabase is
+ * deprecating the JWT-based `service_role` key by the end of 2026, so the old
+ * variable is read as a fallback and nothing more. The new keys are not JWTs,
+ * which is the real improvement: one can be revoked and rotated on its own,
+ * where rotating `service_role` means rotating the project JWT secret and
+ * signing every user out. The browser half of this already prefers
+ * `VITE_SUPABASE_PUBLISHABLE_KEY`, see `src/studio/cloud.ts`.
  */
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 
 import { HttpError } from "./http.js";
 
 const URL = process.env.SUPABASE_URL ?? process.env.VITE_SUPABASE_URL;
-const SERVICE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
+const SECRET_KEY = process.env.SUPABASE_SECRET_KEY ?? process.env.SUPABASE_SERVICE_ROLE_KEY;
 const ANON_KEY =
   process.env.VITE_SUPABASE_PUBLISHABLE_KEY ?? process.env.VITE_SUPABASE_ANON_KEY;
 
-export const hasServiceRole = (): boolean => Boolean(URL && SERVICE_KEY);
+export const hasSecretKey = (): boolean => Boolean(URL && SECRET_KEY);
 
 let admin: SupabaseClient | null = null;
 
 /** Full access. Only ever reached from a verified webhook or a verified caller. */
 export function serviceClient(): SupabaseClient {
-  if (!URL || !SERVICE_KEY) {
+  if (!URL || !SECRET_KEY) {
     // Reached from two directions now: billing writing a plan, and requirePro
     // reading one before an AI route runs. The old wording named only the first,
     // so clicking Draft returned a 503 about billing.
     throw new HttpError(
       503,
-      "No SUPABASE_SERVICE_ROLE_KEY. The server cannot read or update a plan without it.",
+      "No SUPABASE_SECRET_KEY. The server cannot read or update a plan without it.",
     );
   }
-  admin ??= createClient(URL, SERVICE_KEY, {
+  admin ??= createClient(URL, SECRET_KEY, {
     auth: { persistSession: false, autoRefreshToken: false },
   });
   return admin;
