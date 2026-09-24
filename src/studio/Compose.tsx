@@ -1,4 +1,4 @@
-import { ArrowRight, GripVertical, Plus, Sparkles, Trash2, X } from "lucide-react";
+import { ArrowRight, GripVertical, Plus, Shuffle, Sparkles, Trash2, X } from "lucide-react";
 import { Fragment, useState } from "react";
 
 import { MAX_SLIDES } from "./compositions.js";
@@ -90,6 +90,32 @@ export function Compose({
   const remove = (key: string) =>
     setFields((fs) => (fs.length <= 1 ? fs : fs.filter((f) => f.key !== key)));
 
+  /** Boxes this could actually do something to. Drives the disabled state. */
+  const fillable = fields.filter((f) => !f.text.trim() && f.slot.examples.length > 0).length;
+
+  /**
+   * Put one of each slot's own examples into every empty box.
+   *
+   * **Empty boxes only, deliberately.** The obvious reading of "fill with
+   * examples" is to fill everything, and that would delete work somebody had
+   * already typed, with no undo on this screen. Filling the gaps does the whole
+   * job on an empty form, which is when anybody actually presses this, and is
+   * harmless on a half-written one.
+   *
+   * Random rather than the first example, because a slot with three of them is
+   * offering three angles, and always showing the first makes the feature look
+   * like a fixed template rather than a prompt to write something.
+   */
+  function fillWithExamples() {
+    setFields((fs) =>
+      fs.map((f) => {
+        if (f.text.trim() || f.slot.examples.length === 0) return f;
+        const pick = f.slot.examples[Math.floor(Math.random() * f.slot.examples.length)];
+        return pick === undefined ? f : { ...f, text: pick };
+      }),
+    );
+  }
+
   /** Pasting a whole post into an empty box spreads it down the remaining boxes. */
   function spread(index: number, clip: string): boolean {
     const parts = clip
@@ -135,6 +161,21 @@ export function Compose({
         </div>
 
         <div className="flex-1" />
+
+        <button
+          type="button"
+          onClick={fillWithExamples}
+          disabled={fillable === 0}
+          title={
+            fillable === 0
+              ? "Every box already has something in it"
+              : "Put a real example in each empty box"
+          }
+          className="flex h-8 items-center gap-2 rounded-xl border border-hairline px-3 text-body-strong text-secondary hover:border-accent-dim hover:text-accent disabled:pointer-events-none disabled:opacity-40"
+        >
+          <Shuffle size={14} strokeWidth={2.2} />
+          Fill with examples
+        </button>
 
         <div className="flex items-center gap-1.5">
           {(Object.keys(THEMES) as (keyof typeof THEMES)[]).map((id) => (

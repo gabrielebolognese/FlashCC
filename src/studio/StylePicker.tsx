@@ -6,6 +6,7 @@ import { slidePaint } from "./paint.js";
 import { LayerView } from "./LayerView.js";
 import { allFonts } from "./model.js";
 import type { BuildOptions } from "./compositions.js";
+import { StepGuide, Strong } from "./StepGuide.js";
 import { customFrom, DEFAULT_STYLE, type Style } from "./styles.js";
 
 const W = 1080;
@@ -179,7 +180,20 @@ export function StylePicker({
       </header>
 
       <div className="scroll-quiet fcc-rise min-h-0 flex-1 overflow-y-auto">
-        <div className="mx-auto max-w-[1160px] px-6 py-8">
+        <div className="mx-auto flex max-w-[1240px] flex-col gap-10 px-6 py-10 lg:flex-row lg:items-start lg:gap-14">
+          <StepGuide title="Style templates">
+            <p>
+              What will your carousel look like? If you have used a style before, it is{" "}
+              <Strong>highly recommended</Strong> to keep using the same one, for visual
+              consistency on your page.
+            </p>
+            <p>
+              These are fully customisable templates. You can change anything, or start from a
+              blank one.
+            </p>
+          </StepGuide>
+
+          <div className="min-w-0 flex-1">
           <div className="flex flex-wrap gap-5">
             {styles.map((s) => (
               <StyleCard
@@ -202,6 +216,7 @@ export function StylePicker({
             <Palette size={19} strokeWidth={2.2} />
             or create your own style
           </button>
+          </div>
         </div>
       </div>
     </div>

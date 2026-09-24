@@ -1,6 +1,7 @@
 import { ArrowRight, HelpCircle, X } from "lucide-react";
 import { useEffect, useState } from "react";
 
+import { StepGuide } from "./StepGuide.js";
 import { DEFAULT_STRUCTURE, STRUCTURES, type Structure } from "./structures.js";
 
 /** A square preview of the shape, drawn from the framework's own slot count. */
@@ -59,24 +60,28 @@ export function Frameworks({
             </div>
           </div>
         ) : (
-          <div className="grid min-h-full place-items-center px-6 py-8">
-            <div>
-              <p className="mb-6 text-center text-body text-tertiary">
-                Every carousel is one of four shapes. Each one opens differently.
+          <div className="mx-auto flex max-w-[1180px] flex-col gap-10 px-6 py-10 lg:flex-row lg:items-start lg:gap-14">
+            <StepGuide title="Carousel framework">
+              <p>
+                Picking a framework templates the right slide order for the best engagement. You
+                can always change and reorder slides however you want, in any framework.
               </p>
+              <p>
+                Every carousel is one of four shapes, and each one opens differently. Or start
+                from an empty one.
+              </p>
+            </StepGuide>
 
+            <div className="min-w-0 flex-1">
               <div className="fcc-rise grid grid-cols-1 gap-5 sm:grid-cols-2">
                 {STRUCTURES.map((s, i) => (
                   <div
                     key={s.id}
                     className="group flex flex-col justify-between rounded-3xl border border-hairline bg-gradient-to-b from-surface-2 to-surface-1 p-6 shadow-overlay transition-[border-color,transform] duration-standard ease-out hover:-translate-y-0.5 hover:border-accent-dim"
-                    style={{
-                      width: "min(30vw, 34vh)",
-                      height: "min(30vw, 34vh)",
-                      minWidth: 264,
-                      minHeight: 264,
-                      animationDelay: `${i * 60}ms`,
-                    }}
+                    // Sized by the grid cell rather than the viewport. The old
+                    // `min(30vw, 34vh)` assumed the cards owned the whole width,
+                    // which stopped being true once the guide took a column.
+                    style={{ minHeight: 264, animationDelay: `${i * 60}ms` }}
                   >
                     <div className="min-h-0">
                       <ShapeMark slots={s.slots.length} accent="var(--accent)" />
