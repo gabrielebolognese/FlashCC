@@ -1162,13 +1162,12 @@ test asserts it for every style and framework so it cannot regress.
 
 ---
 
-## Batch 10 — The AI pipeline
+## Batch 10, The AI pipeline
 
-**Status:** next
+**Status:** done
 **Size:** medium
-**Why here:** the key is empty, so none of it runs; and when it does run, every
-call goes to the most expensive model there is on a plan that promises not to
-meter anything. Both of those are decisions nobody made.
+**Why here:** every call goes to the most expensive model there is, on a plan
+that promises not to meter anything, and nobody decided either of those.
 
 ### What is there today
 
@@ -1180,10 +1179,9 @@ Two routes, both `claude-opus-5`, both structured output through
 | `/api/draft` | brief + framework to slide copy | 16,000 | genuine reasoning, about fifteen seconds |
 | `/api/hooks` | deck to five opening lines | 4,000 | short generation, one line each |
 
-And three facts that shape everything below: **`ANTHROPIC_API_KEY` is empty**, so
-nothing works at all right now. **Not one token is counted anywhere.** And
-`Brand` carries colours, typefaces and logos but nothing about how anybody
-*sounds*.
+And two facts that shape everything below: **not one token is counted
+anywhere**, and `Brand` carries colours, typefaces and logos but nothing about
+how anybody *sounds*.
 
 ### 10.1 A model per task, and cache the part that never changes
 
@@ -1296,9 +1294,39 @@ plainly which framework failed which property.
 - **AI captions and transcripts.** Those rearrange words already approved.
 - **Credits, of any kind.** Invariant 7.
 
-### Not code, and blocking
+### What the build actually found
 
-`ANTHROPIC_API_KEY` is empty. Nothing in this batch is testable until it is set.
+The key was set before this was built, so `scripts/eval-draft.mjs` ran against
+real models rather than sitting there as an aspiration. Three things came out of
+it that the plan above did not anticipate:
+
+1. **Thin briefs made the model invent.** From "Cut on movement, not on the
+   beat", the showcase framework produced a coffee brand, a 30-second reel and a
+   product launch. Showcase asks for context and results that three words cannot
+   supply, and the model filled the gap rather than leaving it. Fixed with a rule
+   in `DRAFT_SYSTEM`: write something true and general, never invent a client, a
+   number or a result.
+2. **The models wrote em dashes.** Opus put them in four slides out of eight.
+   `copy.test.ts` holds every source file to the house style and model output is
+   not a source file, so nothing was holding it to anything. Fixed twice over: a
+   prompt rule, and `plainText()` in `prompts.ts` applied to every slide and hook
+   on the way out. The prompt is a preference; the function is the guarantee.
+3. **Sonnet is enough.** Sixteen drafts, both models, four frameworks. Opus is
+   richer on thin briefs, where it supplies craft detail the brief did not; Sonnet
+   is tighter and about 20% faster. Neither is wrong and the gap does not justify
+   the price, so 10.1 stands as written.
+
+Also worth recording: the first version of the harness's fabrication check
+flagged every educational draft for hooks like "3 cutting rules", which is a deck
+counting its own slides. It now looks only for measurements, a currency amount, a
+percentage, a multiplier, a unit of time, because nothing separates a listicle
+count from an invented statistic by pattern and a check that is usually wrong is
+one nobody reads.
+
+### Still to run
+
+`supabase/10-brand-voice.sql`. Brand voice works locally without it and will not
+sync until it is applied.
 
 ---
 

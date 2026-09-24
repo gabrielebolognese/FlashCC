@@ -23,6 +23,9 @@ import {
   removeBrand,
   upsertBrand,
   type Brand,
+  MAX_VOICE_SAMPLES,
+  tidyVoice,
+  type Voice,
 } from "./brand.js";
 import { importImages, urlFor } from "./library.js";
 import { ACCEPT } from "./media.js";
@@ -184,6 +187,91 @@ function Logos({ brand, onChange }: { brand: Brand; onChange: (b: Brand) => void
   );
 }
 
+/* ── voice ────────────────────────────────────────────────────────────────── */
+
+/**
+ * How this brand sounds, which is the half a brand was missing.
+ *
+ * Deliberately three plain fields and no wizard. The single most useful thing
+ * somebody can do here is paste two posts they already wrote, and any amount of
+ * guided onboarding around that is friction in front of a paste.
+ *
+ * Nothing is required. A brand with an empty voice produces exactly the prompt
+ * it produced before this existed, so this can be ignored forever without the
+ * product feeling half-configured.
+ */
+function VoiceEditor({ brand, onChange }: { brand: Brand; onChange: (b: Brand) => void }) {
+  const voice: Voice = brand.voice ?? {};
+
+  const set = (patch: Partial<Voice>) =>
+    onChange({
+      ...brand,
+      // Tidied on the way in rather than on the way out: the ceilings then hold
+      // at rest as well as in the prompt, so a pasted newsletter never becomes a
+      // stored newsletter.
+      voice: tidyVoice({ ...voice, ...patch }),
+      updatedAt: new Date().toISOString(),
+    });
+
+  const samples = voice.samples ?? [];
+
+  const setSample = (i: number, text: string) => {
+    const next = [...samples];
+    next[i] = text;
+    set({ samples: next });
+  };
+
+  return (
+    <div>
+      <span className="text-overline uppercase text-tertiary">Voice</span>
+      <p className="mt-1 text-caption leading-4 text-muted">
+        What the AI matches when it drafts for this brand. Optional, and the posts do far more
+        than the description.
+      </p>
+
+      <label className="mt-2.5 block">
+        <span className="text-caption text-tertiary">How would you describe it?</span>
+        <input
+          value={voice.tone ?? ""}
+          onChange={(e) => set({ tone: e.target.value })}
+          placeholder="Blunt, no throat-clearing. Short sentences."
+          className={`${field} mt-1`}
+        />
+      </label>
+
+      <div className="mt-3">
+        <span className="text-caption text-tertiary">
+          Two or three posts you have actually written
+        </span>
+        <div className="mt-1 flex flex-col gap-2">
+          {Array.from({ length: MAX_VOICE_SAMPLES }, (_, i) => (
+            <textarea
+              key={i}
+              value={samples[i] ?? ""}
+              onChange={(e) => setSample(i, e.target.value)}
+              rows={2}
+              placeholder={i === 0 ? "Paste one here. Any post, not necessarily a carousel." : "Another, if you have one."}
+              className={`${field} h-auto resize-y py-2 leading-4`}
+            />
+          ))}
+        </div>
+      </div>
+
+      <label className="mt-3 block">
+        <span className="text-caption text-tertiary">Words you never use</span>
+        <input
+          value={(voice.avoid ?? []).join(", ")}
+          // Split on the way in rather than stored as a string, so the prompt
+          // never has to parse anything and a trailing comma is not a word.
+          onChange={(e) => set({ avoid: e.target.value.split(",") })}
+          placeholder="leverage, synergy, game-changer"
+          className={`${field} mt-1`}
+        />
+      </label>
+    </div>
+  );
+}
+
 /* ── editor ───────────────────────────────────────────────────────────────── */
 
 function Editor({
@@ -245,6 +333,8 @@ function Editor({
         </div>
 
         <Logos brand={brand} onChange={onChange} />
+
+        <VoiceEditor brand={brand} onChange={onChange} />
 
         <div className="grid grid-cols-2 gap-3">
           <label className="block">

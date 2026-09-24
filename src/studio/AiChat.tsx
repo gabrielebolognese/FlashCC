@@ -2,6 +2,8 @@ import { AlertCircle, ArrowUp, PenLine, RotateCcw, Sparkles, X } from "lucide-re
 import { useEffect, useRef, useState } from "react";
 
 import { alignToSlots, draftSlides } from "./ai.js";
+import { contextVoice, listBrands } from "./brand.js";
+import { ALL_CLIENTS, loadSelectedClient } from "./clients.js";
 import { labelFor, type Structure } from "./structures.js";
 
 type Phase =
@@ -48,7 +50,18 @@ export function AiChat({
     abort.current = controller;
     setPhase({ kind: "drafting" });
     try {
-      const drafted = await draftSlides(brief, structure, controller.signal);
+      // Nothing is stamped with a brand yet at this point, so the voice is
+      // inferred from the client on screen. See contextVoice for the rules,
+      // including why it returns nothing when they are ambiguous.
+      // The sentinel is not a client id. Passing it through would happen to
+      // work, by matching no brand and falling to the single-brand rule, and
+      // relying on that is how it breaks the next time the rules change.
+      const selected = loadSelectedClient();
+      const voice = contextVoice(
+        listBrands(),
+        selected === ALL_CLIENTS ? undefined : selected,
+      );
+      const drafted = await draftSlides(brief, structure, controller.signal, voice);
       setPhase({ kind: "drafted", texts: alignToSlots(drafted, structure) });
     } catch (error) {
       if (controller.signal.aborted) return;

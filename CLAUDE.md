@@ -9,8 +9,10 @@ canvas. Four frameworks (problem-solve, showcase, educational, story), each with
 guidance in `src/studio/structures.ts`.
 
 **AI drafting is part of the product**, this reversed an earlier "no AI" position, so ignore that
-line if you find it anywhere else. `server/index.ts` holds the API key and calls `claude-opus-5`
-through `client.messages.parse()` with a zod output format. The browser only ever talks to
+line if you find it anywhere else. `server/` holds the API key: `prompts.ts` assembles every word (pure, golden-tested),
+`anthropic.ts` owns the client, the model per task, retry and error translation, and
+`draft.ts` is left with the two routes. Drafting is `claude-sonnet-5`, hooks are
+`claude-haiku-4-5-20251001`, both through `messages.parse()` with a zod output format. The browser only ever talks to
 `/api/draft` and `/api/hooks` on its own origin: **the key must never reach the bundle.** Everything
 except drafting works with no key set, and the UI degrades to "write it yourself" when the server
 says it has none, including long-form ingest, which is entirely deterministic on purpose (see

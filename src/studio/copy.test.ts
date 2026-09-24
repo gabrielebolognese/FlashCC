@@ -19,10 +19,14 @@ import { describe, expect, it } from "vitest";
  * character entirely, and is not what this is about.
  */
 
-const EM_DASH = "—";
+// Built from its code point so this file contains no literal either, which
+// means the scan below does not have to skip itself. A guard with a blind
+// spot in it is a guard that will eventually be wrong about the one file
+// somebody edits.
+const EM_DASH = String.fromCharCode(0x2014);
 
-const SOURCE = ["src", "server", "scripts"];
-const EXTENSIONS = [".ts", ".tsx", ".css", ".mjs"];
+const SOURCE = ["src", "server", "scripts", "docs", "supabase"];
+const EXTENSIONS = [".ts", ".tsx", ".css", ".mjs", ".md", ".sql"];
 const SKIP = new Set(["node_modules", "dist", ".git", ".vite"]);
 
 function walk(dir: string, out: string[] = []): string[] {
@@ -41,9 +45,6 @@ describe("punctuation", () => {
 
     for (const dir of SOURCE) {
       for (const file of walk(dir)) {
-        // This file has to name the character to test for it.
-        if (file.endsWith("copy.test.ts")) continue;
-
         const lines = readFileSync(file, "utf8").split("\n");
         lines.forEach((line, i) => {
           if (line.includes(EM_DASH)) {

@@ -1,4 +1,5 @@
 import { authHeader } from "./billing.js";
+import { hasVoice, type Voice } from "./brand.js";
 import { readRefusal } from "./gate.js";
 import type { Structure } from "./structures.js";
 
@@ -12,6 +13,7 @@ export async function draftSlides(
   brief: string,
   structure: Structure,
   signal?: AbortSignal,
+  voice?: Voice,
 ): Promise<DraftedSlide[]> {
   const res = await fetch("/api/draft", {
     method: "POST",
@@ -22,6 +24,10 @@ export async function draftSlides(
     ...(signal ? { signal } : {}),
     body: JSON.stringify({
       brief,
+      // Omitted entirely when empty rather than sent as {}. The server builds no
+      // voice block for an absent voice, and an empty object would travel the
+      // same path for no reason.
+      ...(hasVoice(voice) ? { voice } : {}),
       structure: {
         name: structure.name,
         shape: structure.shape,

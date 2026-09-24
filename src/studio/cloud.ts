@@ -142,6 +142,8 @@ export type BrandRow = {
   theme: Brand["theme"];
   /** Asset ids, by variant. See 04-storage.sql for why this is not three columns. */
   logos: Record<string, string>;
+  /** Tone, samples and banned words. jsonb for the same reason `theme` is. */
+  voice: Record<string, unknown> | null;
   client_id: string | null;
   width: number;
   height: number;
@@ -163,6 +165,7 @@ export const brandToRow = (
   name: brand.name,
   theme: brand.theme,
   logos: brand.logos ?? {},
+  voice: brand.voice ?? null,
   client_id: brand.clientId ?? null,
   width: brand.width,
   height: brand.height,
@@ -179,6 +182,9 @@ export const rowToBrand = (row: BrandRow): Brand => ({
   // The column arrives with 04-storage.sql; a project that has not run it yet
   // simply has no logos, which is the same as a brand that never had one.
   logos: row.logos ?? {},
+  // The column arrives with 10-brand-voice.sql; absent reads as no voice,
+  // which is what a brand made before it had one.
+  ...(row.voice ? { voice: row.voice as Brand["voice"] } : {}),
   ...(row.client_id ? { clientId: row.client_id } : {}),
   width: row.width,
   height: row.height,

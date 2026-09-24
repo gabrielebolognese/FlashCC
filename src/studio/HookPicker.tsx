@@ -16,6 +16,7 @@
 import { AlertCircle, RefreshCw, Sparkles, X } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 
+import { listBrands, voiceOf } from "./brand.js";
 import { Chip } from "./Dash.js";
 import type { Doc } from "./model.js";
 import { deckTexts } from "./transcript.js";
@@ -49,7 +50,9 @@ export function HookPicker({
     abort.current = controller;
     setPhase({ at: "loading" });
 
-    draftHooks(current, texts, undefined, HOOK_COUNT, controller.signal)
+    // The deck already names its brand, so the voice is a lookup rather than
+    // a guess. See contextVoice for the harder case.
+    draftHooks(current, texts, undefined, HOOK_COUNT, controller.signal, voiceOf(doc, listBrands()))
       .then((variants) => {
         if (controller.signal.aborted) return;
         const kept = distinctHooks(variants, current);

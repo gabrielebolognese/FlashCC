@@ -599,16 +599,82 @@ The key lives on the server and never reaches the bundle. That is the entire rea
 process exists.
 
 1. `AiChat` takes a brief. `Cmd/Ctrl+Enter` submits; a new request aborts any in flight.
-2. `draftSlides` POSTs `{ brief, structure: { name, shape, slots } }` to `/api/draft`.
-3. The server calls `claude-opus-5` through `messages.parse()` with a zod output format. The system
-   prompt enforces: finished copy not placeholders, one idea per slide, hook under 90 characters,
-   body under 220, stay in the brief's voice, add no claims the brief does not contain, no hashtags
-   or emoji.
+2. `draftSlides` POSTs `{ brief, structure: { name, shape, slots }, voice? }` to `/api/draft`.
+3. The server assembles the prompt in `prompts.ts`, calls the model through `anthropic.ts`, and
+   parses into a zod output format.
 4. **A policy decline returns 200 with no usable content**, so `stop_reason === "refusal"` is
    checked before reading and mapped to 422.
-5. `alignToSlots` runs **two passes**: first match drafts to slots by role, then fill what is left
+5. Every slide goes through `plainText()` on the way out, see below.
+6. `alignToSlots` runs **two passes**: first match drafts to slots by role, then fill what is left
    positionally. One pass swallowed the CTA whenever the model answered out of order, the three
    `point` slots sharing an id is exactly what breaks a naive match.
+
+### Three server modules, and why it is not one
+
+| Module | Holds | Why separate |
+| --- | --- | --- |
+| `prompts.ts` | every word sent to a model, and `plainText` | pure, so `prompts.test.ts` can prove it |
+| `anthropic.ts` | the client, models, retry, usage logging, error translation | one policy, not one per route |
+| `draft.ts` | request shape, zod schemas, rate limits | what is left is only the routes |
+
+It was all inline in `draft.ts`, which meant a prompt edit showed up in somebody's carousel rather
+than in a diff. The golden tests in `prompts.test.ts` assert the assembled bytes.
+
+**A model per task.** Drafting seven slides from a brief is reasoning; five one-line rewrites is
+not. `MODELS.draft` is `claude-sonnet-5`, `MODELS.hooks` is `claude-haiku-4-5-20251001`. This was
+measured, not assumed: `npm run eval:draft -- --compare` ran four frameworks and two briefs through
+Sonnet and Opus. Opus is richer on thin briefs, Sonnet is tighter and faster, and the gap does not
+justify the price.
+
+**The cache boundary is a design decision.** Anthropic caches a *prefix*, so anything before the
+breakpoint must be byte-identical between calls. What never varies goes in the system block with
+`cache_control: { type: "ephemeral" }` and caches across every user; what varies per request goes
+in the user message. Brand voice is deliberately *not* in the cached block: it is per brand, so it
+would give every brand its own cache entry and the shared prefix would be worth nothing.
+
+**Rate limits are not credits.** `DRAFTS_PER_HOUR = 60`, `HOOKS_PER_HOUR = 120`, keyed per account.
+They do not count down, do not appear in the interface, and nobody using the product normally will
+meet one. Invariant 7 stands: a limiter stops a script, a credit system taxes ordinary use, and
+they are opposites that look alike.
+
+### `plainText`, and why a prompt was not enough
+
+The house style has no em dashes and `copy.test.ts` holds every source file to it. Model output is
+not a source file, so nothing held it to anything, and a comparison run had Opus put em dashes in
+four slides out of eight. Both system prompts now ban them **and** `plainText()` strips them from
+every slide and every hook before the response leaves the server. The prompt is a preference; the
+function is the guarantee, and the difference matters when the words publish under somebody else's
+name.
+
+### Brand voice
+
+`Brand.voice` is `{ tone?, samples?, avoid? }`, all optional, stored as one `jsonb` column
+(`10-brand-voice.sql`). A brand with no voice produces exactly the prompt it produced before the
+feature existed, so it can be ignored forever without the product feeling half-configured.
+
+**The samples carry the weight.** Three posts somebody actually wrote do more than any number of
+adjectives about being punchy, because a model can match a pattern it can see and can only guess at
+a description.
+
+Which voice applies: `voiceOf` reads it from the deck's own `styleId` when that names a brand.
+`contextVoice`, for a deck that does not exist yet, takes the selected client's brand, or the only
+brand that has a voice, and otherwise **nothing**. It refuses to guess between several, because no
+voice reads as generic, which is what people expect from a machine, while the wrong one reads as
+the product not understanding who they are.
+
+### The eval harness (`npm run eval:draft`)
+
+Not in `npm test`, because every run costs real money and a suite people run fifty times a day
+cannot be one that bills them. It checks structural properties only: slot count, empty slides, hook
+over 90, body over 220, placeholders, unknown slot ids, duplicate slides, dashes, and measurements
+absent from the brief. Then it prints the copy, because the checks catch *broken* and only a person
+catches *bad*.
+
+It has already earned itself twice. It caught the showcase framework inventing a coffee brand and a
+30-second reel from a three-word brief, fixed with a rule in `DRAFT_SYSTEM`. And it caught the em
+dashes above. Its own fabrication check was wrong first: it flagged every educational draft for
+hooks like "3 cutting rules", which is a deck counting its own slides, so it now looks only for
+measurements, a currency amount, a percentage, a multiplier, a unit of time.
 
 ### AI writes text. It never writes layout.
 

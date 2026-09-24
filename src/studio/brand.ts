@@ -32,12 +32,75 @@ import { DEFAULT_STYLE, styleById, type Style } from "./styles.js";
  */
 export type BrandLogos = Partial<Record<LogoRole, string>>;
 
+/**
+ * How somebody sounds, as opposed to how their slides look.
+ *
+ * Every AI carousel tool produces competent, generic copy, and that is the
+ * complaint underneath most of the research this product was built from. A brand
+ * already carries colour and typeface; this is the half that was missing.
+ *
+ * **Samples carry the weight.** Three posts somebody actually wrote do more than
+ * any number of adjectives about being punchy, because a model can match a
+ * pattern it can see and can only guess at a description. It is also the one
+ * thing a competitor cannot copy, being the customer's own writing.
+ *
+ * All three fields are optional and a brand with none behaves exactly as brands
+ * did before this existed, which is what keeps it from becoming a form somebody
+ * has to fill in before the product works.
+ */
+export type Voice = {
+  /** One line, in their words. "Blunt, no throat-clearing." */
+  tone?: string | undefined;
+  /** Up to three of their own posts. */
+  samples?: string[] | undefined;
+  /** Words and phrases they never use. */
+  avoid?: string[] | undefined;
+};
+
+/** Mirrors the server's ceilings in prompts.ts. Both halves have to agree. */
+export const MAX_VOICE_SAMPLES = 3;
+export const MAX_SAMPLE_CHARS = 1200;
+export const MAX_TONE_CHARS = 400;
+
+/**
+ * True when there is something worth sending.
+ *
+ * An empty voice must produce no voice block at all rather than an empty
+ * heading: telling a model that voice matters and then giving it nothing to work
+ * with is worse than not raising the subject.
+ */
+export const hasVoice = (voice: Voice | undefined): boolean =>
+  Boolean(
+    voice &&
+      (voice.tone?.trim() ||
+        (voice.samples ?? []).some((s) => s.trim()) ||
+        (voice.avoid ?? []).some((w) => w.trim())),
+  );
+
+/** Trimmed and capped before it is stored, so the ceilings hold at rest too. */
+export function tidyVoice(voice: Voice): Voice {
+  const tone = voice.tone?.trim().slice(0, MAX_TONE_CHARS);
+  const samples = (voice.samples ?? [])
+    .map((s) => s.trim().slice(0, MAX_SAMPLE_CHARS))
+    .filter(Boolean)
+    .slice(0, MAX_VOICE_SAMPLES);
+  const avoid = (voice.avoid ?? []).map((w) => w.trim()).filter(Boolean).slice(0, 20);
+
+  return {
+    ...(tone ? { tone } : {}),
+    ...(samples.length > 0 ? { samples } : {}),
+    ...(avoid.length > 0 ? { avoid } : {}),
+  };
+}
+
 export type Brand = {
   id: string;
   name: string;
   /** Colours and typefaces. The same shape the generator already consumes. */
   theme: Theme;
   logos: BrandLogos;
+  /** How this brand sounds. Absent until somebody fills it in. */
+  voice?: Voice | undefined;
   /** Whose brand this is. See clients.ts. */
   clientId?: string | undefined;
   /** The artboard new carousels start at. */
@@ -294,6 +357,50 @@ function paletteFor(theme: Theme, existing: string[]): string[] {
   const head = [theme.bg, theme.fg, theme.accent, theme.muted];
   const tail = existing.filter((c) => !head.some((h) => norm(h) === norm(c)));
   return [...head, ...tail].slice(0, 10);
+}
+
+/* ── whose voice applies ──────────────────────────────────────────────────── */
+
+/**
+ * The voice for a carousel that already exists.
+ *
+ * Unambiguous: a document stamped `brand:<id>` was made with that brand, so that
+ * is the voice. Nothing to infer.
+ */
+export function voiceOf(doc: Doc, brands: readonly Brand[]): Voice | undefined {
+  const id = doc.styleId ? brandIdOf(doc.styleId) : null;
+  if (!id) return undefined;
+  return brands.find((b) => b.id === id)?.voice;
+}
+
+/**
+ * The voice for a carousel that does not exist yet.
+ *
+ * Drafting happens before a style is picked, so there is no brand stamped on
+ * anything and something has to be inferred. Two rules, in order, and a
+ * deliberate refusal after them:
+ *
+ * 1. The client currently selected in the rail, through its brand. If somebody
+ *    is working inside a client, that client's voice is the one they mean.
+ * 2. Otherwise, the only brand that HAS a voice, if there is exactly one. A solo
+ *    operator gets their own voice without configuring anything.
+ *
+ * And if several brands have voices with no client selected, none of them. A
+ * wrong voice is worse than no voice: no voice reads as generic, which is what
+ * people expect from a machine, while the wrong one reads as the product not
+ * understanding who they are.
+ */
+export function contextVoice(
+  brands: readonly Brand[],
+  selectedClientId?: string | undefined,
+): Voice | undefined {
+  if (selectedClientId) {
+    const owned = brands.find((b) => b.clientId === selectedClientId && hasVoice(b.voice));
+    if (owned) return owned.voice;
+  }
+
+  const withVoice = brands.filter((b) => hasVoice(b.voice));
+  return withVoice.length === 1 ? withVoice[0]?.voice : undefined;
 }
 
 /* ── logos ────────────────────────────────────────────────────────────────── */

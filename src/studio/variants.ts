@@ -18,6 +18,7 @@
  */
 
 import { authHeader } from "./billing.js";
+import { hasVoice, type Voice } from "./brand.js";
 import { readRefusal } from "./gate.js";
 import type { Structure } from "./structures.js";
 
@@ -43,6 +44,7 @@ export async function draftHooks(
   structure?: Structure,
   count: number = HOOK_COUNT,
   signal?: AbortSignal,
+  voice?: Voice,
 ): Promise<HookVariant[]> {
   const res = await fetch("/api/hooks", {
     method: "POST",
@@ -52,6 +54,7 @@ export async function draftHooks(
       hook,
       deck: [...deck],
       ...(structure ? { framework: structure.name } : {}),
+      ...(hasVoice(voice) ? { voice } : {}),
       count,
     }),
   });
