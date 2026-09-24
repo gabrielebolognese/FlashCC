@@ -1750,7 +1750,7 @@ every tag generic, a wrong number of alt entries, a wasted preamble.
 
 ## Batch 13, Bring your own source
 
-**Status:** next
+**Status:** done
 **Size:** large
 **Why here:** the brief is the only way in. Everybody making carousels regularly
 is making them FROM something: a newsletter, a transcript, a talk, a post that
@@ -1887,11 +1887,80 @@ returns without it.
 - **No "summarise this for me" general purpose box.** The output is carousel
   angles or it is nothing.
 
+### The biggest thing here was a bug in the FREE path
+
+13.2 said subtitle stripping "belongs in `longform.ts`". It was worse than
+missing: `.srt` and `.vtt` were **actively mangled**, and by the deterministic
+path that needs no key and no account. `TIMESTAMP` matches only the head of a
+cue line, so a real SubRip file came out as
+
+```
+"1 ,000 --> 00:00:04,000 Cutting on the beat makes your edits feel mechanical."
+```
+
+sequence number, millisecond remainder and arrow included, and that went onto a
+slide. Anybody who had pasted subtitles into Repurpose got that. Fixed with
+`stripCues`, plus WebVTT's header, its `NOTE` blocks and its inline `<v Speaker>`
+markup, plus collapsing the duplicate consecutive lines that rolling captions
+produce and which otherwise triple the source.
+
+**`shapeOf` had to decide before the cues were stripped**, which is the
+non-obvious half. Afterwards there is nothing left to recognise a subtitle file
+by: the timestamps that made it a transcript are exactly what was removed. Left
+to the counting it came back "prose", and the prose path groups on blank lines,
+which a stripped subtitle file has none of. An hour of speech then arrived as one
+paragraph and one candidate.
+
+### What else the plan got wrong
+
+**`Repurpose.tsx` already WAS the "start from something you have" screen.**
+13.2's "new entry on the start screen" has existed since Batch 6, with a paste
+box and a candidate picker. So the raw path is a **mode inside Repurpose**, which
+is a better answer than the plan's anyway: 13.3's "one question in plain words"
+is right there above the box, and the two readings are visibly alternatives
+rather than two doors on a menu.
+
+**The caching claim in 13.4 was half wrong.** "No prefix to cache because the
+source is the request" is true of the source and not of the system block, which
+caches exactly as the other five routes do. The limit stands, because input
+tokens dominate either way, but the reasoning in the file says the accurate
+thing.
+
+### Verifying quotes needed two things the plan did not mention
+
+**`plainText` must not run on a quote.** It turns em dashes into commas
+everywhere else in this codebase, and a quote it had cleaned would then fail its
+own check against a source that does contain the dash. It is the one text in the
+product whose entire value is being unaltered.
+
+**Curly apostrophes would have rejected nearly everything.** A pasted source and
+a model's output differ constantly on quote marks, dashes and whitespace without
+either meaning anything different. `canonical` folds those and nothing else.
+**That is not fuzzy matching**: every pair it folds is the same character wearing
+a different code point. Anything still unmatched is dropped, as 13.5 says.
+
+**Matched strictly, deduplicated loosely.** The same sentence returned twice,
+once with a trailing full stop, passes the match both times and would show two
+cards saying the same thing. The dedup key drops punctuation; the match key never
+does.
+
+### The live run
+
+`npm run eval:draft -- --distil` on a multi-thread transcript returned **four
+angles about genuinely different things** (why beat-cutting fails, the note that
+halves revision rounds, retainer pricing, gear mattering least), and five quotes
+of which five verified. A planted near-miss, one word changed from "snare" to
+"drum", was dropped by the same function the route uses.
+
+Worth noting honestly: the source was 1,651 characters rather than 13.3's 6,000
+words, and every quote the model returned happened to be genuine, so the drop
+path was exercised by the planted quote rather than by real output.
+
 ---
 
 ## Batch 14, A voice it works out for itself
 
-**Status:** queued
+**Status:** next
 **Size:** medium
 **Why here:** Batch 10 shipped brand voice and it works, but it asks somebody to
 sit down and paste three posts into a form before they get anything. Almost

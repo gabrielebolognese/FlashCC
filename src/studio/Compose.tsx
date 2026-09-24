@@ -1,4 +1,14 @@
-import { ArrowRight, GripVertical, Plus, Shuffle, Sparkles, Trash2, X } from "lucide-react";
+import {
+  ArrowRight,
+  ChevronDown,
+  GripVertical,
+  Plus,
+  Quote,
+  Shuffle,
+  Sparkles,
+  Trash2,
+  X,
+} from "lucide-react";
 import { Fragment, useState } from "react";
 
 import { MAX_SLIDES } from "./compositions.js";
@@ -23,6 +33,7 @@ export function Compose({
   structure,
   initialTheme = "ink",
   initialTexts,
+  quotes,
   onGenerate,
   onBack,
 }: {
@@ -30,6 +41,14 @@ export function Compose({
   initialTheme?: keyof typeof THEMES;
   /** Copy drafted upstream, one entry per slot. */
   initialTexts?: string[] | undefined;
+  /**
+   * Lines verified as present in the source somebody distilled.
+   *
+   * A clipboard, not a decision: they sit under the fields and go in on a
+   * click. The highest-value sentence in a transcript is usually one the person
+   * already said, and it arrives here unaltered.
+   */
+  quotes?: readonly string[] | undefined;
   onGenerate: (result: ComposeResult) => void;
   onBack: () => void;
 }) {
@@ -38,6 +57,10 @@ export function Compose({
   );
   const [themeId, setThemeId] = useState<keyof typeof THEMES>(initialTheme);
   const [showing, setShowing] = useState<string | null>(null);
+  /** The quote strip, collapsed by default so it is an offer and not a wall. */
+  const [quotesOpen, setQuotesOpen] = useState(false);
+  /** Which field a quote goes into. The last one touched, or the first. */
+  const [focused, setFocused] = useState<string | null>(null);
   // State rather than a ref: the indicator has to re-render as the pointer moves.
   const [dragFrom, setDragFrom] = useState<number | null>(null);
   const [dragOver, setDragOver] = useState<number | null>(null);
@@ -216,6 +239,58 @@ export function Compose({
 
       <div className="scroll-quiet min-h-0 flex-1 overflow-y-auto">
         <div className="mx-auto max-w-[1240px] px-6 py-12">
+          {quotes && quotes.length > 0 ? (
+            <div className="mb-8 rounded-2xl border border-hairline bg-surface-1 p-3.5">
+              <button
+                type="button"
+                onClick={() => setQuotesOpen((v) => !v)}
+                className="flex w-full items-center gap-2 text-left"
+              >
+                <Quote size={13} strokeWidth={2} className="shrink-0 text-accent" />
+                <span className="text-body-strong text-secondary">
+                  {quotes.length} line{quotes.length === 1 ? "" : "s"} from your source
+                </span>
+                <span className="text-caption text-muted">word for word</span>
+                <div className="flex-1" />
+                <ChevronDown
+                  size={14}
+                  strokeWidth={2}
+                  className={quotesOpen ? "rotate-180 text-tertiary" : "text-tertiary"}
+                />
+              </button>
+
+              {quotesOpen ? (
+                <div className="mt-2.5 flex flex-col gap-1.5">
+                  {quotes.map((q, i) => (
+                    <button
+                      key={i}
+                      type="button"
+                      // Into the field somebody last touched, or the first if
+                      // they have not touched one. Appended rather than
+                      // replacing, because a quote is usually the evidence for
+                      // a line rather than the line.
+                      onClick={() => {
+                        const target = focused ?? fields[0]?.key;
+                        if (!target) return;
+                        const field = fields.find((f) => f.key === target);
+                        if (!field) return;
+                        update(target, field.text.trim() ? `${field.text.trim()}
+${q}` : q);
+                      }}
+                      className="rounded-xl border border-hairline bg-surface-2 p-2.5 text-left text-caption leading-[17px] text-secondary hover:border-accent-dim hover:text-primary"
+                    >
+                      {q}
+                    </button>
+                  ))}
+                  <p className="text-caption leading-4 text-muted">
+                    Each one was checked against your source before it got here. Anything the
+                    model tidied was dropped rather than corrected.
+                  </p>
+                </div>
+              ) : null}
+            </div>
+          ) : null}
+
           {fields.map((f, i) => (
             <Fragment key={f.key}>
               {i > 0 ? <InsertRow onClick={() => insertAt(i)} disabled={fields.length >= MAX_SLIDES} /> : null}
@@ -331,6 +406,7 @@ export function Compose({
                     value={f.text}
                     rows={Math.min(8, Math.max(2, Math.ceil(f.text.length / 58) + 1))}
                     placeholder={f.slot.placeholder}
+                    onFocus={() => setFocused(f.key)}
                     onChange={(e) => update(f.key, e.target.value)}
                     onPaste={(e) => {
                       if (f.text.trim().length > 0) return;

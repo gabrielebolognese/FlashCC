@@ -5,6 +5,7 @@ import {
   readLongForm,
   segments,
   sentences,
+  isSubtitles,
   shapeOf,
   slideEstimate,
   THIN_CHARS,
@@ -257,5 +258,97 @@ describe("end to end", () => {
     const { candidates } = readLongForm(TRANSCRIPT);
     const texts = candidates.flatMap((c) => toSlides(c));
     expect(texts.join(" ")).not.toMatch(/\d{2}:\d{2}/);
+  });
+});
+
+/**
+ * Subtitles were not merely unsupported, they were MANGLED, and by the free
+ * deterministic path rather than by anything new. `TIMESTAMP` matches only the
+ * head of a cue line, so an SRT came out as
+ * "1 ,000 --> 00:00:04,000 Cutting on the beat...", sequence number and all,
+ * and that went onto a slide.
+ */
+describe("subtitle files", () => {
+  const SRT = [
+    "1",
+    "00:00:01,000 --> 00:00:04,000",
+    "Cutting on the beat makes your edits feel mechanical.",
+    "",
+    "2",
+    "00:00:04,500 --> 00:00:08,200",
+    "Attention resets when the frame changes, not when the snare hits.",
+    "",
+  ].join("\n");
+
+  const VTT = [
+    "WEBVTT",
+    "",
+    "NOTE recorded 2026",
+    "",
+    "00:00:01.000 --> 00:00:04.000 align:start",
+    "<v Alex>Cut on movement instead.",
+    "",
+  ].join("\n");
+
+  it("recognises both formats", () => {
+    expect(isSubtitles(SRT)).toBe(true);
+    expect(isSubtitles(VTT)).toBe(true);
+  });
+
+  it("does not mistake ordinary prose for subtitles", () => {
+    expect(isSubtitles("A sentence. Another one.")).toBe(false);
+    expect(isSubtitles("ALEX: so anyway, 00:12 was when it happened")).toBe(false);
+  });
+
+  it("keeps the words and drops everything else", () => {
+    const text = segments(SRT).map((s) => s.text).join(" ");
+    expect(text).toContain("Cutting on the beat makes your edits feel mechanical.");
+    expect(text).toContain("Attention resets when the frame changes");
+    expect(text).not.toContain("-->");
+    expect(text).not.toContain("00:00");
+  });
+
+  it("drops the WebVTT header, its notes and its inline markup", () => {
+    const text = segments(VTT).map((s) => s.text).join(" ");
+    expect(text).toBe("Cut on movement instead.");
+    expect(text).not.toContain("WEBVTT");
+    expect(text).not.toContain("NOTE");
+    expect(text).not.toContain("align:start");
+    expect(text).not.toContain("<v");
+  });
+
+  /**
+   * Decided before the cues are stripped, because afterwards there is nothing
+   * left to recognise them by. Classified as prose, a subtitle file has no
+   * blank lines to group on and an hour of speech arrives as one paragraph.
+   */
+  it("is still a transcript once the timestamps are gone", () => {
+    expect(shapeOf(SRT)).toBe("transcript");
+    expect(shapeOf(VTT)).toBe("transcript");
+  });
+
+  /** Rolling captions repeat the previous line as new words arrive. */
+  it("collapses a repeated caption line", () => {
+    const rolling = [
+      "00:00:01.000 --> 00:00:02.000",
+      "Cut on movement",
+      "",
+      "00:00:02.000 --> 00:00:03.000",
+      "Cut on movement",
+      "",
+      "00:00:03.000 --> 00:00:04.000",
+      "Cut on movement, not on the beat.",
+      "",
+    ].join("\n");
+    const text = segments(rolling).map((s) => s.text).join(" ");
+    expect(text.match(/Cut on movement/g)?.length).toBe(2);
+  });
+
+  it("leaves a plain transcript working exactly as before", () => {
+    const plain = ["ALEX: Cutting on the beat feels mechanical.", "SAM: Because attention resets on the frame."].join("\n");
+    expect(shapeOf(plain)).toBe("transcript");
+    const text = segments(plain).map((s) => s.text).join(" ");
+    expect(text).toContain("Cutting on the beat feels mechanical.");
+    expect(text).not.toContain("ALEX");
   });
 });

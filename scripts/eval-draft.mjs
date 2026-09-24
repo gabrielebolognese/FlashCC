@@ -5,6 +5,7 @@
  *   npm run eval:draft -- --compare claude-sonnet-5 vs claude-opus-5, side by side
  *   npm run eval:draft -- --rewrite every rewrite intent, on one line
  *   npm run eval:draft -- --caption every platform's caption, and alt text
+ *   npm run eval:draft -- --distil  a transcript, its angles and its quotes
  *
  * ── What this can and cannot tell you ────────────────────────────────────────
  *
@@ -37,10 +38,12 @@ import {
   assembleRewrite,
   CAPTION_PLATFORMS,
   MAX_ALT_CHARS,
+  assembleDistil,
   PLATFORM_CAPTION,
   REWRITE_INTENTS,
 } from "../server/prompts.ts";
 import { groundedTags } from "../server/caption.ts";
+import { verbatimOnly } from "../server/distil.ts";
 import { STRUCTURES } from "../src/studio/structures.ts";
 
 /* ── config ───────────────────────────────────────────────────────────────── */
@@ -60,6 +63,7 @@ if (!process.env.ANTHROPIC_API_KEY) {
 const compare = process.argv.includes("--compare");
 const rewriteOnly = process.argv.includes("--rewrite");
 const captionOnly = process.argv.includes("--caption");
+const distilOnly = process.argv.includes("--distil");
 const MODELS = compare ? ["claude-sonnet-5", "claude-opus-5"] : ["claude-sonnet-5"];
 
 /**
@@ -369,6 +373,118 @@ async function evalCaptions() {
   return bad;
 }
 
+/* ── reading a source ────────────────────────────────────────────────────── */
+
+/**
+ * The two acceptance criteria in 13.3 and 13.5, neither of which a unit test
+ * can reach: are the angles genuinely about different things, and are the
+ * quotes actually in the source.
+ *
+ * The second is checkable exactly, and it is checked here against the SAME
+ * function the route uses, so a run that passes means the route drops what it
+ * should. The first is printed for a person, because "genuinely different" is
+ * not a property code can assert.
+ */
+const DistilSchema = z.object({
+  brief: z.string(),
+  angles: z.array(z.object({ title: z.string(), brief: z.string(), why: z.string() })),
+  quotes: z.array(z.string()),
+});
+
+/** Several distinct threads on purpose, so there is something to separate. */
+const TRANSCRIPT = [
+  "ALEX: Right, so the question I get asked most is why edits feel mechanical even when they're technically clean.",
+  "And the answer nobody likes is that it's usually the music. People cut on the beat because it's the obvious grid.",
+  "ALEX: Attention resets when the frame changes, not when the snare hits. Those are two different clocks and you can only serve one.",
+  "SAM: I spent about three years cutting to music before anyone pointed that out to me.",
+  "ALEX: Everyone does. The fix is to cut on movement. A hand leaving frame, a head turning, a door closing.",
+  "The motion carries the eye across the cut, so it barely registers as a cut at all.",
+  "SAM: Can we talk about the client side of this? Because that's where I lose the most time.",
+  "ALEX: The revision loop, yes. My rule now is that I never send a first cut without a written note saying what I was going for.",
+  "Without the note, the client reviews the edit against a version they imagined. With it, they review it against what I said I'd do.",
+  "SAM: That halved my revision rounds. Not exaggerating, halved.",
+  "ALEX: The other one is pricing. I stopped quoting per video about two years ago and started quoting per month.",
+  "A per-video price makes every conversation about scope. A retainer makes it about outcomes, and it makes my income predictable.",
+  "SAM: Did you lose clients doing that?",
+  "ALEX: Three. And every one of them was a client I was losing money on anyway, I just hadn't worked it out yet.",
+  "ALEX: The last thing is gear, which is the thing everybody wants to talk about and the thing that matters least.",
+  "I shot on the same camera for six years. Nobody ever asked what it was. They asked why the cuts felt good.",
+].join("\n");
+
+async function evalDistil() {
+  console.log(`\n${"=".repeat(64)}\nreading a source\n${"=".repeat(64)}`);
+  console.log(`\n  source: ${TRANSCRIPT.length} characters\n`);
+
+  const { system, user, clipped } = assembleDistil({ source: TRANSCRIPT, kind: "transcript" });
+  const started = Date.now();
+  let parsed;
+
+  try {
+    const response = await client.messages.parse({
+      model: "claude-sonnet-5",
+      max_tokens: 8000,
+      system: [{ type: "text", text: system, cache_control: { type: "ephemeral" } }],
+      output_config: { effort: "medium", format: zodOutputFormat(DistilSchema) },
+      messages: [{ role: "user", content: user }],
+    });
+    parsed = response.parsed_output;
+    calls += 1;
+    inTokens += response.usage?.input_tokens ?? 0;
+    outTokens += response.usage?.output_tokens ?? 0;
+  } catch (error) {
+    console.log(`  FAIL distil  CALL FAILED: ${error.message}`);
+    return 1;
+  }
+
+  const angles = parsed?.angles ?? [];
+  const raw = parsed?.quotes ?? [];
+  const kept = verbatimOnly(raw, clipped.text);
+  const problems = [];
+
+  if (angles.length < 3) problems.push(`only ${angles.length} angle(s), wanted at least three`);
+  if (angles.some((a) => !a.title?.trim() || !a.brief?.trim() || !a.why?.trim())) {
+    problems.push("an angle is missing its title, brief or supporting line");
+  }
+
+  // Genuinely different is not checkable, but identical is.
+  const titles = new Set(angles.map((a) => a.title.toLowerCase().replace(/[^a-z0-9]/g, "")));
+  if (titles.size !== angles.length) problems.push("two angles have the same title");
+
+  if (raw.length === 0) problems.push("no quotes at all");
+
+  console.log(`  ${problems.length === 0 ? "ok  " : "FAIL"} distil  ${Date.now() - started}ms`);
+  for (const p of problems) console.log(`       ! ${p}`);
+
+  for (const a of angles) {
+    console.log(`\n       ${a.title}`);
+    console.log(`       why   ${a.why}`);
+    console.log(`       brief ${a.brief}`);
+  }
+
+  console.log(`\n       quotes returned ${raw.length}, verified ${kept.length}`);
+  for (const q of kept) console.log(`       kept    ${q}`);
+  for (const q of raw) {
+    if (!kept.includes(q)) console.log(`       DROPPED ${q}`);
+  }
+
+  /*
+   * The 13.5 criterion, run for real rather than only in a unit test: a quote
+   * the model never returned, planted here with one word changed, has to be
+   * dropped by the same function the route uses.
+   */
+  const planted = "Attention resets when the frame changes, not when the drum hits.";
+  const survived = verbatimOnly([planted], clipped.text);
+  if (survived.length > 0) {
+    console.log("       ! a planted near-miss quote survived verification");
+    problems.push("planted quote survived");
+  } else {
+    console.log("       planted near-miss was dropped, as it must be");
+  }
+
+  console.log("");
+  return problems.length > 0 ? 1 : 0;
+}
+
 /* ── run ──────────────────────────────────────────────────────────────────── */
 
 const client = new Anthropic({ maxRetries: 1, timeout: 120_000 });
@@ -378,7 +494,7 @@ let calls = 0;
 let inTokens = 0;
 let outTokens = 0;
 
-for (const model of rewriteOnly || captionOnly ? [] : MODELS) {
+for (const model of rewriteOnly || captionOnly || distilOnly ? [] : MODELS) {
   console.log(`\n${"=".repeat(64)}\n${model}\n${"=".repeat(64)}`);
 
   for (const structure of STRUCTURES) {
@@ -422,8 +538,9 @@ for (const model of rewriteOnly || captionOnly ? [] : MODELS) {
   }
 }
 
-if (rewriteOnly || (!compare && !captionOnly)) failures += await evalRewrites();
+if (rewriteOnly || (!compare && !captionOnly && !distilOnly)) failures += await evalRewrites();
 if (captionOnly) failures += await evalCaptions();
+if (distilOnly) failures += await evalDistil();
 
 console.log(
   `\n${"=".repeat(64)}\n${calls} calls, ${inTokens} in, ${outTokens} out, ${failures} failing\n`,

@@ -45,6 +45,9 @@ export const MODELS = {
   // Describing what is already there, inside 125 characters. Description,
   // not composition.
   alt: "claude-haiku-4-5-20251001",
+  // Reading forty thousand characters and working out which carousels are in
+  // them is the most reasoning any route here asks for.
+  distil: "claude-sonnet-5",
 } as const;
 
 /** A hung request otherwise holds a browser tab open until somebody closes it. */

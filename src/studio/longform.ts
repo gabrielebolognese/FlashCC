@@ -43,12 +43,72 @@ export type Segment = {
 
 const normalise = (source: string): string => source.replace(/\r\n?/g, "\n").replace(/ /g, " ");
 
+/**
+ * Line endings and spacing settled, then subtitles unwrapped.
+ *
+ * One funnel, because `shapeOf` and `segments` both have to see the same text:
+ * if one of them read the cue numbering and the other did not, a subtitle file
+ * would be classified on different words than it was split on.
+ */
+const prepare = (source: string): string => {
+  const text = normalise(source);
+  return isSubtitles(text) ? stripCues(text) : text;
+};
+
 /** `# H1` through `###### H6`, or an `===`/`---` underline on the line below. */
 const MD_HEADING = /^#{1,6}\s+(.+)$/;
 const SETEXT = /^(=|-){3,}\s*$/;
 
 /** `00:12`, `1:02:33`, `[00:12]`, `(00:12:33)`, with or without a trailing dash. */
 const TIMESTAMP = /^[\s([]*\d{1,2}:\d{2}(?::\d{2})?[\s)\]]*[-\u2013\u2014]?\s*/;
+
+/**
+ * A subtitle cue line: `00:00:01,000 --> 00:00:04,000`, with optional settings
+ * after it. Milliseconds follow a comma in SubRip and a full stop in WebVTT.
+ *
+ * Needed as its own pattern because `TIMESTAMP` matches only the head of one.
+ * Pointed at an SRT cue it consumed `00:00:01` and left `,000 --> 00:00:04,000`
+ * behind, which then went onto a slide. That was a live defect rather than a
+ * gap: every subtitle file pasted into the deterministic path came out mangled.
+ */
+const CUE = /^\s*\d{1,2}:\d{2}(?::\d{2})?[.,]\d{1,3}\s*-->\s*\d{1,2}:\d{2}(?::\d{2})?[.,]\d{1,3}.*$/;
+
+/** The sequence number SubRip puts on its own line before each cue. */
+const CUE_INDEX = /^\s*\d{1,6}\s*$/;
+
+/** WebVTT's header, and the block headers that can follow it. */
+const VTT_HEADER = /^\s*(WEBVTT.*|NOTE\b.*|STYLE|REGION)\s*$/;
+
+/** Does this look like a subtitle file rather than a plain transcript? */
+export const isSubtitles = (source: string): boolean =>
+  /^\s*WEBVTT/.test(source) || source.split("\n").some((l) => CUE.test(l));
+
+/**
+ * Subtitles, reduced to what was actually said.
+ *
+ * Run before anything else looks at the text, because every later decision,
+ * whether this is a transcript, where the headings are, how sentences group, is
+ * made worse by cue numbering that is not language.
+ *
+ * **Duplicate consecutive lines go too.** Rolling captions repeat the previous
+ * line as new words arrive, and left alone that triples the source and makes
+ * every candidate look like the same one.
+ */
+function stripCues(text: string): string {
+  const out: string[] = [];
+
+  for (const raw of text.split("\n")) {
+    if (CUE.test(raw) || CUE_INDEX.test(raw) || VTT_HEADER.test(raw)) continue;
+
+    // `<v Speaker>` and `<00:00:02.000>` are WebVTT markup, not speech.
+    const line = raw.replace(/<[^>]*>/g, "").trim();
+    if (!line || out[out.length - 1] === line) continue;
+
+    out.push(line);
+  }
+
+  return out.join("\n");
+}
 
 /** `Name:` or `NAME [00:12]:` at the head of a line. Two words at most, so a
  *  sentence containing a colon is not mistaken for a speaker turn. */
@@ -72,7 +132,18 @@ function looksLikeHeading(line: string): boolean {
 }
 
 export function shapeOf(source: string): Shape {
-  const text = normalise(source);
+  /*
+   * Subtitles are a transcript, decided before the cues are stripped.
+   *
+   * After stripping there is nothing left to recognise them by: the timestamps
+   * that made them a transcript are exactly what was removed. Left to the
+   * counting below they came back "prose", and the prose path groups on blank
+   * lines, which a subtitle file does not have once its cues are gone. A whole
+   * hour of speech then arrives as one paragraph and one candidate.
+   */
+  if (isSubtitles(source)) return "transcript";
+
+  const text = prepare(source);
   const lines = text.split("\n").filter((l) => l.trim());
   if (lines.length === 0) return "prose";
 
@@ -94,7 +165,7 @@ export function shapeOf(source: string): Shape {
  * in is how "00:12:33 So anyway" ends up as somebody's hook.
  */
 export function segments(source: string): Segment[] {
-  const text = normalise(source);
+  const text = prepare(source);
   const shape = shapeOf(text);
   const out: Segment[] = [];
 

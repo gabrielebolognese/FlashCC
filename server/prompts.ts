@@ -259,6 +259,79 @@ export function assembleHooks(input: HookInput): Assembled {
   return { system: HOOK_SYSTEM, user };
 }
 
+/* ── reading a source ─────────────────────────────────────────────────────── */
+
+/**
+ * Higher than the brief ceiling on purpose.
+ *
+ * A brief is something somebody typed; a source is something they had. Forty
+ * thousand characters is roughly a long conference talk or a substantial
+ * newsletter, and it clips rather than refuses, because reading most of a
+ * transcript beats refusing all of it. What must not happen is reading half and
+ * saying nothing, which is why the caller is told how much was used.
+ */
+export const MAX_SOURCE_CHARS = 40000;
+
+export type SourceKind = "transcript" | "article" | "notes" | "post";
+
+export const SOURCE_KINDS: readonly SourceKind[] = ["transcript", "article", "notes", "post"];
+
+export const DISTIL_SYSTEM = `You read a piece of source material and work out which carousels are in it.
+
+You do NOT write the carousel. You find the angles worth building and hand back what each one would be about.
+
+Rules:
+- Return three to five angles. Each one is a DIFFERENT carousel, not the same idea described five ways. If the source genuinely only supports two, return two.
+- Each angle needs a short title, a brief that would produce that carousel, and a line saying what in the source supports it.
+- The brief is written the way somebody would write it for themselves: what the carousel argues, and the specifics from the source that back it up. Two or three sentences.
+- Never invent material. Every angle has to be supported by something actually in the source, and the supporting line is where you say what.
+- Also return the source's most quotable lines, COPIED EXACTLY, character for character, with no tidying, no trimming, no fixing of grammar and no joining of two sentences that were apart. A quote you have improved is a quote the person never said.
+- Prefer quotes that would stand alone on a slide: a claim, a number, a reversal, a sentence somebody would repeat.
+- If the source is thin, say so by returning fewer angles rather than padding it with angles it cannot support.
+- No em dashes in anything you write yourself. A comma or a full stop. This does not apply to the quotes, which are copied.
+- Also return one plain brief describing the most obvious carousel, for somebody who does not want to choose.`;
+
+export type DistilInput = {
+  source: string;
+  kind?: SourceKind | undefined;
+  structure?: Structure | undefined;
+  voice?: Voice | undefined;
+};
+
+/** What was sent and what was left behind, so the interface can say so. */
+export type Clipped = { text: string; used: number; total: number; clipped: boolean };
+
+export function clipSource(source: string): Clipped {
+  const trimmed = source.trim();
+  const clipped = trimmed.length > MAX_SOURCE_CHARS;
+  return {
+    text: clipped ? trimmed.slice(0, MAX_SOURCE_CHARS) : trimmed,
+    used: Math.min(trimmed.length, MAX_SOURCE_CHARS),
+    total: trimmed.length,
+    clipped,
+  };
+}
+
+export function assembleDistil(input: DistilInput): Assembled & { clipped: Clipped } {
+  const clipped = clipSource(input.source);
+  const voice = voiceBlock(input.voice);
+
+  const user = [
+    ...(input.kind ? [`The source is a ${input.kind}.`, ""] : []),
+    ...(input.structure
+      ? [
+          `The carousel will use the ${input.structure.name} framework (${input.structure.shape}), so favour angles that fit it.`,
+          "",
+        ]
+      : []),
+    ...(voice ? [voice, ""] : []),
+    "The source:",
+    clipped.text,
+  ].join("\n");
+
+  return { system: DISTIL_SYSTEM, user, clipped };
+}
+
 /* ── the caption, and the words around the deck ───────────────────────────── */
 
 /**

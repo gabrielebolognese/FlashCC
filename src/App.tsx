@@ -44,9 +44,29 @@ type Screen =
   | { view: "start" }
   | { view: "bulk" }
   | { view: "longform" }
-  | { view: "frameworks"; theme: keyof typeof THEMES }
-  | { view: "ai"; structure: Structure; theme: keyof typeof THEMES }
-  | { view: "compose"; structure: Structure; theme: keyof typeof THEMES; texts?: string[] }
+  /**
+   * `brief` and `quotes` ride along from a distilled source.
+   *
+   * Both optional, because the ordinary route into these screens has neither.
+   * They travel as screen state rather than being stashed in a store, so
+   * pressing Back loses them exactly the way it loses everything else, which is
+   * what somebody pressing Back means.
+   */
+  | { view: "frameworks"; theme: keyof typeof THEMES; brief?: string; quotes?: string[] }
+  | {
+      view: "ai";
+      structure: Structure;
+      theme: keyof typeof THEMES;
+      brief?: string;
+      quotes?: string[];
+    }
+  | {
+      view: "compose";
+      structure: Structure;
+      theme: keyof typeof THEMES;
+      texts?: string[];
+      quotes?: string[];
+    }
   | { view: "style"; draft: Draft; theme: keyof typeof THEMES }
   | { view: "studio"; doc: Doc };
 
@@ -214,6 +234,11 @@ function Screens() {
       <Repurpose
         onHome={() => setScreen({ view: "start" })}
         onOpen={(doc: Doc) => setScreen({ view: "studio", doc })}
+        // An angle is a brief, so it joins the ordinary flow at the framework
+        // picker rather than skipping to a deck. The quotes ride with it.
+        onBrief={(brief, quotes) =>
+          setScreen({ view: "frameworks", theme: "ink", brief, quotes })
+        }
       />
     );
   }
@@ -222,7 +247,15 @@ function Screens() {
     return (
       <Frameworks
         onCancel={() => setScreen({ view: "start" })}
-        onPick={(structure) => setScreen({ view: "ai", structure, theme: screen.theme })}
+        onPick={(structure) =>
+          setScreen({
+            view: "ai",
+            structure,
+            theme: screen.theme,
+            ...(screen.brief ? { brief: screen.brief } : {}),
+            ...(screen.quotes ? { quotes: screen.quotes } : {}),
+          })
+        }
       />
     );
   }
@@ -231,12 +264,24 @@ function Screens() {
     return (
       <AiChat
         structure={screen.structure}
+        {...(screen.brief ? { initialBrief: screen.brief } : {})}
         onCancel={() => setScreen({ view: "frameworks", theme: screen.theme })}
         onWriteMyself={() =>
-          setScreen({ view: "compose", structure: screen.structure, theme: screen.theme })
+          setScreen({
+            view: "compose",
+            structure: screen.structure,
+            theme: screen.theme,
+            ...(screen.quotes ? { quotes: screen.quotes } : {}),
+          })
         }
         onDrafted={(texts) =>
-          setScreen({ view: "compose", structure: screen.structure, theme: screen.theme, texts })
+          setScreen({
+            view: "compose",
+            structure: screen.structure,
+            theme: screen.theme,
+            texts,
+            ...(screen.quotes ? { quotes: screen.quotes } : {}),
+          })
         }
       />
     );
@@ -248,6 +293,7 @@ function Screens() {
         structure={screen.structure}
         initialTheme={screen.theme}
         initialTexts={screen.texts}
+        quotes={screen.quotes}
         onBack={() => setScreen({ view: "ai", structure: screen.structure, theme: screen.theme })}
         onGenerate={({ texts, roles, themeId }) =>
           setScreen({

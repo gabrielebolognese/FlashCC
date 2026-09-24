@@ -14,17 +14,22 @@ type Phase =
 
 export function AiChat({
   structure,
+  initialBrief,
   onDrafted,
   onWriteMyself,
   onCancel,
 }: {
   structure: Structure;
+  /** A brief carried in from a distilled source. Editable like any other. */
+  initialBrief?: string | undefined;
   onDrafted: (texts: string[]) => void;
   onWriteMyself: () => void;
   onCancel: () => void;
 }) {
   const [loading, setLoading] = useState(true);
-  const [brief, setBrief] = useState("");
+  // Seeded once. An angle's brief is a starting point somebody edits, not a
+  // value that keeps reasserting itself while they type over it.
+  const [brief, setBrief] = useState(initialBrief ?? "");
   const [phase, setPhase] = useState<Phase>({ kind: "idle" });
   const [handingOver, setHandingOver] = useState(false);
   const abort = useRef<AbortController | null>(null);

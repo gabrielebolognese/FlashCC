@@ -688,6 +688,67 @@ words deterministically.
 A route that returned a size, a position, a colour or a composition would break this, and the
 breakage is invisible until somebody's deck ships looking wrong.
 
+### Reading a source (`/api/distil`, `distil.ts`, `Repurpose.tsx`)
+
+**It returns angles, not a deck.** A long transcript contains several carousels, and a route that
+returns one has thrown the rest away without saying so. Three to five, each with a title, the brief
+that would produce it, and a line saying what in the source supports it. Choosing one joins the
+ordinary flow at the framework picker.
+
+**It does not replace `longform.ts`, and the two are a visible choice.** `Repurpose` asks one
+question in plain words: is it already written how you want it, or is it raw? The first runs the
+deterministic path, free, no key, no account, rearranging words already approved. The second sends
+it to a model. They answer different questions and are not variants of one feature.
+
+`MAX_SOURCE_CHARS = 40000`, clipping rather than refusing, and the interface says how much was read
+when it clips. Reading half a transcript and saying nothing is the worst available behaviour.
+
+`DISTILS_PER_HOUR = 20`, lower than every other route because 40,000 characters go in on each call
+and the *source* never caches. The system block does, like everywhere else.
+
+### Quotes are verified, not trusted
+
+The highest-value line in a transcript is usually one the person already said, and a model asked for
+verbatim will occasionally tidy one. A quote attributed to a source that does not contain it is the
+failure that actually hurts.
+
+`verbatimOnly` substring-matches every quote against **what was sent**, not the whole source: a
+quote from the clipped tail is one the model could not have read.
+
+Two details that are easy to get wrong:
+
+- **`plainText` must never run on a quote.** It turns em dashes into commas everywhere else, and a
+  cleaned quote then fails its own check against a source that does contain the dash.
+- **`canonical` folds curly quotes, dashes and whitespace, and nothing else.** Without it nearly
+  every real quote fails on an apostrophe. This is not fuzzy matching: every pair it folds is the
+  same character wearing a different code point.
+
+**Matched strictly, deduplicated loosely**, with two different keys on purpose. The same sentence
+returned twice, once with a trailing full stop, passes the match both times; the dedup key drops
+punctuation so those collapse without ever loosening what counts as present.
+
+Verified quotes ride into `Compose` as a collapsible strip and go into the focused field on a click.
+A clipboard, not a decision.
+
+### Subtitles (`longform.ts`)
+
+`.srt` and `.vtt` were **mangled**, not unsupported, by the free deterministic path. `TIMESTAMP`
+matches only the head of a cue line, so a SubRip file produced
+`"1 ,000 --> 00:00:04,000 Cutting on the beat..."` and that reached a slide.
+
+`stripCues` removes cue lines, SubRip sequence numbers, the WebVTT header and its `NOTE`, `STYLE`
+and `REGION` blocks, and inline `<v Speaker>` markup. It also collapses duplicate consecutive lines,
+because rolling captions repeat the previous line as new words arrive and left alone that triples
+the source.
+
+**`shapeOf` decides before the cues are stripped.** Afterwards there is nothing left to recognise a
+subtitle file by, since the timestamps that made it a transcript are exactly what was removed. Left
+to the line counting it came back "prose", and the prose path groups on blank lines, which a
+stripped subtitle file has none of, so an hour of speech arrived as one paragraph.
+
+**PDF is deliberately absent.** Parsing one properly is a dependency and an afternoon, and every PDF
+anybody has can be select-all-copied into the box today.
+
 ### The caption (`/api/caption`, `caption.ts`, `PostSheet.tsx`)
 
 **Beside `captionOf`, never instead of it.** `transcript.ts` already builds a caption

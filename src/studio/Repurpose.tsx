@@ -24,10 +24,21 @@
  * than it sounds: the thing people distrust is a model choosing their material,
  * and a heading is a choice the author already made.
  */
-import { AlertTriangle, ArrowLeft, ChevronRight, FileText, Layers, Link2 } from "lucide-react";
+import {
+  AlertTriangle,
+  ArrowLeft,
+  ChevronRight,
+  FileText,
+  Layers,
+  Link2,
+  RefreshCw,
+  Sparkles,
+} from "lucide-react";
 import { useMemo, useState } from "react";
 
 import { buildDocs } from "./bulk.js";
+import { distilSource, isReadableFile, MIN_SOURCE_CHARS, SOURCE_TYPES, type DistilResult } from "./distil.js";
+import { listBrands, contextVoice } from "./brand.js";
 import { Chip, Empty } from "./Dash.js";
 import { preview, readLongForm, slideEstimate, toBlocks, type Candidate } from "./longform.js";
 import type { Doc } from "./model.js";
@@ -55,8 +66,32 @@ anybody noticing why.
 
 Do it too often and it reads as a nervous tic. Twice an answer is plenty.`;
 
-export function Repurpose({ onHome, onOpen }: { onHome: () => void; onOpen: (doc: Doc) => void }) {
+export function Repurpose({
+  onHome,
+  onOpen,
+  onBrief,
+}: {
+  onHome: () => void;
+  onOpen: (doc: Doc) => void;
+  /** An angle chosen from a distilled source, on its way to the framework picker. */
+  onBrief: (brief: string, quotes: string[]) => void;
+}) {
   const [source, setSource] = useState("");
+  /**
+   * Which of the two readings is running.
+   *
+   * `own` is the deterministic path: `longform.ts`, free, no key, no account,
+   * rearranging words already approved. `raw` sends the source to a model to
+   * work out what is in it. They are not variants of one feature, they answer
+   * different questions, and the switch asks that question in plain words
+   * because the technical distinction means nothing to anybody.
+   */
+  const [mode, setMode] = useState<"own" | "raw">("own");
+  const [read2, setRead2] = useState<
+    { at: "idle" } | { at: "loading" } | { at: "ready"; result: DistilResult } | { at: "failed"; error: string }
+  >({ at: "idle" });
+  const [dropping, setDropping] = useState(false);
+  const [dropError, setDropError] = useState<string | null>(null);
   const [picked, setPicked] = useState<Set<string>>(new Set());
   const [structure, setStructure] = useState<Structure>(() => STRUCTURES[0]!);
   const [theme, setTheme] = useState<keyof typeof THEMES>("ink");
@@ -85,6 +120,129 @@ export function Repurpose({ onHome, onOpen }: { onHome: () => void; onOpen: (doc
    * numbering is applied after, in the order the material ran in, which is the
    * order the author wrote it in, and the only order that can be right.
    */
+  /* ── the raw reading ──────────────────────────────────────────── */
+
+  const readRaw = () => {
+    setRead2({ at: "loading" });
+    distilSource(source, { voice: contextVoice(listBrands(), undefined) })
+      .then((result) => setRead2({ at: "ready", result }))
+      .catch((e: unknown) =>
+        setRead2({ at: "failed", error: e instanceof Error ? e.message : "Could not read that" }),
+      );
+  };
+
+  /**
+   * The angles, or the button that asks for them.
+   *
+   * Declared here rather than as a sibling component because it reads half the
+   * screen's state and passing all of it down would be a longer signature than
+   * the component.
+   */
+  function RawPanel() {
+    if (read2.at === "idle") {
+      return (
+        <div className="mt-6 rounded-2xl border border-hairline bg-surface-1 p-4">
+          <p className="text-caption leading-4 text-muted">
+            It will read the whole thing and come back with several carousels it could become,
+            plus any line worth quoting word for word.
+          </p>
+          <button
+            type="button"
+            disabled={source.trim().length < MIN_SOURCE_CHARS}
+            onClick={readRaw}
+            style={{ background: "var(--brand-gold)", color: "var(--on-brand-gold)" }}
+            className="mt-3 flex h-9 items-center gap-2 rounded-xl px-4 text-body-strong disabled:pointer-events-none disabled:opacity-40"
+          >
+            <Sparkles size={14} strokeWidth={2.4} />
+            Read it
+          </button>
+          {source.trim().length > 0 && source.trim().length < MIN_SOURCE_CHARS ? (
+            <p className="mt-2 text-caption text-muted">
+              Too short to be worth reading. Paste the whole thing, or write a brief instead.
+            </p>
+          ) : null}
+        </div>
+      );
+    }
+
+    if (read2.at === "loading") {
+      return (
+        <div className="mt-6 flex items-center gap-2 rounded-2xl border border-hairline bg-surface-1 px-4 py-3">
+          <RefreshCw size={14} strokeWidth={2} className="fcc-spin shrink-0 text-accent" />
+          <span className="text-body text-secondary">Reading it through…</span>
+        </div>
+      );
+    }
+
+    if (read2.at === "failed") {
+      return (
+        <div className="mt-6 flex items-start gap-2.5 rounded-2xl border border-danger-dim bg-danger-wash p-3">
+          <AlertTriangle size={14} strokeWidth={2} className="mt-0.5 shrink-0 text-danger" />
+          <div className="min-w-0 flex-1">
+            <p className="text-body leading-5 text-secondary">{read2.error}</p>
+            <button
+              type="button"
+              onClick={readRaw}
+              className="mt-2 h-7 rounded-lg border border-hairline px-2.5 text-caption text-secondary hover:text-primary"
+            >
+              Try again
+            </button>
+          </div>
+        </div>
+      );
+    }
+
+    const { angles, brief, quotes, used, total, clipped } = read2.result;
+
+    return (
+      <div className="mt-6">
+        <div className="flex items-center gap-2">
+          <span className="text-overline uppercase text-tertiary">Carousels in this</span>
+          <Chip>{angles.length}</Chip>
+          {quotes.length > 0 ? (
+            <span className="text-caption text-muted">
+              {quotes.length} quotable line{quotes.length === 1 ? "" : "s"} found
+            </span>
+          ) : null}
+        </div>
+
+        {/* Reading half a transcript and saying nothing is the worst available
+            behaviour, so when it clips it says by how much. */}
+        {clipped ? (
+          <p className="mt-2 text-caption leading-4 text-muted">
+            It read the first {used.toLocaleString()} of {total.toLocaleString()} characters. The
+            rest was left out, so split it up if the end matters.
+          </p>
+        ) : null}
+
+        <div className="mt-3 flex flex-col gap-2">
+          {angles.map((a, i) => (
+            <button
+              key={i}
+              type="button"
+              onClick={() => onBrief(a.brief, quotes)}
+              className="rounded-2xl border border-hairline bg-surface-1 p-3.5 text-left hover:border-accent-dim hover:bg-accent-wash"
+            >
+              <div className="text-body-strong text-primary">{a.title}</div>
+              <div className="mt-1 text-caption leading-4 text-accent">{a.why}</div>
+              <div className="mt-2 text-caption leading-[17px] text-tertiary">{a.brief}</div>
+            </button>
+          ))}
+
+          {/* Choosing wrong here is expensive, so not choosing has to lead
+              somewhere rather than stall. */}
+          <button
+            type="button"
+            onClick={() => onBrief(brief, quotes)}
+            className="fcc-lift flex items-center justify-center gap-2 rounded-2xl border border-dashed border-hairline px-4 py-3 text-caption text-tertiary hover:border-accent-dim hover:bg-accent-wash"
+          >
+            None of these, let me write my own
+          </button>
+        </div>
+      </div>
+    );
+  }
+
   const build = () => {
     if (chosen.length === 0) return;
 
@@ -135,6 +293,33 @@ export function Repurpose({ onHome, onOpen }: { onHome: () => void; onOpen: (doc
           <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_300px]">
             {/* ── the paste ── */}
             <div>
+              <div className="mb-3 flex flex-col gap-1 rounded-2xl border border-hairline bg-surface-1 p-1">
+                {(
+                  [
+                    ["own", "It is already written how I want it", "Rearranged, never rewritten. Free, and works with no account."],
+                    ["raw", "It is raw, work out what is in it", "Reads it and offers several carousels it could become."],
+                  ] as const
+                ).map(([id, label, note]) => (
+                  <button
+                    key={id}
+                    type="button"
+                    onClick={() => {
+                      setMode(id);
+                      setRead2({ at: "idle" });
+                    }}
+                    className={[
+                      "rounded-xl px-3 py-2 text-left",
+                      mode === id ? "bg-accent-wash" : "hover:bg-white/[0.04]",
+                    ].join(" ")}
+                  >
+                    <span className={mode === id ? "block text-body-strong text-accent" : "block text-body-strong text-secondary"}>
+                      {label}
+                    </span>
+                    <span className="mt-0.5 block text-caption leading-4 text-muted">{note}</span>
+                  </button>
+                ))}
+              </div>
+
               <div className="flex items-center gap-2">
                 <span className="text-overline uppercase text-tertiary">What you wrote</span>
                 {source ? <Chip>{shapeLabel(read.shape)}</Chip> : null}
@@ -150,19 +335,55 @@ export function Repurpose({ onHome, onOpen }: { onHome: () => void; onOpen: (doc
                 )}
               </div>
 
+              {/*
+                Drop straight onto the box, because a transcript arrives as a
+                file far more often than it arrives on a clipboard. Text only:
+                `longform.ts` already knows what a subtitle file is and unwraps
+                it, and PDF is deliberately out, it is a dependency and an
+                afternoon, and a PDF can be select-all-copied into here today.
+              */}
               <textarea
                 value={source}
                 onChange={(e) => {
                   setSource(e.target.value);
                   setPicked(new Set());
                 }}
+                onDragOver={(e) => {
+                  e.preventDefault();
+                  setDropping(true);
+                }}
+                onDragLeave={() => setDropping(false)}
+                onDrop={(e) => {
+                  e.preventDefault();
+                  setDropping(false);
+                  const file = e.dataTransfer.files[0];
+                  if (!file) return;
+                  if (!isReadableFile(file.name)) {
+                    setDropError(`${file.name} is not a text file. Accepted: ${SOURCE_TYPES}`);
+                    return;
+                  }
+                  setDropError(null);
+                  void file.text().then((text) => {
+                    setSource(text);
+                    setPicked(new Set());
+                    setRead2({ at: "idle" });
+                  });
+                }}
                 rows={10}
                 spellCheck={false}
-                placeholder="Paste a blog post, a newsletter, or a transcript. Headings are followed when there are any."
-                className={`${field} mt-2 resize-y leading-5`}
+                placeholder="Paste a blog post, a newsletter or a transcript, or drop a .txt, .md, .vtt or .srt file here."
+                className={[
+                  field,
+                  "mt-2 resize-y leading-5",
+                  dropping ? "border-accent" : "",
+                ].join(" ")}
               />
 
-              {read.warnings.map((w) => (
+              {dropError ? (
+                <p className="mt-2 text-caption leading-4 text-danger">{dropError}</p>
+              ) : null}
+
+              {(mode === "own" ? read.warnings : []).map((w) => (
                 <p
                   key={w}
                   className="mt-2 flex items-start gap-2 rounded-xl border border-hairline bg-surface-1 px-3 py-2 text-caption leading-4 text-tertiary"
@@ -172,8 +393,10 @@ export function Repurpose({ onHome, onOpen }: { onHome: () => void; onOpen: (doc
                 </p>
               ))}
 
+              {mode === "raw" ? <RawPanel /> : null}
+
               {/* ── the candidates ── */}
-              {read.candidates.length > 0 ? (
+              {mode === "own" && read.candidates.length > 0 ? (
                 <div className="mt-6">
                   <div className="flex items-center gap-2">
                     <span className="text-overline uppercase text-tertiary">
@@ -224,7 +447,11 @@ export function Repurpose({ onHome, onOpen }: { onHome: () => void; onOpen: (doc
             </div>
 
             {/* ── the settings ── */}
-            <div className="lg:sticky lg:top-0 lg:self-start">
+            {/* Framework, theme, CTA and series all configure the deterministic
+                build. In raw mode the framework is chosen on the next screen and
+                nothing else here applies yet, so the column goes rather than
+                sitting there disabled. */}
+            <div className={mode === "own" ? "lg:sticky lg:top-0 lg:self-start" : "hidden"}>
               <span className="text-overline uppercase text-tertiary">How to build them</span>
 
               <label className="mt-2 block">
