@@ -7,6 +7,11 @@
  *
  * No framework. A handful of routes do not need one.
  */
+// FIRST, and it has to stay first. Every module below reads process.env when
+// it is evaluated, and ES modules evaluate imports in declaration order. See
+// env.ts for the bug this fixes.
+import "./env.js";
+
 import { createServer, type IncomingMessage, type ServerResponse } from "node:http";
 
 import { billingConfigured, checkout, portal, status, webhook } from "./billing.js";
@@ -20,13 +25,6 @@ import { exportDeck, renderDocument, renderImages } from "./export.js";
 import { HttpError, json } from "./http.js";
 import { addComment, decide, readShare } from "./review.js";
 import { hasSecretKey } from "./supabase.js";
-
-// Node reads .env itself; absent is fine, each route reports its own gap.
-try {
-  process.loadEnvFile();
-} catch {
-  /* no .env, fall back to the ambient environment */
-}
 
 const PORT = Number(process.env.PORT ?? 8787);
 
