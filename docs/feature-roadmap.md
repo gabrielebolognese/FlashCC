@@ -1330,6 +1330,611 @@ sync until it is applied.
 
 ---
 
+## Batch 11, Rewrite anything, in place
+
+**Status:** next
+**Size:** large
+**Why here:** drafting is one shot. You get eight slides and then you are alone
+with them. Every other tool in this category lets somebody push on a line they
+almost like, and the absence of that is the difference between a draft you edit
+and a draft you delete. It is also the single most reached-for AI action in every
+writing product that has one.
+
+### What exists today
+
+Two routes, both whole-deck. `/api/draft` takes a brief and returns a deck;
+`/api/hooks` takes a deck and returns five openings for slide one. There is
+nothing between them. A slide four that is nearly right has to be fixed by hand
+or by redrafting the whole carousel, which throws away the seven slides that were
+fine.
+
+Two mechanisms already exist and this batch is mostly about connecting them:
+
+- **`restateSlide(doc, index, text, theme, options, roles)`** in `regenerate.ts`
+  already replaces one slide's words and rebuilds, returning `{ doc, replaced,
+  kept }`. It exists because writing new text onto a layer whose box was measured
+  for the old words is how type overflows. The hook picker already uses it.
+- **`markEdited`** already tags a layer somebody has touched by hand, so a
+  rebuild knows what not to clobber.
+
+### 11.1 One route, several intents
+
+A single `/api/rewrite`, not a route per verb. The difference between "shorter"
+and "punchier" is one line of the prompt, and five routes that differ by one line
+is five things to keep in step.
+
+**The request:**
+
+| Field | Type | Notes |
+| --- | --- | --- |
+| `text` | string | the line being rewritten, required, ceiling 2,000 chars |
+| `intent` | enum | `shorter`, `punchier`, `simpler`, `angle`, `expand`, `free` |
+| `instruction` | string? | only read when `intent` is `free`, ceiling 300 chars |
+| `slot` | `{ id, label, note }`? | the job this slide does, so a CTA is rewritten as a CTA |
+| `deck` | string[]? | the rest of the carousel, for context, ceiling 12,000 chars |
+| `count` | number? | 2 to 5, default 3 |
+| `voice` | Voice? | same shape as `/api/draft`, omitted when empty |
+
+**The return:**
+
+```
+{ options: [ { text: string, note: string } ] }
+```
+
+`note` is two or three words naming what that option did, the same idea as
+`angle` on a hook variant: "tighter", "names the cost", "plainer words". It is
+what lets somebody choose on judgement rather than by reading three near
+identical lines and guessing.
+
+**Nothing is ranked and nothing is scored.** Invariant 7's cousin: the ranking
+complaint in the research is not about credits, it is about a machine asserting
+which of your sentences is better. Three options in the order the model wrote
+them.
+
+**Done when:** a POST with a line and an intent returns two to five options, each
+with a note, and the deck's own vocabulary is visible in them.
+
+### 11.2 What the user sees
+
+**Entry point one, the canvas.** Select a text layer. The Properties panel grows
+a **Rewrite** control under the text field: a 28px row of intent chips
+(`Shorter`, `Punchier`, `Simpler`, `New angle`, `Longer`) and a free-text box
+behind a "Tell it what to change" disclosure. Clicking a chip fires immediately;
+there is no second confirm, because the result is a list to choose from and not a
+change to the document.
+
+**Entry point two, the filmstrip.** Right-click a slide, "Rewrite this slide".
+Same panel, with `deck` populated from the other slides.
+
+**The result is a popover, not a replacement.** Three cards, each showing the
+proposed line and its note, with the current text pinned at the top under
+"Now". Clicking a card applies it. Escape or clicking away discards all of them
+and nothing has changed.
+
+**Applying goes through `restateSlide`, never a direct layer write.** This is the
+rule that keeps invariant 5 honest: the model returned words, and the layout is
+recomputed from those words by `compositions.ts`. A slide whose text layer has
+been hand-moved keeps its position, because `markEdited` already protects it, and
+the panel says "kept your layout" when `kept > 0`.
+
+**Undo is one step.** The apply is a single history entry labelled "Rewrite", so
+Cmd+Z puts the old line back with its old layout.
+
+### 11.3 The intents, and what each one actually asks for
+
+Worth writing down, because "punchier" means nothing to a model without a
+definition and everything about this feature is whether the options are
+meaningfully different from each other:
+
+| Intent | The instruction underneath it |
+| --- | --- |
+| `shorter` | same meaning, fewer words, never by deleting the specific detail |
+| `punchier` | same claim, stronger verb, front-load the consequence |
+| `simpler` | plainer vocabulary, shorter clauses, no jargon, same claim |
+| `angle` | the same slide's job, approached from a different direction |
+| `expand` | one more concrete beat, still inside the character ceiling |
+| `free` | whatever the user typed, bounded by the rules that always apply |
+
+The rules that always apply in every case: keep the slot's job, keep the
+character ceiling for that slot, add no claim the deck does not already contain,
+no em dashes, no hashtags, no emoji.
+
+**`expand` has a trap and needs saying:** a slide told to grow will grow past its
+box. The ceiling goes in the prompt AND `splitToFit` still runs on the way in, so
+a long answer splits rather than overflows.
+
+### 11.4 Model, cost and limits
+
+`claude-haiku-4-5`. One line in, three short lines out, no reasoning to do. The
+same argument that put hooks on Haiku applies more strongly here, because this is
+the route people will press twenty times in a session.
+
+`REWRITES_PER_HOUR = 300`, per account, keyed like the others. High because this
+is meant to be pressed constantly and a limit anybody meets in normal use is a
+credit system with a different name. It exists so one script cannot spend a month
+of margin.
+
+Cached system block, per-request everything else, same boundary as `prompts.ts`
+already draws.
+
+**Done when:** a rewrite round trip is under two seconds on an ordinary line,
+and `logUsage` shows the cache being hit from the second call onward.
+
+### 11.5 Multi-select, and the thing not to build
+
+Selecting three slides and rewriting all of them is one request per slide, run in
+parallel, not one request containing three slides. A single call would let the
+model rewrite slide two in a way that only makes sense given its rewrite of slide
+one, and then somebody accepts one and rejects the other and is left with a
+non-sequitur.
+
+**Not building: rewrite the whole deck at once.** That is `/api/draft` with extra
+steps, and the whole point of this batch is the thing between a line and a deck.
+
+**Done when:** rewriting a three-slide selection shows three independent option
+sets and accepting one does not alter the other two.
+
+### What this batch deliberately does not do
+
+- **No layout suggestions.** Invariant 5. The route returns strings.
+- **No automatic application.** Every option is a choice somebody makes.
+- **No scoring, ranking or "best" badge.** See 11.1.
+- **No streaming.** Three short lines arrive together; a token stream would add
+  a loading state to a call that is already fast.
+
+---
+
+## Batch 12, The caption, and the words around the deck
+
+**Status:** queued
+**Size:** medium
+**Why here:** `posts.caption` has existed since Batch 8 and is filled in by hand
+every single time. The carousel is the hard part and the product does it; the
+200 words that go under the carousel are the easy part and the product leaves
+them blank. It is also the one place where a model has the whole deck to work
+from and needs no new input at all.
+
+### What exists today
+
+`08-pipeline-fields.sql` added `caption` to `posts`. `PostSheet.tsx` shows it as
+an empty textarea. Nothing writes it but a person. Alt text does not exist
+anywhere, which is both an accessibility gap and, on LinkedIn, a ranking one.
+
+### 12.1 The caption route
+
+`/api/caption`.
+
+**The request:**
+
+| Field | Type | Notes |
+| --- | --- | --- |
+| `deck` | string[] | every slide's text in order, required, ceiling 12,000 |
+| `platform` | enum | `linkedin`, `instagram`, `tiktok`, from `platforms.ts` |
+| `framework` | string? | the structure's name, for tone |
+| `cta` | string? | what the last slide asks for, so the caption does not contradict it |
+| `voice` | Voice? | as everywhere else |
+| `count` | number? | 1 to 3, default 2 |
+
+**The return:**
+
+```
+{
+  captions: [ { text: string, note: string, chars: number } ],
+  hashtags: string[]
+}
+```
+
+`chars` comes back from the server rather than being counted in the browser,
+because the platform ceilings live in `platforms.ts` on both sides and one of
+them will drift.
+
+### 12.2 Per platform, and this is the whole reason it is not one prompt
+
+A caption is not a caption. The three destinations want genuinely different
+things and a single generic caption is worse than none:
+
+| Platform | Ceiling | What the first line has to do | Hashtags |
+| --- | --- | --- | --- |
+| LinkedIn | 3,000, but **the first 210 characters are what shows before "see more"** | earn the click on "see more", never "Swipe to learn" | 3 to 5, at the end, not inline |
+| Instagram | 2,200 | earn a stop, the deck is already visible | up to 10, own paragraph, never mid-sentence |
+| TikTok | 2,200 | context for a video-first audience who may not swipe at all | 3 to 5, inline is acceptable here |
+
+**The 210-character truncation is the load-bearing fact for LinkedIn** and the
+one thing a generic caption writer always gets wrong. It goes in the prompt as a
+hard rule and in the UI as a marker in the textarea.
+
+### 12.3 What the user sees
+
+In `PostSheet`, above the caption box: a quiet **Write caption** button with a
+`Sparkles` glyph, disabled with a tooltip when the deck has no copy yet.
+
+Pressing it replaces the button row with two option cards, each showing the
+caption, its note, and a character count coloured against the platform ceiling.
+The LinkedIn cards draw a hairline rule after character 210 with a small "see
+more" label, so what gets truncated is visible before it is chosen rather than
+after it is posted.
+
+Choosing one writes it into the existing textarea, which stays fully editable.
+It is a draft in a text box, not a managed field.
+
+Hashtags land as a separate chip row under the box, each removable, with a
+"copy all" affordance. They are not appended to the caption text automatically,
+because half of people want them in a first comment instead and a caption that
+silently contains them is one somebody has to unpick.
+
+### 12.4 Alt text, in the same batch because it comes from the same place
+
+`/api/alt`, or the same route with `mode: "alt"`. One string per slide,
+describing what the slide SHOWS, not what it says.
+
+**This matters and is not decoration.** A carousel exported as images is
+invisible to a screen reader, and LinkedIn surfaces alt text. The deck's own
+words are already the best possible source for it.
+
+Ceiling 125 characters per slide, which is where most screen readers truncate.
+The return is positional, one entry per slide, and the UI shows them in the
+export dialog as an editable list with a "regenerate this one" affordance.
+
+**Done when:** exporting a deck to Instagram or LinkedIn offers alt text for
+every slide, and skipping it is one click rather than the default.
+
+### 12.5 Model and limits
+
+`claude-haiku-4-5` for alt text, which is description. `claude-sonnet-5` for
+captions, which is writing that has to hold up next to the deck.
+
+`CAPTIONS_PER_HOUR = 120`.
+
+### What this batch deliberately does not do
+
+- **No posting.** The roadmap already rejects LinkedIn auto-posting on evidence
+  and nothing here changes that.
+- **No hashtag research, volume or reach estimates.** That is the virality score
+  again wearing a different hat.
+- **No scheduling suggestions.** Best-time-to-post claims are the least
+  defensible number in this category.
+
+---
+
+## Batch 13, Bring your own source
+
+**Status:** queued
+**Size:** large
+**Why here:** the brief is the only way in. Everybody making carousels regularly
+is making them FROM something: a newsletter, a transcript, a talk, a post that
+did well last year. Today that means reading the thing and typing a summary,
+which is the work the product is supposed to remove.
+
+### What exists today, and what this must not break
+
+`longform.ts` already ingests long text and is **completely deterministic**, on
+purpose. `readLongForm`, `segments`, `sentences`, `toSlides`. It rearranges words
+somebody already approved and introduces no drift.
+
+**This batch does not replace it and must not.** The deterministic path is the
+right answer when the source is already good prose in the user's own voice. The
+new path is for when the source is raw: a transcript full of filler, an article
+written by somebody else, a set of notes.
+
+The two sit side by side and the interface has to make the choice obvious, which
+is most of the design work here.
+
+### 13.1 The distil route
+
+`/api/distil`.
+
+**The request:**
+
+| Field | Type | Notes |
+| --- | --- | --- |
+| `source` | string | the raw text, ceiling 40,000 chars, higher than the brief ceiling on purpose |
+| `kind` | enum? | `transcript`, `article`, `notes`, `post`, or absent for "work it out" |
+| `structure` | Structure? | when the framework is already chosen |
+| `voice` | Voice? | as everywhere |
+
+**The return, and this is the interesting decision:**
+
+```
+{
+  brief: string,
+  angles: [ { title: string, brief: string, why: string } ],
+  quotes: string[]
+}
+```
+
+**It returns a brief, not slides.** A 40,000 word transcript contains five
+carousels, not one, and a route that returns one deck has silently thrown four
+away and made the choice on the user's behalf. So it comes back as `angles`: three
+to five distinct carousels this source could become, each with a one-line title, a
+brief that would produce it, and `why` naming what in the source supports it.
+
+`quotes` is the source's own most quotable lines, verbatim, with no rewriting. It
+exists because the single highest-value thing in a transcript is usually a
+sentence the person already said, and a model that paraphrases it has destroyed
+the only part that was already perfect.
+
+### 13.2 What the user sees
+
+A new entry on the start screen beside "Write a brief": **"Start from something
+you have"**.
+
+**Step one, the source.** A large paste box, plus drag-and-drop for `.txt`,
+`.md`, `.vtt` and `.srt`. Subtitle formats are in because a transcript is the
+most common raw source and it arrives as subtitles; stripping timestamps and
+speaker labels from those is deterministic and belongs in `longform.ts` rather
+than in a prompt.
+
+**PDF is deliberately out of this batch.** Parsing it properly is a dependency
+and a whole afternoon, and every PDF somebody has can be select-all-copied into
+the paste box today. Revisit if anybody asks.
+
+**Step two, the angles.** Three to five cards, each a title, the `why` line, and
+the brief underneath in smaller type. Choosing one carries its brief into the
+normal framework picker, which is the existing flow from there on.
+
+A **"none of these, write my own"** escape hatch sits under them, pre-filled with
+the plain `brief`. Choosing wrong here is expensive and not choosing must lead
+somewhere.
+
+**Step three, the quotes, which are not a step.** The quote list rides along into
+the compose screen as a collapsible strip under the fields, each quote a click to
+insert. It is a clipboard, not a decision, and it is the thing that makes the
+feature feel like it read the source rather than skimmed it.
+
+### 13.3 The split between this and `longform.ts`
+
+The start screen asks one question, in plain words, because the technical
+distinction is meaningless to a user:
+
+| What they pick | What runs |
+| --- | --- |
+| "It is already written how I want it" | `longform.ts`, deterministic, no model, no key needed |
+| "It is raw, work out what is in it" | `/api/distil` |
+
+The first option stays available with no API key and on the free tier, because it
+is not an AI feature and never was.
+
+**Done when:** pasting a 6,000 word transcript returns at least three angles that
+are genuinely about different things, and the quotes are present in the source
+verbatim.
+
+### 13.4 Model, cost and the ceiling
+
+`claude-sonnet-5`. This is the most expensive route in the product: 40,000
+characters in, every time, and no prefix to cache because the source is the
+request.
+
+That is worth stating plainly because it changes the limit. `DISTILS_PER_HOUR =
+20`. Still not a credit, still invisible, but the ceiling is lower than the
+others because one call here costs what thirty rewrites cost.
+
+The 40,000 ceiling clips rather than refuses, and the UI says how much was used
+when it clips, because silently reading half a transcript and saying nothing is
+the worst available behaviour.
+
+### 13.5 Verbatim quotes have to be verified, not trusted
+
+A model asked for verbatim quotes will occasionally tidy one. A quote in
+somebody's carousel attributed to a transcript that does not contain it is the
+failure that actually hurts, and it is checkable for free: **every returned quote
+is substring-matched against the source on the server, and anything that does not
+match exactly is dropped before the response is sent.**
+
+No repair, no fuzzy match, no "close enough". Dropped.
+
+**Done when:** a test plants a near-miss quote in a model response and the route
+returns without it.
+
+### What this batch deliberately does not do
+
+- **No URL fetching.** Somebody else's page is somebody else's content, fetching
+  it server-side makes us the one requesting it, and the paste box covers the
+  same ground with the user's own copy of the text. Revisit deliberately, not by
+  drift.
+- **No audio or video upload.** Transcription is a different product.
+- **No "summarise this for me" general purpose box.** The output is carousel
+  angles or it is nothing.
+
+---
+
+## Batch 14, A voice it works out for itself
+
+**Status:** queued
+**Size:** medium
+**Why here:** Batch 10 shipped brand voice and it works, but it asks somebody to
+sit down and paste three posts into a form before they get anything. Almost
+nobody will. Meanwhile the product is sitting on a folder of carousels that
+person already wrote, which is a better sample than anything they would have
+pasted.
+
+### What exists today
+
+`Brand.voice` is `{ tone?, samples?, avoid? }`, stored as one `jsonb` column, all
+optional. `voiceOf` reads it from a deck's `styleId`, `contextVoice` infers it for
+a deck that does not exist yet and refuses to guess between several brands.
+`VoiceEditor` in `Brands.tsx` is three plain fields.
+
+The machinery is right. The input is the problem.
+
+### 14.1 Learn from what they already made
+
+`/api/voice/learn`.
+
+**The request:** `{ decks: string[][], existing?: Voice }`, where each entry is
+one carousel's slide texts. Ceiling: 12 decks, 20,000 characters total.
+
+**The return:**
+
+```
+{
+  tone: string,
+  avoid: string[],
+  observed: [ { trait: string, evidence: string } ]
+}
+```
+
+**`observed` is the part that matters.** A model that says "your tone is direct
+and punchy" has told somebody nothing they can check. Each trait comes with a
+line from their own decks that demonstrates it, so the whole thing is auditable
+in ten seconds rather than accepted on faith.
+
+**It does not return `samples`.** Samples stay the user's own choice, because
+they are the highest-weight part of the prompt and picking three posts is a
+judgement about which of your work represents you. A machine choosing those is
+the machine deciding what you sound like.
+
+### 14.2 What the user sees
+
+In `Brands.tsx`, above the voice fields: **"Learn from my carousels"**, with a
+count ("from your 14 saved carousels"). Disabled with an explanation below three
+decks, because a voice derived from one carousel is a description of one
+carousel.
+
+Pressing it does not write anything. It opens a review panel:
+
+- The proposed `tone`, in an editable field
+- Each `observed` trait as a row: the trait, and the quoted evidence under it,
+  with a checkbox
+- The proposed `avoid` list as removable chips
+
+**Nothing is applied until "Use this" is pressed**, and unchecking a trait
+removes it from the tone that gets written. A voice somebody disagrees with is
+worse than no voice, which is already the stated rule in `contextVoice`, and that
+rule applies just as much to a voice we generated as to one we guessed at.
+
+If a voice already exists, the panel shows the current value beside the proposed
+one and "Use this" says "Replace". No silent overwrite.
+
+### 14.3 The honest limits, stated in the UI
+
+Two lines under the button, because both are true and both will otherwise be
+discovered as disappointments:
+
+- It reads carousels, which are short-form and structured. Somebody's newsletter
+  voice is a different voice.
+- It reads what they have saved here, which for a new account is whatever the AI
+  drafted for them. **Learning your voice from a model's output is a loop**, and
+  the button says so when most of the source decks were AI-drafted and unedited.
+
+That last one needs a real signal, not a guess: `markEdited` already knows which
+layers a person has touched. A deck with no hand edits is a deck the model wrote.
+
+**Done when:** an account whose decks are all unedited AI drafts sees the warning,
+and an account with hand-written decks does not.
+
+### 14.4 Model and limits
+
+`claude-sonnet-5`. Reading twelve decks and characterising a voice is a reasoning
+task and the output is short.
+
+`VOICE_LEARNS_PER_HOUR = 10`. Nobody needs to do this twice in an afternoon.
+
+### What this batch deliberately does not do
+
+- **No automatic application, ever.** See 14.2.
+- **No voice scoring.** "Your carousel is 73% on-brand" is the virality score
+  with a new label.
+- **No cross-account learning.** One person's voice is derived from one person's
+  decks, full stop.
+
+---
+
+## Batch 15, Checks before it reaches the canvas
+
+**Status:** queued
+**Size:** medium
+**Why here:** by the end of Batch 14 there are six routes that put model output
+in front of a customer and exactly one thing checking any of it: a script
+somebody runs by hand. `scripts/eval-draft.mjs` already found two real defects
+before they shipped, which is the argument for running its checks where they
+actually matter.
+
+### What exists today
+
+`eval-draft.mjs` checks structural properties and costs real money per run, so it
+is deliberately outside `npm test`. It checks: slot count, empty slides, hook over
+90, body over 220, placeholders, unknown slot ids, duplicate slides, dashes, and
+measurements absent from the brief.
+
+`plainText` in `prompts.ts` is the only check that runs on every response, and it
+only strips punctuation.
+
+### 15.1 The checks move to the server, and the cheap ones become guarantees
+
+Three tiers, and the difference between them is the whole design:
+
+| Tier | What happens | Examples |
+| --- | --- | --- |
+| **Repair** | fixed silently, always | em dashes, smart quotes, trailing whitespace, doubled spaces |
+| **Retry** | one retry with the failure named in the prompt, then pass through with a flag | empty slide, placeholder text, hook over ceiling, duplicate adjacent slides |
+| **Flag** | passed through, surfaced in the UI | a measurement absent from the brief, a claim the source does not contain |
+
+**Why retry and not refuse:** a refused draft leaves somebody with nothing after
+fifteen seconds of waiting, and the failure is usually a single slide. One retry
+costs one call and fixes most of it.
+
+**Why one retry and not three:** the retry policy in `anthropic.ts` already says
+it, two layers of retry on a paid call is how one failure becomes four charges.
+
+**Why flag and not block for fabrication:** because the check cannot be certain.
+A number absent from the brief is usually invented and occasionally correct, and
+a product that deletes a customer's correct number is worse than one that points
+at it.
+
+### 15.2 What the user sees
+
+Nothing at all, in the common case. Repairs are silent and retries are invisible
+inside a call that was already going to take a few seconds.
+
+When something is flagged, the affected slide gets a small amber dot in the
+filmstrip and, in the compose screen, a line under the field: "This number is not
+in your brief. Check it." with the number highlighted.
+
+**It is a note, not a modal, not a blocking dialog, and it never prevents
+generation.** The finding is information the person can act on, and they know
+things the brief does not contain.
+
+Dismissing a flag is one click and it stays dismissed for that slide.
+
+### 15.3 The same checks run in the test suite, for free
+
+The properties become pure functions in a new `server/checks.ts`, which means
+`checks.test.ts` can cover every rule with no API key and no cost. The paid eval
+script then imports the same functions rather than keeping its own copy, which
+closes the gap where the script's checks and the server's checks drift apart and
+nobody notices.
+
+**This is the actual win of the batch**: the checks stop being a thing somebody
+remembers to run and become a thing that cannot be skipped, at no per-run cost.
+
+**Done when:** `eval-draft.mjs` contains no check logic of its own, only calls
+into `checks.ts`, and `checks.test.ts` covers every rule without a key.
+
+### 15.4 A record of what was flagged
+
+Not analytics on users. A rolling in-memory count per route of how often each
+check fires, exposed on `/api/health` behind the same conditions as the rest of
+it.
+
+The reason is narrow and specific: **a prompt edit that makes fabrication twice
+as likely is invisible today.** If the flag rate for "measurement not in brief"
+doubles after a prompt change, that is worth seeing, and it costs nothing to
+count.
+
+In memory, not in the database, because it is an operational signal about the
+prompts and not a fact about any customer.
+
+### What this batch deliberately does not do
+
+- **No quality score.** Every check is a defect that anybody would recognise as
+  a defect. Nothing here judges whether the writing is good.
+- **No blocking on a flag.** See 15.2.
+- **No per-user record of what was flagged.** See 15.4.
+- **No automated prompt tuning.** A loop that edits its own prompts against a
+  metric is how a product drifts somewhere nobody chose.
+
+---
+
 ## Explicitly not building
 
 Each of these was considered and rejected on evidence.
@@ -1434,9 +2039,10 @@ that endpoint is not.
 
 ## Where this stands
 
-Eight batches built the product. A ninth, added after an audit on 2026-09-23,
-makes it sellable, see Batch 9 above. What the eight turned out to be, in one
-line each:
+Eight batches built the product. A ninth made it sellable, a tenth made the AI
+deliberate rather than accidental, and Batches 11 to 15 are the AI features that
+Batch 10's pipeline was the prerequisite for. What the first eight turned out to
+be, in one line each:
 
 | | Was | Turned out to be |
 | --- | --- | --- |
@@ -1448,6 +2054,8 @@ line each:
 | 6 | One asset becomes many | Candidates you choose from, never a ranking |
 | 7 | Clients and approval | A review link, and the only place RLS is not the boundary |
 | 8 | Trust, and the long tail | Two features and three promises |
+| 9 | Make the paywall real | An audit first, and five routes that needed different answers |
+| 10 | The AI pipeline | A model per task, and two defects the eval found before customers did |
 
 **Three roadmap items turned out to be rules rather than features**, 6.6, 7.6
 and 8.5, and all three are now invariants in `CLAUDE.md` with the copy that
@@ -1458,5 +2066,30 @@ is worth remembering when the next one is written.
 effort. That list is the other half of the plan and should be re-read before
 anything is added to it.
 
-The open work is Batch 10, and `docs/reference.md` §29, the defect list, which is
+### The AI batches, 11 to 15
+
+Batch 10 built the pipeline: prompts that can be tested, a model per task, a
+cache boundary, brand voice, and an eval harness. It added no feature anybody
+would notice. These five are what it was for.
+
+| | The gap it closes |
+| --- | --- |
+| 11 | Drafting is one shot. Nothing sits between a line and a whole deck. |
+| 12 | `posts.caption` has been an empty textarea since Batch 8. |
+| 13 | The brief is the only way in, and everybody is working from something. |
+| 14 | Voice works, but asks for three pasted posts before it does anything. |
+| 15 | Six routes putting words in front of customers, one hand-run script checking any of it. |
+
+**Read 11 first even if you build something else.** It is the one people press
+constantly, and it is the only one of the five that changes the shape of the
+editing loop rather than adding a step to the creation flow.
+
+Two rules run through all five and are worth stating once rather than five times:
+**every route returns words**, never a size, a position or a composition, because
+invariant 5 is the only thing standing between this and the layout complaints
+that define the category. And **nothing is ranked, scored or graded**, because
+the ranking complaint in the research corpus is not about cost, it is about a
+machine asserting which of your sentences is better.
+
+The other open work is `docs/reference.md` §29, the defect list, which is
 deliberately not a roadmap item and should not be folded into one.
