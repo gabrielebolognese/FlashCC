@@ -28,9 +28,12 @@ let admin: SupabaseClient | null = null;
 /** Full access. Only ever reached from a verified webhook or a verified caller. */
 export function serviceClient(): SupabaseClient {
   if (!URL || !SERVICE_KEY) {
+    // Reached from two directions now: billing writing a plan, and requirePro
+    // reading one before an AI route runs. The old wording named only the first,
+    // so clicking Draft returned a 503 about billing.
     throw new HttpError(
       503,
-      "No SUPABASE_SERVICE_ROLE_KEY. Billing cannot update a plan without it.",
+      "No SUPABASE_SERVICE_ROLE_KEY. The server cannot read or update a plan without it.",
     );
   }
   admin ??= createClient(URL, SERVICE_KEY, {
