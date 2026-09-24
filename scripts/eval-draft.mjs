@@ -6,6 +6,7 @@
  *   npm run eval:draft -- --rewrite every rewrite intent, on one line
  *   npm run eval:draft -- --caption every platform's caption, and alt text
  *   npm run eval:draft -- --distil  a transcript, its angles and its quotes
+ *   npm run eval:draft -- --voice   four decks in one voice, and what it sees
  *
  * ── What this can and cannot tell you ────────────────────────────────────────
  *
@@ -39,11 +40,13 @@ import {
   CAPTION_PLATFORMS,
   MAX_ALT_CHARS,
   assembleDistil,
+  assembleVoice,
   PLATFORM_CAPTION,
   REWRITE_INTENTS,
 } from "../server/prompts.ts";
 import { groundedTags } from "../server/caption.ts";
-import { verbatimOnly } from "../server/distil.ts";
+import { verbatimOnly } from "../server/verbatim.ts";
+import { groundedTraits } from "../server/voice.ts";
 import { STRUCTURES } from "../src/studio/structures.ts";
 
 /* ── config ───────────────────────────────────────────────────────────────── */
@@ -64,6 +67,7 @@ const compare = process.argv.includes("--compare");
 const rewriteOnly = process.argv.includes("--rewrite");
 const captionOnly = process.argv.includes("--caption");
 const distilOnly = process.argv.includes("--distil");
+const voiceOnly = process.argv.includes("--voice");
 const MODELS = compare ? ["claude-sonnet-5", "claude-opus-5"] : ["claude-sonnet-5"];
 
 /**
@@ -485,6 +489,131 @@ async function evalDistil() {
   return problems.length > 0 ? 1 : 0;
 }
 
+/* ── working out a voice ─────────────────────────────────────────────────── */
+
+/**
+ * Whether the traits are worth reading is a judgement, so they are printed.
+ * Whether the EVIDENCE is real is exact, and is checked against the same
+ * function the route uses.
+ *
+ * The decks below are written in one deliberate voice: very short sentences,
+ * second person, the claim first, no hedging. If the traits come back as
+ * "direct and punchy" the prompt has failed, because that describes everything.
+ */
+const VoiceSchema = z.object({
+  tone: z.string(),
+  avoid: z.array(z.string()),
+  observed: z.array(z.object({ trait: z.string(), evidence: z.string() })),
+});
+
+const VOICE_DECKS = [
+  [
+    "Your edits feel mechanical. Here is why.",
+    "You cut on the beat. The beat is not where attention lives.",
+    "Attention resets when the frame changes.",
+    "Cut on movement. A hand leaving frame. A door closing.",
+    "Try it on one clip. You will hear the difference.",
+  ],
+  [
+    "You are quoting per video. Stop.",
+    "Per video makes every call about scope.",
+    "A retainer makes it about outcomes.",
+    "You will lose two clients. They were the unprofitable ones.",
+    "Send the new terms this week.",
+  ],
+  [
+    "Nobody asks what camera you used.",
+    "They ask why the cuts feel good.",
+    "I shot on the same body for six years.",
+    "The gear was never the thing.",
+    "Fix the cuts first.",
+  ],
+  [
+    "Your first cut goes out with no note. That is the problem.",
+    "Without a note the client reviews against a version they imagined.",
+    "With one they review against what you said you would do.",
+    "Write two lines. Send them with the link.",
+    "Your revision rounds will halve.",
+  ],
+];
+
+async function evalVoice() {
+  console.log(`\n${"=".repeat(64)}\nworking out a voice\n${"=".repeat(64)}`);
+
+  const { system, user } = assembleVoice({ decks: VOICE_DECKS });
+  const corpus = VOICE_DECKS.map((d) => d.join("\n")).join("\n");
+  const started = Date.now();
+  let parsed;
+
+  try {
+    const response = await client.messages.parse({
+      model: "claude-sonnet-5",
+      max_tokens: 3000,
+      system: [{ type: "text", text: system, cache_control: { type: "ephemeral" } }],
+      output_config: { effort: "medium", format: zodOutputFormat(VoiceSchema) },
+      messages: [{ role: "user", content: user }],
+    });
+    parsed = response.parsed_output;
+    calls += 1;
+    inTokens += response.usage?.input_tokens ?? 0;
+    outTokens += response.usage?.output_tokens ?? 0;
+  } catch (error) {
+    console.log(`  FAIL voice  CALL FAILED: ${error.message}`);
+    return 1;
+  }
+
+  const observed = parsed?.observed ?? [];
+  const kept = groundedTraits(observed, corpus);
+  const problems = [];
+
+  if (observed.length < 3) problems.push(`only ${observed.length} trait(s), wanted at least three`);
+  if (kept.length < 3) {
+    problems.push(`only ${kept.length} of ${observed.length} traits had real evidence`);
+  }
+
+  // The adjectives that describe every piece of writing anybody has praised.
+  const EMPTY = /^(direct|punchy|engaging|conversational|concise|clear|authentic)\b/i;
+  const vague = kept.filter((o) => EMPTY.test(o.trait.trim()));
+  if (vague.length > 0) problems.push(`trait describes nothing: "${vague[0].trait}"`);
+
+  if (!parsed?.tone?.trim()) problems.push("no tone description");
+
+  console.log(`\n  ${problems.length === 0 ? "ok  " : "FAIL"} voice  ${Date.now() - started}ms`);
+  for (const p of problems) console.log(`       ! ${p}`);
+
+  console.log(`\n       tone  ${parsed?.tone ?? ""}`);
+  console.log(`\n       traits ${observed.length} returned, ${kept.length} with real evidence`);
+  for (const o of kept) {
+    console.log(`       kept    ${o.trait}`);
+    console.log(`                 "${o.evidence}"`);
+  }
+  for (const o of observed) {
+    if (!kept.some((k) => k.trait === o.trait)) {
+      console.log(`       DROPPED ${o.trait}`);
+      console.log(`                 "${o.evidence}"  <- not in the decks`);
+    }
+  }
+  console.log(`\n       avoid ${(parsed?.avoid ?? []).join(", ") || "(none)"}`);
+
+  /*
+   * The same planted-near-miss check the distil route gets: evidence with one
+   * word changed has to take its trait down with it.
+   */
+  const planted = groundedTraits(
+    [{ trait: "Planted", evidence: "Attention resets when the shot changes." }],
+    corpus,
+  );
+  if (planted.length > 0) {
+    console.log("       ! a planted near-miss trait survived verification");
+    problems.push("planted trait survived");
+  } else {
+    console.log("       planted near-miss was dropped, as it must be");
+  }
+
+  console.log("");
+  return problems.length > 0 ? 1 : 0;
+}
+
 /* ── run ──────────────────────────────────────────────────────────────────── */
 
 const client = new Anthropic({ maxRetries: 1, timeout: 120_000 });
@@ -494,7 +623,7 @@ let calls = 0;
 let inTokens = 0;
 let outTokens = 0;
 
-for (const model of rewriteOnly || captionOnly || distilOnly ? [] : MODELS) {
+for (const model of rewriteOnly || captionOnly || distilOnly || voiceOnly ? [] : MODELS) {
   console.log(`\n${"=".repeat(64)}\n${model}\n${"=".repeat(64)}`);
 
   for (const structure of STRUCTURES) {
@@ -538,9 +667,12 @@ for (const model of rewriteOnly || captionOnly || distilOnly ? [] : MODELS) {
   }
 }
 
-if (rewriteOnly || (!compare && !captionOnly && !distilOnly)) failures += await evalRewrites();
+if (rewriteOnly || (!compare && !captionOnly && !distilOnly && !voiceOnly)) {
+  failures += await evalRewrites();
+}
 if (captionOnly) failures += await evalCaptions();
 if (distilOnly) failures += await evalDistil();
+if (voiceOnly) failures += await evalVoice();
 
 console.log(
   `\n${"=".repeat(64)}\n${calls} calls, ${inTokens} in, ${outTokens} out, ${failures} failing\n`,

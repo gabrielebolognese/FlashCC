@@ -11,10 +11,28 @@
  * database is what actually holds, and a paywall that only refuses after a round
  * trip, with an error, is a worse experience than one that explains itself first.
  */
-import { Check, ImagePlus, Palette, Plus, Trash2, Type, X } from "lucide-react";
+import {
+  AlertTriangle,
+  Check,
+  ImagePlus,
+  Palette,
+  Plus,
+  RefreshCw,
+  Sparkles,
+  Trash2,
+  Type,
+  X,
+} from "lucide-react";
 import { useMemo, useRef, useState } from "react";
 
 import { listAssets, LOGO_ROLE_LABEL, LOGO_ROLES, type Asset, type LogoRole } from "./assets.js";
+import {
+  gatherDecks,
+  learnVoice,
+  MIN_LEARN_DECKS,
+  toneFrom,
+  type Learned,
+} from "./learn.js";
 import {
   brandLimit,
   canAddBrand,
@@ -23,6 +41,7 @@ import {
   removeBrand,
   upsertBrand,
   type Brand,
+  hasVoice,
   MAX_VOICE_SAMPLES,
   tidyVoice,
   type Voice,
@@ -200,6 +219,199 @@ function Logos({ brand, onChange }: { brand: Brand; onChange: (b: Brand) => void
  * it produced before this existed, so this can be ignored forever without the
  * product feeling half-configured.
  */
+/**
+ * Reading somebody's own carousels to work out how they write.
+ *
+ * **Nothing is applied until "Use this" is pressed, and unchecking a trait
+ * changes what gets written.** A voice somebody disagrees with is worse than no
+ * voice, which is already the rule `contextVoice` follows when it refuses to
+ * guess between brands, and that rule applies just as much to a voice we
+ * generated as to one we inferred.
+ *
+ * The evidence under each trait is the reason the panel exists. Every line was
+ * checked against the decks on the server, so unticking one is a judgement made
+ * against something real rather than against an adjective.
+ */
+function LearnVoice({
+  brand,
+  existing,
+  onUse,
+}: {
+  brand: Brand;
+  existing: Voice;
+  onUse: (tone: string, avoid: string[]) => void;
+}) {
+  const [phase, setPhase] = useState<
+    { at: "idle" } | { at: "loading" } | { at: "ready"; learned: Learned } | { at: "failed"; error: string }
+  >({ at: "idle" });
+  const [kept, setKept] = useState<boolean[]>([]);
+  const [tone, setTone] = useState("");
+  const [avoid, setAvoid] = useState<string[]>([]);
+
+  // Read once, when the panel is first shown, rather than on every render: this
+  // touches localStorage for every saved document.
+  const source = useMemo(() => gatherDecks(brand.id), [brand.id]);
+
+  const enough = source.count >= MIN_LEARN_DECKS;
+
+  const run = () => {
+    setPhase({ at: "loading" });
+    learnVoice(source.decks, hasVoice(existing) ? existing : undefined)
+      .then((learned) => {
+        setPhase({ at: "ready", learned });
+        setKept(learned.observed.map(() => true));
+        setTone(learned.tone);
+        setAvoid(learned.avoid);
+      })
+      .catch((e: unknown) =>
+        setPhase({ at: "failed", error: e instanceof Error ? e.message : "Could not read your carousels" }),
+      );
+  };
+
+  return (
+    <div className="mt-3 rounded-xl border border-hairline bg-surface-2 p-3">
+      <div className="flex items-center gap-2">
+        <span className="text-caption text-tertiary">
+          {enough
+            ? `From your ${source.count} saved carousel${source.count === 1 ? "" : "s"}`
+            : `${source.count} saved carousel${source.count === 1 ? "" : "s"}, needs ${MIN_LEARN_DECKS}`}
+        </span>
+        <div className="flex-1" />
+        <button
+          type="button"
+          disabled={!enough || phase.at === "loading"}
+          onClick={run}
+          className="flex h-7 items-center gap-1.5 rounded-lg border border-hairline px-2.5 text-caption text-secondary hover:border-accent-dim hover:text-accent disabled:pointer-events-none disabled:opacity-40"
+        >
+          {phase.at === "loading" ? (
+            <RefreshCw size={12} strokeWidth={2} className="fcc-spin" />
+          ) : (
+            <Sparkles size={12} strokeWidth={2} />
+          )}
+          Learn from my carousels
+        </button>
+      </div>
+
+      {/*
+        Both limits stated up front, because both are true and both would
+        otherwise be discovered as disappointments.
+      */}
+      <p className="mt-1.5 text-caption leading-4 text-muted">
+        It reads carousels, which are short and structured. Your newsletter voice is a different
+        voice.
+        {source.scope === "all" && enough
+          ? " These are your most recent carousels, not only the ones made with this brand."
+          : ""}
+      </p>
+
+      {source.drafted && enough ? (
+        <p className="mt-1.5 flex items-start gap-1.5 text-caption leading-4 text-muted">
+          <AlertTriangle size={12} strokeWidth={2.2} className="mt-0.5 shrink-0 text-muted" />
+          <span>
+            Most of these have no edits of your own on the canvas, so they may be mostly what the
+            AI wrote. Learning your voice from its output is a loop. If you wrote them in the
+            compose screen and never touched a layer, ignore this.
+          </span>
+        </p>
+      ) : null}
+
+      {phase.at === "failed" ? (
+        <p className="mt-2 text-caption leading-4 text-danger">{phase.error}</p>
+      ) : null}
+
+      {phase.at === "ready" ? (
+        <div className="mt-3 border-t border-hairline pt-3">
+          {hasVoice(existing) ? (
+            <div className="mb-2.5 rounded-lg border border-hairline bg-surface-1 p-2">
+              <span className="text-caption text-tertiary">What you have now</span>
+              <p className="mt-0.5 text-caption leading-4 text-muted">
+                {existing.tone || "(no description)"}
+              </p>
+            </div>
+          ) : null}
+
+          <label className="block">
+            <span className="text-caption text-tertiary">Proposed</span>
+            <input
+              value={tone}
+              onChange={(e) => setTone(e.target.value)}
+              className={`${field} mt-1`}
+            />
+          </label>
+
+          <div className="mt-2.5 flex flex-col gap-1.5">
+            {phase.learned.observed.map((o, i) => (
+              <label
+                key={i}
+                className="flex cursor-pointer items-start gap-2 rounded-lg border border-hairline bg-surface-1 p-2"
+              >
+                <input
+                  type="checkbox"
+                  checked={kept[i] ?? true}
+                  onChange={(e) =>
+                    setKept((k) => k.map((v, j) => (j === i ? e.target.checked : v)))
+                  }
+                  className="mt-0.5 h-3 w-3 shrink-0 accent-accent"
+                />
+                <span className="min-w-0 flex-1">
+                  <span className="block text-caption text-primary">{o.trait}</span>
+                  {/* Checked against the decks on the server. Anything the model
+                      tidied was dropped along with the trait it supported. */}
+                  <span className="mt-0.5 block text-caption leading-4 text-muted">
+                    &ldquo;{o.evidence}&rdquo;
+                  </span>
+                </span>
+              </label>
+            ))}
+          </div>
+
+          {avoid.length > 0 ? (
+            <div className="mt-2.5 flex flex-wrap gap-1">
+              {avoid.map((w) => (
+                <button
+                  key={w}
+                  type="button"
+                  onClick={() => setAvoid((list) => list.filter((x) => x !== w))}
+                  title="Remove"
+                  className="flex h-6 items-center gap-1 rounded-md border border-hairline px-1.5 text-caption text-tertiary hover:border-danger-dim hover:text-danger"
+                >
+                  {w}
+                  <X size={10} strokeWidth={2.4} />
+                </button>
+              ))}
+            </div>
+          ) : null}
+
+          <div className="mt-3 flex items-center gap-2">
+            <button
+              type="button"
+              onClick={() => {
+                onUse(toneFrom(phase.learned, kept, tone), avoid);
+                setPhase({ at: "idle" });
+              }}
+              style={{ background: "var(--brand-gold)", color: "var(--on-brand-gold)" }}
+              className="flex h-7 items-center rounded-lg px-3 text-caption font-semibold"
+            >
+              {hasVoice(existing) ? "Replace what I have" : "Use this"}
+            </button>
+            <button
+              type="button"
+              onClick={() => setPhase({ at: "idle" })}
+              className="text-caption text-tertiary hover:text-primary"
+            >
+              Discard
+            </button>
+            <div className="flex-1" />
+            <span className="text-caption text-muted">
+              {kept.filter(Boolean).length} of {phase.learned.observed.length} kept
+            </span>
+          </div>
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
 function VoiceEditor({ brand, onChange }: { brand: Brand; onChange: (b: Brand) => void }) {
   const voice: Voice = brand.voice ?? {};
 
@@ -238,6 +450,15 @@ function VoiceEditor({ brand, onChange }: { brand: Brand; onChange: (b: Brand) =
           className={`${field} mt-1`}
         />
       </label>
+
+      <LearnVoice
+        brand={brand}
+        existing={voice}
+        // Applied only here, only on a press, and only with what survived the
+        // checkboxes. `samples` is deliberately untouched: choosing which of
+        // your posts represents you is not a machine's call.
+        onUse={(tone, avoid) => set({ tone, ...(avoid.length > 0 ? { avoid } : {}) })}
+      />
 
       <div className="mt-3">
         <span className="text-caption text-tertiary">

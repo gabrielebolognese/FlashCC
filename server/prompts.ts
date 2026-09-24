@@ -259,6 +259,64 @@ export function assembleHooks(input: HookInput): Assembled {
   return { system: HOOK_SYSTEM, user };
 }
 
+/* ── working out a voice ──────────────────────────────────────────────────── */
+
+export const MAX_LEARN_DECKS = 12;
+export const MAX_LEARN_CHARS = 20000;
+
+export const VOICE_SYSTEM = `You read several carousels one person wrote and describe how they write.
+
+You are characterising a voice, not reviewing it. Nothing here is a judgement about whether the writing is good.
+
+Rules:
+- Return three to six traits. Each one is a specific, checkable habit: sentence length, where they put the claim, what person they write in, punctuation they favour, what they refuse to do.
+- **Every trait needs one line from the decks, COPIED EXACTLY, that demonstrates it.** Character for character, no tidying, no trimming, no joining two lines that were apart. The evidence is the whole point: a description somebody cannot check is a description they have to take on faith.
+- Never claim a trait the decks do not show. If you can only support three, return three.
+- "Direct", "punchy", "engaging" and "conversational" are not traits. They describe every piece of writing anybody has ever praised. Say what they actually DO instead.
+- Also return a short tone description, two sentences at most, in the second person: "You write X. You never Y."
+- Also return the words and constructions these decks conspicuously avoid, where there is evidence of avoidance rather than mere absence. If there is none, return an empty list. An invented list of banned words is worse than none, because it will be applied to everything they write afterwards.
+- No em dashes in anything you write yourself. This does not apply to the evidence, which is copied.`;
+
+export type VoiceInput = {
+  decks: string[][];
+  existing?: Voice | undefined;
+};
+
+/**
+ * The decks, numbered, with the slides inside each one kept together.
+ *
+ * Flattening them into one list of lines would lose the thing being measured:
+ * how somebody opens, how they close, and how long they let a middle slide run
+ * are all facts about a carousel's shape, not about a sentence.
+ */
+export function assembleVoice(input: VoiceInput): Assembled {
+  const decks = input.decks
+    .map((d) => d.map((t) => t.trim()).filter(Boolean))
+    .filter((d) => d.length > 0);
+
+  const body = clip(
+    decks
+      .map((d, i) => `Carousel ${i + 1}:\n${d.map((t, j) => `  ${j + 1}. ${t}`).join("\n")}`)
+      .join("\n\n"),
+    MAX_LEARN_CHARS,
+  );
+
+  const user = [
+    ...(input.existing?.tone
+      ? [
+          `They have already described their own voice as: ${clip(input.existing.tone.trim(), MAX_TONE_CHARS)}`,
+          "Say what the decks actually show, whether or not it agrees with that.",
+          "",
+        ]
+      : []),
+    `${decks.length} carousel${decks.length === 1 ? "" : "s"} they wrote:`,
+    "",
+    body,
+  ].join("\n");
+
+  return { system: VOICE_SYSTEM, user };
+}
+
 /* ── reading a source ─────────────────────────────────────────────────────── */
 
 /**

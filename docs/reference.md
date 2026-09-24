@@ -688,6 +688,46 @@ words deterministically.
 A route that returned a size, a position, a colour or a composition would break this, and the
 breakage is invisible until somebody's deck ships looking wrong.
 
+### Learning a voice (`/api/voice/learn`, `learn.ts`, `Brands.tsx`)
+
+Brand voice worked from Batch 10 but asked somebody to paste three posts into a form first, and
+almost nobody will. The product is already sitting on a folder of their own writing.
+
+**Every trait arrives with a line from their own decks, and that line is verified.** A model saying
+"your tone is direct and punchy" has told somebody nothing they can check. A model that
+*paraphrases* the evidence is worse: the panel looks auditable and is not, which invites the trust
+it has not earned. A trait whose evidence fails `verbatimOnly` is **dropped as a pair**, because a
+trait shown without its line is the unfalsifiable claim this exists to avoid.
+
+**It never returns `samples`.** They are the highest-weight part of the drafting prompt, and
+choosing which three of your posts represent you is a judgement about your own work.
+
+**Nothing is applied until Use is pressed**, and unchecking a trait changes what gets written:
+`toneFrom` rebuilds the tone from the surviving traits, so the checkboxes are not theatre. A voice
+somebody disagrees with is worse than no voice, which is already `contextVoice`'s rule.
+
+### Which decks it reads
+
+`pickDecks` prefers decks made with this brand, identified through `styleId`'s `brand:<id>`, and
+falls back to everything when there are fewer than three. Strict filtering alone usually returns
+nothing, because most people have one brand and everything older carries a stock style. The panel
+says which happened.
+
+**The AI-loop warning** fires when more than half the source decks have no hand edits, which
+`handEditedCount` knows for free. Learning your voice from a model's output is a loop and the
+interface has to say so. Its honest limit, also stated in the interface: `markEdited` fires on
+*canvas* edits, so somebody who writes only in the compose screen gets a false positive. Over-warning
+is the right direction here.
+
+**`avoid` is the one field that cannot be verified**, since by definition those words are not in the
+decks. The chips are individually removable, and nothing reaches a prompt until Use is pressed.
+
+### Verifying that text is really there (`server/verbatim.ts`)
+
+Shared by `/api/distil` and `/api/voice/learn`, which need the same answer for the same reason. See
+the quotes section under Reading a source for `canonical`, the strict-match-loose-dedup split, and
+why `plainText` must never touch any of it.
+
 ### Reading a source (`/api/distil`, `distil.ts`, `Repurpose.tsx`)
 
 **It returns angles, not a deck.** A long transcript contains several carousels, and a route that

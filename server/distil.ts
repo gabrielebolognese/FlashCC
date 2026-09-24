@@ -32,6 +32,7 @@ import {
   type Voice,
 } from "./prompts.js";
 import { requirePro } from "./supabase.js";
+import { verbatimOnly } from "./verbatim.js";
 
 /**
  * Lower than every other route, and for a reason worth stating.
@@ -69,73 +70,6 @@ type DistilRequest = {
 
 const isKind = (v: unknown): v is SourceKind =>
   typeof v === "string" && (SOURCE_KINDS as readonly string[]).includes(v);
-
-/**
- * The characters that differ between what somebody pasted and what a model
- * typed back, without either of them meaning anything different.
- *
- * Curly and straight quotes, the various dashes and spaces, and runs of
- * whitespace. **This is not fuzzy matching and it is not "close enough".** Every
- * pair here is the same character wearing a different code point, and without
- * this step nearly every real quote fails on an apostrophe.
- */
-const canonical = (text: string): string =>
-  text
-    .replace(/[‘’‛′]/g, "'")
-    .replace(/[“”‟″]/g, '"')
-    .replace(/[‐-―−]/g, "-")
-    .replace(/[   ]/g, " ")
-    .replace(/\s+/g, " ")
-    .trim()
-    .toLowerCase();
-
-/**
- * Only the quotes the source actually contains.
- *
- * A model asked for verbatim will occasionally tidy one: fix a comma, drop a
- * filler word, join two sentences that were apart. A quote in somebody's
- * carousel, attributed to a transcript that does not contain it, is the failure
- * that actually hurts, and it is checkable for free.
- *
- * **No repair, no fuzzy match, no nearest neighbour. Dropped.** Anything else is
- * this function deciding what somebody said.
- *
- * Note what does NOT run on these: `plainText`, which turns em dashes into
- * commas everywhere else in this codebase. Cleaning a quote would alter the one
- * text in the product whose whole value is being unaltered, and would then fail
- * its own check.
- */
-export function verbatimOnly(quotes: readonly string[], source: string): string[] {
-  const haystack = canonical(source);
-  const seen = new Set<string>();
-  const out: string[] = [];
-
-  for (const raw of quotes) {
-    const quote = raw.trim();
-    // Too short to be a quote, and short strings match by accident.
-    if (quote.length < 12) continue;
-
-    const key = canonical(quote);
-    if (!key || !haystack.includes(key)) continue;
-
-    /*
-     * Matched strictly, deduplicated loosely, and the two keys are different on
-     * purpose.
-     *
-     * The match has to stay exact: that is the entire promise. But the same
-     * sentence returned twice, once with a trailing full stop, passes the match
-     * both times and would show somebody two cards saying the same thing. The
-     * dedup key drops punctuation so those collapse, without ever loosening
-     * what counts as present in the source.
-     */
-    const dedup = key.replace(/[^a-z0-9 ]+/g, "").trim();
-    if (seen.has(dedup)) continue;
-    seen.add(dedup);
-    out.push(quote);
-  }
-
-  return out;
-}
 
 export async function distil(req: IncomingMessage, res: ServerResponse): Promise<void> {
   if (!draftConfigured()) {

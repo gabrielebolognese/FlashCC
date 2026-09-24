@@ -1960,7 +1960,7 @@ path was exercised by the planted quote rather than by real output.
 
 ## Batch 14, A voice it works out for itself
 
-**Status:** next
+**Status:** done
 **Size:** medium
 **Why here:** Batch 10 shipped brand voice and it works, but it asks somebody to
 sit down and paste three posts into a form before they get anything. Almost
@@ -2058,11 +2058,80 @@ task and the output is short.
 - **No cross-account learning.** One person's voice is derived from one person's
   decks, full stop.
 
+### The plan was accurate, which has not happened before
+
+Nothing in it was already built, stale or blocked. `handEditedCount` already
+existed in `regenerate.ts`, so 14.3's signal needed no new plumbing.
+
+### The decision the plan did not make: which decks
+
+`Brands.tsx` edits one brand at a time, and `DocSummary.styleId` carries
+`brand:<id>`, so a brand's own decks are identifiable. Learning Brand A's voice
+from Brand B's decks would be straightforwardly wrong.
+
+But strict filtering usually returns nothing: most people have one brand, and
+everything made before that brand existed carries a stock style. So `pickDecks`
+**prefers this brand's decks when there are at least three, and falls back to
+everything otherwise, and the panel says which happened.** Silently reading the
+wrong decks is the failure to avoid; silently reading none is the failure that
+makes the button look broken.
+
+### The AI-loop warning, and its honest limit
+
+`mostlyDrafted` warns when **more than half** the source decks have zero hand
+edits. Generous and simple on purpose: a threshold anybody can explain in one
+line beats a cleverer one that cannot be reasoned about from the warning it
+produces.
+
+The limit, which the interface states rather than hides: `markEdited` fires on
+CANVAS edits. Somebody who writes everything in the compose screen and never
+touches a layer has no hand edits either, so this over-warns for them. Over is
+the right direction for a warning about a feedback loop, and the line says so.
+
+### Added, and not in the plan: the evidence is verified
+
+14.1 says each trait comes with "a line from their own decks", and the whole
+value is that it is auditable. **A model that paraphrases the evidence produces a
+panel that LOOKS auditable and is not**, which is worse than one with no evidence
+at all because it invites the trust it has not earned.
+
+So every evidence line is checked against the decks, and a trait whose evidence
+does not survive is **dropped as a pair**. A trait shown without its line is
+precisely the unfalsifiable claim the feature exists to avoid, so losing the
+evidence has to lose the trait.
+
+This is the same job Batch 13's quotes needed, so `verbatimOnly` and `canonical`
+moved out of `distil.ts` into `server/verbatim.ts` rather than being written
+twice.
+
+### What cannot be verified, and is therefore removable
+
+**`avoid` is the one unverifiable field**, by definition: the words are absent
+from the decks, so there is nothing to match against. A live run returned
+"maybe, I think, could, just, really", which is a defensible reading of an
+instructional voice and is still a claim nobody can check. The chips are
+individually removable, which is the mitigation, and nothing about this list
+reaches a prompt until somebody presses Use.
+
+### The live run
+
+`npm run eval:draft -- --voice` on four decks written in one deliberate voice
+returned **six traits, all six with evidence that verified**, and none of them
+the empty adjectives the prompt rules out:
+
+| Trait | Its evidence |
+| --- | --- |
+| Opens with a blunt diagnostic naming the reader's problem | "Your edits feel mechanical. Here is why." |
+| Clipped fragments with no main verb, one idea per line | "A hand leaving frame. A door closing." |
+| A one or two word command as a standalone closing line | "Fix the cuts first." |
+
+A planted near-miss, "shot" for "frame", was dropped with its trait.
+
 ---
 
 ## Batch 15, Checks before it reaches the canvas
 
-**Status:** queued
+**Status:** next
 **Size:** medium
 **Why here:** by the end of Batch 14 there are six routes that put model output
 in front of a customer and exactly one thing checking any of it: a script

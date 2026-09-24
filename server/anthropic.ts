@@ -48,6 +48,9 @@ export const MODELS = {
   // Reading forty thousand characters and working out which carousels are in
   // them is the most reasoning any route here asks for.
   distil: "claude-sonnet-5",
+  // Reading twelve carousels and characterising how somebody writes is a
+  // reasoning task with a short answer.
+  voice: "claude-sonnet-5",
 } as const;
 
 /** A hung request otherwise holds a browser tab open until somebody closes it. */

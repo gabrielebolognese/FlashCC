@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { verbatimOnly } from "./distil.js";
+import { verbatimOnly } from "./verbatim.js";
 import { assembleDistil, clipSource, DISTIL_SYSTEM, MAX_SOURCE_CHARS } from "./prompts.js";
 
 const SOURCE = [
