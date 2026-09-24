@@ -28,7 +28,9 @@ import { z } from "zod";
 import { anthropic, callModel, draftConfigured, MODELS } from "./anthropic.js";
 import { bearer, HttpError, json, rateLimit, readJson } from "./http.js";
 import { assembleVoice, MAX_AVOID, MAX_LEARN_DECKS, plainText, type Voice } from "./prompts.js";
+import { checkVoice } from "./checks.js";
 import { requirePro } from "./supabase.js";
+import { countFindings } from "./tally.js";
 import { verbatimOnly } from "./verbatim.js";
 
 /** Nobody needs to do this twice in an afternoon. */
@@ -147,6 +149,8 @@ export async function learnVoice(req: IncomingMessage, res: ServerResponse): Pro
       "Nothing it said about your writing could be backed up by your own decks, so none of it is worth showing you.",
     );
   }
+
+  countFindings("voice", checkVoice(observed, parsed.tone));
 
   json(res, 200, {
     tone: plainText(parsed.tone),

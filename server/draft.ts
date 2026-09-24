@@ -18,6 +18,8 @@ import { z } from "zod";
 
 import { anthropic, callModel, draftConfigured, MODELS } from "./anthropic.js";
 import { bearer, HttpError, json, rateLimit, readJson } from "./http.js";
+import { checkDraft, checkHooks, flagged, repair, withContentRetry } from "./checks.js";
+import { countFindings } from "./tally.js";
 import {
   assembleDraft,
   assembleHooks,
@@ -94,34 +96,66 @@ export async function draft(req: IncomingMessage, res: ServerResponse): Promise<
     ...(body.voice ? { voice: body.voice } : {}),
   });
 
-  const response = await callModel("draft", MODELS.draft, () =>
-    anthropic().messages.parse({
-      model: MODELS.draft,
-      max_tokens: 16000,
-      // An array with a cache breakpoint rather than a bare string. The block is
-      // byte-identical for every draft anybody makes, so it caches across users
-      // rather than only across one person's session.
-      system: [{ type: "text", text: system, cache_control: { type: "ephemeral" } }],
-      output_config: {
-        effort: "medium",
-        format: zodOutputFormat(DraftSchema),
-      },
-      messages: [{ role: "user", content: user }],
-    }),
+  const slots = body.structure.slots;
+
+  // Named explicitly: the generic cannot be inferred through a `run` that
+  // throws on two of its paths.
+  type Drafted = { slides: { role: string; text: string }[] };
+
+  const { out, findings, retried } = await withContentRetry<Drafted>(
+    async (retry) => {
+      const response = await callModel("draft", MODELS.draft, () =>
+        anthropic().messages.parse({
+          model: MODELS.draft,
+          max_tokens: 16000,
+          // An array with a cache breakpoint rather than a bare string. The block
+          // is byte-identical for every draft anybody makes, so it caches across
+          // users rather than only across one person's session.
+          system: [{ type: "text", text: system, cache_control: { type: "ephemeral" } }],
+          output_config: {
+            effort: "medium",
+            format: zodOutputFormat(DraftSchema),
+          },
+          messages: retry
+            ? [
+                { role: "user", content: user },
+                // Its own answer back, so "Item 4" names something it can see.
+                { role: "assistant", content: JSON.stringify(retry.previous) },
+                { role: "user", content: retry.note },
+              ]
+            : [{ role: "user", content: user }],
+        }),
+      );
+
+      // A policy decline returns 200 with no usable content, so check before reading.
+      if (response.stop_reason === "refusal") {
+        const why = response.stop_details?.explanation ?? "the request was declined";
+        throw new HttpError(422, `Claude declined this brief: ${why}`);
+      }
+
+      const parsed = response.parsed_output;
+      if (!parsed) throw new HttpError(502, "Draft came back unreadable");
+
+      // Repaired BEFORE checking, so the ceiling is measured on the text that
+      // will actually ship rather than on one still carrying punctuation this
+      // product removes.
+      return { slides: parsed.slides.map((s) => ({ ...s, text: repair(s.text) })) };
+    },
+    (draft) => checkDraft(draft.slides, slots, body.brief),
   );
 
-  // A policy decline returns 200 with no usable content, so check before reading.
-  if (response.stop_reason === "refusal") {
-    const why = response.stop_details?.explanation ?? "the request was declined";
-    throw new HttpError(422, `Claude declined this brief: ${why}`);
-  }
+  if (retried) console.log("[ai] draft retried once on its own output");
+  countFindings("draft", findings);
 
-  const parsed = response.parsed_output;
-  if (!parsed) throw new HttpError(502, "Draft came back unreadable");
-
-  // Cleaned here rather than in the browser: this is the only door the copy
-  // comes through, and the browser is not the place to be fixing house style.
-  json(res, 200, { slides: parsed.slides.map((s) => ({ ...s, text: plainText(s.text) })) });
+  /*
+   * Flags travel with the draft; retry findings do not.
+   *
+   * A retry finding is about an answer that has already been replaced or
+   * accepted, and showing somebody "slide 4 was empty" about a slide that is no
+   * longer empty is noise. A flag is the one thing the server could not settle,
+   * and the person reading it knows things the brief does not contain.
+   */
+  json(res, 200, { slides: out.slides, findings: flagged(findings) });
 }
 
 /* ── hook variants ────────────────────────────────────────────────────────── */
@@ -198,9 +232,14 @@ export async function hooks(req: IncomingMessage, res: ServerResponse): Promise<
   const parsed = response.parsed_output;
   if (!parsed) throw new HttpError(502, "The hooks came back unreadable");
 
-  json(res, 200, {
-    hooks: parsed.hooks.slice(0, count).map((h) => ({ ...h, text: plainText(h.text) })),
-  });
+  const hooks = parsed.hooks.slice(0, count).map((h) => ({ ...h, text: repair(h.text) }));
+
+  // Counted but not retried. A hook picker showing four good openings and one
+  // repeat is usable; spending a second call to make it five is not worth it
+  // when the person is choosing from a list anyway.
+  countFindings("hooks", checkHooks(hooks, deck));
+
+  json(res, 200, { hooks });
 }
 
 /**

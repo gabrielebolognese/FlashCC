@@ -10,6 +10,7 @@ import { Compose } from "./studio/Compose.js";
 import { FirstRun } from "./studio/FirstRun.js";
 import { Home } from "./studio/Home.js";
 import { Repurpose } from "./studio/Repurpose.js";
+import type { Finding } from "./studio/ai.js";
 import { Landing } from "./landing/Landing.js";
 import { ReviewLink } from "./studio/ReviewLink.js";
 import { onPaywall } from "./studio/gate.js";
@@ -66,6 +67,16 @@ type Screen =
       theme: keyof typeof THEMES;
       texts?: string[];
       quotes?: string[];
+      /**
+       * What the server could not settle about the draft.
+       *
+       * Carried as screen state and no further. A finding is derived FROM the
+       * brief, and the brief does not survive onto a Doc, so there is nowhere
+       * downstream that could recompute it and nothing that could keep it
+       * honest once the text is edited. Compose is where it is both true and
+       * actionable.
+       */
+      findings?: Finding[];
     }
   | { view: "style"; draft: Draft; theme: keyof typeof THEMES }
   | { view: "studio"; doc: Doc };
@@ -274,12 +285,13 @@ function Screens() {
             ...(screen.quotes ? { quotes: screen.quotes } : {}),
           })
         }
-        onDrafted={(texts) =>
+        onDrafted={(texts, findings) =>
           setScreen({
             view: "compose",
             structure: screen.structure,
             theme: screen.theme,
             texts,
+            ...(findings.length > 0 ? { findings } : {}),
             ...(screen.quotes ? { quotes: screen.quotes } : {}),
           })
         }
@@ -294,6 +306,7 @@ function Screens() {
         initialTheme={screen.theme}
         initialTexts={screen.texts}
         quotes={screen.quotes}
+        findings={screen.findings}
         onBack={() => setScreen({ view: "ai", structure: screen.structure, theme: screen.theme })}
         onGenerate={({ texts, roles, themeId }) =>
           setScreen({

@@ -2131,7 +2131,7 @@ A planted near-miss, "shot" for "frame", was dropped with its trait.
 
 ## Batch 15, Checks before it reaches the canvas
 
-**Status:** next
+**Status:** done
 **Size:** medium
 **Why here:** by the end of Batch 14 there are six routes that put model output
 in front of a customer and exactly one thing checking any of it: a script
@@ -2222,6 +2222,70 @@ prompts and not a fact about any customer.
 - **No per-user record of what was flagged.** See 15.4.
 - **No automated prompt tuning.** A loop that edits its own prompts against a
   metric is how a product drifts somewhere nobody chose.
+
+### The filmstrip dot in 15.2 was not built, and should not be
+
+A finding is derived FROM the brief, and the brief does not survive onto a `Doc`.
+That leaves two ways to show a dot in the filmstrip and both are worse than not
+showing one:
+
+- **Store the findings on the Doc.** They then outlive the edit that fixes them.
+  Correct the invented number and the dot still says it is invented. A warning
+  that lies is worse than no warning, and this one would start lying seconds
+  after being acted on.
+- **Store the brief on the Doc** so findings can be recomputed. New permanent
+  state, derived-data-adjacent, kept forever for something needed for ninety
+  seconds.
+
+**Compose is where the finding is both true and actionable.** The brief is in
+scope, the text is editable in front of you, and the note is recomputed against
+the field as it is typed, so fixing the number makes it disappear. That is the
+whole of 15.2's value without the half that goes stale.
+
+### The retry cap, which 15.1 half-spots
+
+`callModel` already retries, for transport failures. A content retry wrapped
+naively around it gives **two times two calls**, which is precisely what the
+comment in `anthropic.ts` warns about: two layers of retry on a paid call is how
+one failure becomes four charges.
+
+`withContentRetry` calls `run` at most twice, whatever happens, and a test
+asserts it. It also **keeps whichever answer is better rather than whichever came
+second**, because a retry usually improves things and occasionally does not, and
+there is no reason to prefer the later one when more is wrong with it.
+
+Two smaller decisions worth recording:
+
+- **Repair runs before checking**, so a ceiling is measured on the text that will
+  actually ship rather than on one still carrying punctuation this product
+  removes.
+- **The previous answer travels with the retry note.** The note says "Item 4",
+  and that means nothing to a model which cannot see what item 4 was.
+
+### What reaches the browser, and what does not
+
+Only the `flag` tier. A retry finding is about an answer that has already been
+replaced or accepted, and telling somebody "slide 4 was empty" about a slide that
+is no longer empty is noise.
+
+### Two routes gained checks they were never going to get
+
+15.1's table is about drafting, but `/api/distil` and `/api/voice/learn` had
+nothing checking them at all. Rather than leave the script holding rules the
+server does not run, both now have `checkDistil` and `checkVoice`, counted like
+everything else. `checkVoice` includes the empty-adjective rule, so "direct and
+punchy" is caught in production and not only on the days somebody runs the eval.
+
+### What is left in the eval script, and why
+
+15.3's "done when" is satisfied: every rule about a RESPONSE is imported. Three
+things remain and each is a different kind of thing:
+
+| Line | What it is |
+| --- | --- |
+| every hashtag generic | about the FILTER, not the answer. A fact about the prompt. |
+| planted quote and planted trait survived | eval-only probes OF the verifier, not checks on a response. |
+| traits whose evidence was not real | measures how often the model paraphrases. The route drops these, so production never sees them to count. |
 
 ---
 
@@ -2370,9 +2434,23 @@ would notice. These five are what it was for.
 | 14 | Voice works, but asks for three pasted posts before it does anything. |
 | 15 | Six routes putting words in front of customers, one hand-run script checking any of it. |
 
-**Read 11 first even if you build something else.** It is the one people press
-constantly, and it is the only one of the five that changes the shape of the
-editing loop rather than adding a step to the creation flow.
+All five are built. What they turned out to be, in one line each:
+
+| | Turned out to be |
+| --- | --- |
+| 11 | Plus a live bug: `/api/hooks` had been broken on every call since Batch 10 |
+| 12 | Plus a hashtag filter that took three attempts to get right |
+| 13 | Plus a worse bug: `.srt` and `.vtt` were mangled by the FREE path |
+| 14 | Plus evidence verification the plan did not ask for |
+| 15 | The checks stop being a thing somebody remembers to run |
+
+**The eval harness earned itself four times.** It found the `effort` parameter
+breaking hook variants, the alt text preamble, the LinkedIn hashtag famine, and
+the fabricated showcase brief in Batch 10. Every one of those would have reached
+a customer, and none of them would have been found by reading the code.
+
+**Batch 15 is the answer to that.** Every rule it kept finding things with now
+runs on every response, is covered without a key, and cannot be skipped.
 
 Two rules run through all five and are worth stating once rather than five times:
 **every route returns words**, never a size, a position or a composition, because
@@ -2381,5 +2459,7 @@ that define the category. And **nothing is ranked, scored or graded**, because
 the ranking complaint in the research corpus is not about cost, it is about a
 machine asserting which of your sentences is better.
 
-The other open work is `docs/reference.md` §29, the defect list, which is
-deliberately not a roadmap item and should not be folded into one.
+**Every batch in this document is done.** The open work is `docs/reference.md`
+§29, the defect list, which is deliberately not a roadmap item and should not be
+folded into one, and the two migrations that wait on billing: `02-pro-gate.sql`
+and `09-gates.sql`.

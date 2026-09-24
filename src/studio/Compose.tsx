@@ -1,4 +1,5 @@
 import {
+  AlertCircle,
   ArrowRight,
   ChevronDown,
   GripVertical,
@@ -14,6 +15,7 @@ import { Fragment, useState } from "react";
 import { MAX_SLIDES } from "./compositions.js";
 import { THEMES } from "./presets.js";
 import { labelFor, repeatableOf, type Slot, type Structure } from "./structures.js";
+import type { Finding } from "./ai.js";
 
 export type ComposeResult = {
   texts: string[];
@@ -34,6 +36,7 @@ export function Compose({
   initialTheme = "ink",
   initialTexts,
   quotes,
+  findings,
   onGenerate,
   onBack,
 }: {
@@ -49,6 +52,19 @@ export function Compose({
    * already said, and it arrives here unaltered.
    */
   quotes?: readonly string[] | undefined;
+  /**
+   * What the server flagged and could not settle.
+   *
+   * Shown here and nowhere else. A finding is derived from the brief, which
+   * does not survive onto a Doc, so a filmstrip dot could never be recomputed
+   * and would go on pointing at a number somebody had already fixed. A warning
+   * that lies is worse than no warning, and this one would start lying within
+   * seconds of being acted on.
+   *
+   * Here it stays honest: it is recomputed against the field as it is typed, so
+   * correcting the number makes the note disappear.
+   */
+  findings?: readonly Finding[] | undefined;
   onGenerate: (result: ComposeResult) => void;
   onBack: () => void;
 }) {
@@ -61,6 +77,8 @@ export function Compose({
   const [quotesOpen, setQuotesOpen] = useState(false);
   /** Which field a quote goes into. The last one touched, or the first. */
   const [focused, setFocused] = useState<string | null>(null);
+  /** Dismissed per slide index, and only for this screen. */
+  const [hushed, setHushed] = useState<Set<number>>(new Set());
   // State rather than a ref: the indicator has to re-render as the pointer moves.
   const [dragFrom, setDragFrom] = useState<number | null>(null);
   const [dragOver, setDragOver] = useState<number | null>(null);
@@ -414,6 +432,32 @@ ${q}` : q);
                     }}
                     className="w-full resize-none bg-transparent text-[14px] leading-[22px] text-primary outline-none placeholder:text-muted"
                   />
+
+                  {/*
+                    Recomputed against the field as it is typed, not shown from
+                    a snapshot. Correcting the number makes it disappear, which
+                    is the only way a note like this stays true.
+                  */}
+                  {(findings ?? [])
+                    .filter((fi) => fi.at === i && !hushed.has(i))
+                    .filter((fi) => !fi.detail || f.text.includes(fi.detail))
+                    .slice(0, 1)
+                    .map((fi) => (
+                      <p
+                        key={fi.code}
+                        className="mt-1.5 flex items-start gap-1.5 text-caption leading-4 text-muted"
+                      >
+                        <AlertCircle size={12} strokeWidth={2.2} className="mt-0.5 shrink-0 text-accent" />
+                        <span className="min-w-0 flex-1">{fi.message}</span>
+                        <button
+                          type="button"
+                          onClick={() => setHushed((h) => new Set(h).add(i))}
+                          className="shrink-0 text-tertiary hover:text-primary"
+                        >
+                          Dismiss
+                        </button>
+                      </p>
+                    ))}
                 </div>
 
                 <button

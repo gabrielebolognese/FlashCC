@@ -45,6 +45,14 @@ import {
   REWRITE_INTENTS,
 } from "../server/prompts.ts";
 import { groundedTags } from "../server/caption.ts";
+import {
+  checkAlt,
+  checkCaption,
+  checkDistil,
+  checkDraft,
+  checkRewrite,
+  checkVoice,
+} from "../server/checks.ts";
 import { verbatimOnly } from "../server/verbatim.ts";
 import { groundedTraits } from "../server/voice.ts";
 import { STRUCTURES } from "../src/studio/structures.ts";
@@ -89,78 +97,20 @@ const Schema = z.object({
   slides: z.array(z.object({ role: z.string(), text: z.string() })),
 });
 
-/* ── the properties ───────────────────────────────────────────────────────── */
+/* ── the properties ───────────────────────────────────────────────── */
 
-const PLACEHOLDERS = ["your hook", "type something", "lorem", "insert ", "[", "xxx"];
-
-/** Structural only. Every one of these is a defect anybody would recognise. */
-function check(slides, structure, briefText) {
-  const problems = [];
-  const texts = slides.map((s) => (s.text ?? "").trim());
-
-  if (slides.length !== structure.slots.length) {
-    problems.push(`${slides.length} slides for ${structure.slots.length} slots`);
-  }
-  if (texts.some((t) => !t)) problems.push("a slide came back empty");
-
-  const hook = texts[0] ?? "";
-  if (hook.length > 90) problems.push(`hook is ${hook.length} chars, over 90`);
-
-  const long = texts.slice(1).filter((t) => t.length > 220);
-  if (long.length > 0) problems.push(`${long.length} body slide(s) over 220 chars`);
-
-  for (const t of texts) {
-    const low = t.toLowerCase();
-    if (PLACEHOLDERS.some((p) => low.includes(p))) problems.push(`placeholder text: "${t.slice(0, 40)}"`);
-  }
-
-  /*
-   * Invented specifics.
-   *
-   * An earlier run produced, from the brief "Cut on movement, not on the beat",
-   * a coffee brand, a 30-second reel and a product launch. The showcase
-   * framework asks for context and results a thin brief cannot supply, and the
-   * model filled the gap rather than leaving it.
-   *
-   * This looks only for a MEASUREMENT: a currency amount, a percentage, a
-   * multiplier, or a number welded to a unit of time. Those are claims, and a
-   * claim absent from the brief was invented.
-   *
-   * It deliberately ignores bare integers. The first version of this check
-   * flagged every educational draft for hooks like "3 cutting rules", which is
-   * a deck counting its own slides, not a fabrication. Nothing separates the
-   * two by pattern, and a check that is usually wrong is one nobody reads.
-   */
-  const MEASURE = /[$£€]\s?\d[\d,.]*k?|\d[\d,.]*\s?%|\d+\s?x|\d+[-\s](?:second|minute|hour|day|week|month|year)s?/gi;
-  const inBrief = new Set((briefText.match(MEASURE) ?? []).map((m) => m.toLowerCase()));
-  for (const t of texts) {
-    const made = (t.match(MEASURE) ?? []).filter((m) => !inBrief.has(m.toLowerCase()));
-    if (made.length > 0) {
-      problems.push(`a measurement the brief never gave: "${made[0]}"`);
-      break;
-    }
-  }
-
-  // House style, and now guaranteed by `plainText` on the server. This runs
-  // against the raw model output, so it measures how well the PROMPT holds.
-  const dashes = texts.filter((t) => /[\u2014\u2013]/.test(t));
-  if (dashes.length > 0) problems.push(`${dashes.length} slide(s) used a dash`);
-
-  const ids = new Set(structure.slots.map((s) => s.id));
-  if (slides.some((s) => !ids.has(s.role))) problems.push("a slide came back with an unknown slot id");
-
-  // Two identical slides is the oldest generation bug in this codebase and the
-  // one a reader notices first.
-  const seen = new Set();
-  for (const t of texts) {
-    const key = t.toLowerCase().replace(/[^a-z0-9]/g, "");
-    if (key && seen.has(key)) problems.push("two slides say the same thing");
-    seen.add(key);
-  }
-
-  return problems;
-}
-
+/**
+ * There are none here any more, and that is the point of Batch 15.
+ *
+ * Every rule now lives in `server/checks.ts`, runs on every response in
+ * production, and is covered by `checks.test.ts` with no key and no bill. This
+ * script imports the same functions rather than keeping a second copy, which
+ * closes the gap where the two drift apart and nobody notices.
+ *
+ * What is left here is the half that cannot be automated: printing the copy so
+ * a person can read it. The checks catch BROKEN; only you catch BAD.
+ */
+const describe = (findings) => findings.map((f) => (f.at >= 0 ? `${f.at + 1}: ${f.message}` : f.message));
 
 /* ── rewriting ──────────────────────────────────────────────────── */
 
@@ -219,19 +169,7 @@ async function evalRewrites() {
     }
 
     const options = parsed?.options ?? [];
-    const problems = [];
-
-    if (options.length < 2) problems.push(`only ${options.length} option(s)`);
-    if (new Set(options.map((o) => key(o.text))).size !== options.length) {
-      problems.push("two options say the same thing");
-    }
-    if (options.some((o) => key(o.text) === key(LINE))) problems.push("returned the original");
-    if (options.some((o) => !String(o.note ?? "").trim())) problems.push("an option has no note");
-    if (new Set(options.map((o) => key(o.note))).size !== options.length) {
-      problems.push("two notes are identical");
-    }
-    const over = options.filter((o) => o.text.length > LIMIT);
-    if (over.length > 0) problems.push(`${over.length} option(s) over ${LIMIT} chars`);
+    const problems = describe(checkRewrite(options, LINE, LIMIT));
 
     if (problems.length > 0) bad += 1;
     console.log(`  ${problems.length === 0 ? "ok  " : "FAIL"} ${intent}  ${Date.now() - started}ms`);
@@ -306,16 +244,11 @@ async function evalCaptions() {
     const captions = parsed?.captions ?? [];
     const tags = parsed?.hashtags ?? [];
     const kept = groundedTags(tags, CAP_DECK, spec.hashtags);
-    const problems = [];
+    const problems = describe(checkCaption(captions, spec, CAP_DECK));
 
-    if (captions.length === 0) problems.push("no captions");
-    for (const c of captions) {
-      if (c.text.length > spec.limit) problems.push(`over ${spec.limit} chars`);
-      if (/#\w/.test(c.text)) problems.push("a hashtag ended up inside the caption");
-      if (/^(swipe|read on|here is a thread)/i.test(c.text.trim())) {
-        problems.push("opened with an instruction to swipe");
-      }
-    }
+    // The one rule here that is about the FILTER rather than the answer, which
+    // is why it is not in checks.ts: every tag being dropped means the model
+    // went generic, and that is a fact about the prompt.
     if (tags.length > 0 && kept.length === 0) {
       problems.push(`every hashtag was generic: ${tags.slice(0, 4).join(", ")}`);
     }
@@ -355,14 +288,7 @@ async function evalCaptions() {
     outTokens += response.usage?.output_tokens ?? 0;
 
     const alt = response.parsed_output?.alt ?? [];
-    const problems = [];
-    if (alt.length !== CAP_DECK.length) problems.push(`${alt.length} entries for ${CAP_DECK.length} slides`);
-    for (const a of alt) {
-      if (a.length > MAX_ALT_CHARS) problems.push(`over ${MAX_ALT_CHARS} chars`);
-      if (/^(image of|slide showing|text (saying|reading)|a graphic|this slide)/i.test(a.trim())) {
-        problems.push(`wasted the budget on a preamble: "${a.slice(0, 24)}"`);
-      }
-    }
+    const problems = describe(checkAlt(alt, CAP_DECK.length));
 
     if (problems.length > 0) bad += 1;
     console.log(`\n  ${problems.length === 0 ? "ok  " : "FAIL"} alt text  ${Date.now() - started}ms`);
@@ -445,16 +371,7 @@ async function evalDistil() {
   const kept = verbatimOnly(raw, clipped.text);
   const problems = [];
 
-  if (angles.length < 3) problems.push(`only ${angles.length} angle(s), wanted at least three`);
-  if (angles.some((a) => !a.title?.trim() || !a.brief?.trim() || !a.why?.trim())) {
-    problems.push("an angle is missing its title, brief or supporting line");
-  }
-
-  // Genuinely different is not checkable, but identical is.
-  const titles = new Set(angles.map((a) => a.title.toLowerCase().replace(/[^a-z0-9]/g, "")));
-  if (titles.size !== angles.length) problems.push("two angles have the same title");
-
-  if (raw.length === 0) problems.push("no quotes at all");
+  problems.push(...describe(checkDistil(angles, kept)));
 
   console.log(`  ${problems.length === 0 ? "ok  " : "FAIL"} distil  ${Date.now() - started}ms`);
   for (const p of problems) console.log(`       ! ${p}`);
@@ -566,17 +483,14 @@ async function evalVoice() {
   const kept = groundedTraits(observed, corpus);
   const problems = [];
 
-  if (observed.length < 3) problems.push(`only ${observed.length} trait(s), wanted at least three`);
-  if (kept.length < 3) {
-    problems.push(`only ${kept.length} of ${observed.length} traits had real evidence`);
+  problems.push(...describe(checkVoice(kept, parsed?.tone ?? "")));
+
+  // About the VERIFIER rather than the answer, which is why it stays here: the
+  // route already drops these, so production never sees them and has nothing to
+  // count. Here it measures how often the model paraphrases its own evidence.
+  if (kept.length < observed.length) {
+    problems.push(`${observed.length - kept.length} trait(s) had evidence that was not real`);
   }
-
-  // The adjectives that describe every piece of writing anybody has praised.
-  const EMPTY = /^(direct|punchy|engaging|conversational|concise|clear|authentic)\b/i;
-  const vague = kept.filter((o) => EMPTY.test(o.trait.trim()));
-  if (vague.length > 0) problems.push(`trait describes nothing: "${vague[0].trait}"`);
-
-  if (!parsed?.tone?.trim()) problems.push("no tone description");
 
   console.log(`\n  ${problems.length === 0 ? "ok  " : "FAIL"} voice  ${Date.now() - started}ms`);
   for (const p of problems) console.log(`       ! ${p}`);
@@ -651,7 +565,9 @@ for (const model of rewriteOnly || captionOnly || distilOnly || voiceOnly ? [] :
       }
 
       const ms = Date.now() - started;
-      const problems = parsed ? check(parsed.slides, structure, brief.text) : ["nothing parsed"];
+      const problems = parsed
+        ? describe(checkDraft(parsed.slides, structure.slots, brief.text))
+        : ["nothing parsed"];
       if (problems.length > 0) failures += 1;
 
       const mark = problems.length === 0 ? "ok  " : "FAIL";

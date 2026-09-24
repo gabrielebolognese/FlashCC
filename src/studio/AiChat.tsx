@@ -1,7 +1,7 @@
 import { AlertCircle, ArrowUp, PenLine, RotateCcw, Sparkles, X } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 
-import { alignToSlots, draftSlides } from "./ai.js";
+import { alignToSlots, draftSlides, type Finding } from "./ai.js";
 import { contextVoice, listBrands } from "./brand.js";
 import { ALL_CLIENTS, loadSelectedClient } from "./clients.js";
 import { labelFor, type Structure } from "./structures.js";
@@ -9,7 +9,7 @@ import { labelFor, type Structure } from "./structures.js";
 type Phase =
   | { kind: "idle" }
   | { kind: "drafting" }
-  | { kind: "drafted"; texts: string[] }
+  | { kind: "drafted"; texts: string[]; findings: Finding[] }
   | { kind: "failed"; message: string };
 
 export function AiChat({
@@ -22,7 +22,7 @@ export function AiChat({
   structure: Structure;
   /** A brief carried in from a distilled source. Editable like any other. */
   initialBrief?: string | undefined;
-  onDrafted: (texts: string[]) => void;
+  onDrafted: (texts: string[], findings: Finding[]) => void;
   onWriteMyself: () => void;
   onCancel: () => void;
 }) {
@@ -67,7 +67,11 @@ export function AiChat({
         selected === ALL_CLIENTS ? undefined : selected,
       );
       const drafted = await draftSlides(brief, structure, controller.signal, voice);
-      setPhase({ kind: "drafted", texts: alignToSlots(drafted, structure) });
+      setPhase({
+        kind: "drafted",
+        texts: alignToSlots(drafted.slides, structure),
+        findings: drafted.findings,
+      });
     } catch (error) {
       if (controller.signal.aborted) return;
       setPhase({ kind: "failed", message: error instanceof Error ? error.message : "Drafting failed" });
@@ -107,7 +111,7 @@ export function AiChat({
             <Drafted
               structure={structure}
               texts={phase.texts}
-              onUse={() => onDrafted(phase.texts)}
+              onUse={() => onDrafted(phase.texts, phase.findings)}
               onRedo={() => setPhase({ kind: "idle" })}
             />
           ) : (

@@ -34,7 +34,9 @@ import {
   type CaptionPlatform,
   type Voice,
 } from "./prompts.js";
+import { checkAlt, checkCaption, repair } from "./checks.js";
 import { requirePro } from "./supabase.js";
+import { countFindings } from "./tally.js";
 
 const CAPTIONS_PER_HOUR = 120;
 const HOUR_MS = 3_600_000;
@@ -239,13 +241,15 @@ export async function caption(req: IncomingMessage, res: ServerResponse): Promis
 
   const captions = parsed.captions
     .map((c) => {
-      const text = plainText(c.text);
-      return { note: shortNote(plainText(c.note)), text, chars: text.length };
+      const text = repair(c.text);
+      return { note: shortNote(repair(c.note)), text, chars: text.length };
     })
     .filter((c) => c.text.length > 0)
     .slice(0, count);
 
   if (captions.length === 0) throw new HttpError(502, "The caption came back empty");
+
+  countFindings("caption", checkCaption(captions, spec, deck));
 
   json(res, 200, {
     captions,
@@ -310,9 +314,14 @@ export async function alt(req: IncomingMessage, res: ServerResponse): Promise<vo
    * nothing about it looks wrong.
    */
   const out = Array.from({ length: deck.length }, (_, i) => {
-    const text = plainText(parsed.alt[i] ?? "");
+    const text = repair(parsed.alt[i] ?? "");
     return text.length > MAX_ALT_CHARS ? `${text.slice(0, MAX_ALT_CHARS - 1).trimEnd()}…` : text;
   });
+
+  // Checked against what the model returned rather than the padded array, so a
+  // short answer is counted as a short answer rather than hidden by the padding
+  // that fixes it.
+  countFindings("alt", checkAlt(parsed.alt, deck.length));
 
   json(res, 200, { alt: out, limit: MAX_ALT_CHARS });
 }

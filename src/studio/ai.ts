@@ -9,12 +9,29 @@ export type DraftedSlide = { role: string; text: string };
  * Ask the drafting server for slide copy. The key lives server-side, so this is a
  * plain fetch to our own origin, nothing secret ever reaches the bundle.
  */
+/**
+ * Something the server could not settle, passed on rather than acted on.
+ *
+ * Only the `flag` tier reaches here. A repair was silent and a retry has already
+ * happened, so the only thing left is the finding that needs a human: a
+ * measurement the brief never gave, which is usually invented and occasionally
+ * something the person knows and the brief did not say.
+ */
+export type Finding = {
+  at: number;
+  code: string;
+  message: string;
+  detail?: string;
+};
+
+export type Drafted = { slides: DraftedSlide[]; findings: Finding[] };
+
 export async function draftSlides(
   brief: string,
   structure: Structure,
   signal?: AbortSignal,
   voice?: Voice,
-): Promise<DraftedSlide[]> {
+): Promise<Drafted> {
   const res = await fetch("/api/draft", {
     method: "POST",
     // Drafting is Pro and the server checks the plan, so the token goes with it.
@@ -43,10 +60,10 @@ export async function draftSlides(
 
   if (!res.ok) throw await readRefusal(res);
 
-  const body: unknown = await res.json().catch(() => null);
-  const slides = (body as { slides?: DraftedSlide[] } | null)?.slides;
+  const body = (await res.json().catch(() => null)) as Partial<Drafted> | null;
+  const slides = body?.slides;
   if (!Array.isArray(slides) || slides.length === 0) throw new Error("No slides came back");
-  return slides;
+  return { slides, findings: Array.isArray(body?.findings) ? body.findings : [] };
 }
 
 /**

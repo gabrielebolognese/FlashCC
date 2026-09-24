@@ -12,6 +12,7 @@ import { createServer, type IncomingMessage, type ServerResponse } from "node:ht
 import { billingConfigured, checkout, portal, status, webhook } from "./billing.js";
 import { alt, caption } from "./caption.js";
 import { distil } from "./distil.js";
+import { tally } from "./tally.js";
 import { learnVoice } from "./voice.js";
 import { rewrite } from "./rewrite.js";
 import { draft, draftConfigured, draftStatus, hooks } from "./draft.js";
@@ -67,6 +68,9 @@ const server = createServer((req, res) => {
       draft: draftConfigured(),
       billing: billingConfigured(),
       secretKey: hasSecretKey(),
+      // Counts of which checks fired since this process started. Codes, not
+      // customers. See tally.ts for why this is not in the database.
+      checks: tally(),
     });
   }
 

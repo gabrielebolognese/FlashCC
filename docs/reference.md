@@ -688,6 +688,51 @@ words deterministically.
 A route that returned a size, a position, a colour or a composition would break this, and the
 breakage is invisible until somebody's deck ships looking wrong.
 
+### Checking what a model returned (`server/checks.ts`)
+
+Every rule lives here, runs on every response, and is covered by `checks.test.ts` with no key and no
+bill. `scripts/eval-draft.mjs` imports the same functions rather than keeping a second copy, which
+is what closes the gap where the two drift apart and nobody notices.
+
+**Three tiers, and the difference between them is the design:**
+
+| Tier | What happens | Why |
+| --- | --- | --- |
+| repair | fixed silently, always | punctuation the house style does not use. Nobody needs telling |
+| retry | one more call, the failure named | a refused draft leaves somebody with nothing, and the fault is usually one slide |
+| flag | passed through, surfaced | only where the check CANNOT be certain |
+
+**Repair runs before checking**, so a ceiling is measured on the text that will actually ship.
+
+**`withContentRetry` calls at most twice, whatever happens.** `callModel` already retries transport
+failures, so a content retry wrapped naively gives two times two calls, which is how one failure
+becomes four charges. It also keeps whichever answer is *better* rather than whichever came second,
+because a retry usually improves things and occasionally does not. The previous answer travels with
+the note, because the note says "Item 4" and that means nothing to a model that cannot see item 4.
+
+**Only flags reach the browser.** A retry finding is about an answer already replaced or accepted,
+and "slide 4 was empty" about a slide that is no longer empty is noise.
+
+**Only fabrication is flagged rather than retried**, because the check cannot be certain: a number
+absent from the brief is usually invented and occasionally something the person knows. Deleting a
+customer's correct number is worse than pointing at it.
+
+### Where a flag is shown, and where it deliberately is not
+
+**Compose only.** A finding is derived from the brief, and the brief does not survive onto a `Doc`,
+so a filmstrip dot could never be recomputed: it would outlive the edit that fixed it and go on
+pointing at a number already corrected. A warning that lies is worse than no warning.
+
+In Compose it stays honest, because it is recomputed against the field as it is typed and disappears
+when the number is fixed.
+
+### Counting what fires (`server/tally.ts`, `/api/health`)
+
+Codes, not customers, in memory, not in the database. The reason is narrow: **a prompt edit that
+makes fabrication twice as likely is invisible otherwise.** If `measure-not-in-brief` doubles the
+week after a prompt change, that is worth seeing, and counting it costs nothing. It resets on
+deploy, which is the right granularity for a signal about prompts rather than about people.
+
 ### Learning a voice (`/api/voice/learn`, `learn.ts`, `Brands.tsx`)
 
 Brand voice worked from Batch 10 but asked somebody to paste three posts into a form first, and

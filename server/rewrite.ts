@@ -29,7 +29,9 @@ import {
   type SlotSpec,
   type Voice,
 } from "./prompts.js";
+import { checkRewrite, repair } from "./checks.js";
 import { requirePro } from "./supabase.js";
+import { countFindings } from "./tally.js";
 
 /**
  * Higher than drafting by a wide margin, and that is the point.
@@ -139,7 +141,7 @@ export async function rewrite(req: IncomingMessage, res: ServerResponse): Promis
    */
   const seen = new Set<string>();
   const options = parsed.options
-    .map((o) => ({ note: shortNote(plainText(o.note)), text: plainText(o.text) }))
+    .map((o) => ({ note: shortNote(repair(o.note)), text: repair(o.text) }))
     .filter((o) => {
       const key = o.text.toLowerCase().replace(/[^a-z0-9]/g, "");
       if (!key || seen.has(key)) return false;
@@ -149,6 +151,8 @@ export async function rewrite(req: IncomingMessage, res: ServerResponse): Promis
     .slice(0, count);
 
   if (options.length === 0) throw new HttpError(502, "The rewrite came back empty");
+
+  countFindings("rewrite", checkRewrite(options, text, limitFor(body.slot, body.limit)));
 
   /*
    * The ceiling goes back with the answer.

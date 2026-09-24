@@ -31,7 +31,9 @@ import {
   type Structure,
   type Voice,
 } from "./prompts.js";
+import { checkDistil } from "./checks.js";
 import { requirePro } from "./supabase.js";
+import { countFindings } from "./tally.js";
 import { verbatimOnly } from "./verbatim.js";
 
 /**
@@ -126,13 +128,16 @@ export async function distil(req: IncomingMessage, res: ServerResponse): Promise
 
   if (angles.length === 0) throw new HttpError(502, "Nothing usable came back from that source");
 
+  const quotes = verbatimOnly(parsed.quotes, clipped.text);
+  countFindings("distil", checkDistil(angles, quotes));
+
   json(res, 200, {
     brief: plainText(parsed.brief),
     angles,
     // Checked against what was actually SENT, not against the whole source: a
     // quote from the clipped tail is one the model could not have read, so a
     // match there would mean something has gone wrong rather than right.
-    quotes: verbatimOnly(parsed.quotes, clipped.text),
+    quotes,
     used: clipped.used,
     total: clipped.total,
     clipped: clipped.clipped,
