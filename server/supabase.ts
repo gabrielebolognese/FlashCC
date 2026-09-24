@@ -101,13 +101,18 @@ export async function requirePro(
   return { ...caller, plan };
 }
 
+/**
+ * Deliberately provider-neutral. These were named after Stripe, which is what
+ * made renaming them necessary when the provider changed; see
+ * `11-lemon-billing.sql`.
+ */
 export type PlanUpdate = {
   plan: PlanName;
-  stripeCustomerId?: string | undefined;
-  stripeSubscriptionId?: string | null | undefined;
+  customerId?: string | undefined;
+  subscriptionId?: string | null | undefined;
   renewsAt?: string | null | undefined;
   /**
-   * Stripe's `cancel_at_period_end`.
+   * Cancelled, but still inside the period already paid for.
    *
    * Stored rather than inferred, because it is the difference between "renews on
    * the 3rd" and "ends on the 3rd" and there is no way to tell those apart from
@@ -120,9 +125,9 @@ export type PlanUpdate = {
 /** The one write that decides who has paid. */
 export async function setPlan(userId: string, update: PlanUpdate): Promise<void> {
   const patch: Record<string, unknown> = { plan: update.plan };
-  if (update.stripeCustomerId !== undefined) patch.stripe_customer_id = update.stripeCustomerId;
-  if (update.stripeSubscriptionId !== undefined) {
-    patch.stripe_subscription_id = update.stripeSubscriptionId;
+  if (update.customerId !== undefined) patch.billing_customer_id = update.customerId;
+  if (update.subscriptionId !== undefined) {
+    patch.billing_subscription_id = update.subscriptionId;
   }
   if (update.renewsAt !== undefined) patch.plan_renews_at = update.renewsAt;
   if (update.endsAtPeriodEnd !== undefined) {
@@ -135,29 +140,39 @@ export async function setPlan(userId: string, update: PlanUpdate): Promise<void>
 
 export async function readBilling(
   userId: string,
-): Promise<{ customerId: string | null; plan: PlanName }> {
+): Promise<{ customerId: string | null; subscriptionId: string | null; plan: PlanName }> {
   const { data, error } = await serviceClient()
     .from("profiles")
-    .select("stripe_customer_id, plan")
+    .select("billing_customer_id, billing_subscription_id, plan")
     .eq("id", userId)
     .maybeSingle();
 
   if (error) throw new HttpError(500, error.message);
 
-  const row = data as { stripe_customer_id: string | null; plan: PlanName } | null;
-  return { customerId: row?.stripe_customer_id ?? null, plan: row?.plan ?? "free" };
+  const row = data as {
+    billing_customer_id: string | null;
+    billing_subscription_id: string | null;
+    plan: PlanName;
+  } | null;
+
+  return {
+    customerId: row?.billing_customer_id ?? null,
+    subscriptionId: row?.billing_subscription_id ?? null,
+    plan: row?.plan ?? "free",
+  };
 }
 
 /**
- * Stripe knows a customer, not a user. The mapping is kept on our side so a
- * webhook that arrives with only a customer id can still find whose it is,
- * Stripe metadata is a convenience, not somewhere to keep the only copy.
+ * The provider knows a customer, not a user. The mapping is kept on our side so
+ * a webhook arriving with only a customer id can still find whose it is; the
+ * custom data carried on a checkout is a convenience, not somewhere to keep the
+ * only copy.
  */
 export async function userIdForCustomer(customerId: string): Promise<string | null> {
   const { data, error } = await serviceClient()
     .from("profiles")
     .select("id")
-    .eq("stripe_customer_id", customerId)
+    .eq("billing_customer_id", customerId)
     .maybeSingle();
 
   if (error) return null;

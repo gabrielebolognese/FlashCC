@@ -74,7 +74,7 @@ export type Profile = {
   planRenewsAt: string | null;
   /** True when that date is the END rather than the next charge. */
   planEndsAtPeriodEnd: boolean;
-  /** Stripe has a customer for them, so the billing portal has something to show. */
+  /** They have a subscription, so the billing portal has something to show. */
   hasBilling: boolean;
 };
 

@@ -18,7 +18,7 @@ the output, so check the result pane says *Success* before moving on, and if it
 does not, the error text is the useful thing to keep.
 
 It is idempotent, so you can re-run it after editing without dropping anything. **Do not run
-`02-pro-gate.sql`**, that one turns the paywall on and belongs after Stripe exists.
+`02-pro-gate.sql`**, that one turns the paywall on and belongs after billing exists.
 
 Check it landed: **Table Editor** should show `profiles`, `docs` and `posts`, each with the green
 **RLS enabled** badge. If any table says RLS is disabled, stop and work out why, that badge is
@@ -115,15 +115,16 @@ it should stay deleted. That second half is the one that catches real bugs.
 | File | When |
 | --- | --- |
 | `01-schema.sql` | Now. Tables, RLS, triggers, indexes. |
-| `02-pro-gate.sql` | After Stripe. Makes the cloud pipeline Pro-only, enforced by Postgres. |
+| `02-pro-gate.sql` | After billing. Makes the cloud pipeline Pro-only, enforced by Postgres. |
 | `03-brands.sql` | Now. The brands table, and the tier limit as an INSERT policy. |
 | `04-storage.sql` | Now. Two buckets, the `assets` library table, and `brands.logos`. |
 | `05-series.sql` | Now. Two nullable columns on `docs` and `posts`, so a series can be queried. |
 | `06-clients.sql` | Now. The `clients` table, the tier limit, and `client_id` on four tables. |
 | `07-review.sql` | Now. Review links and comments. **Required**, review has no offline half. |
 | `08-pipeline-fields.sql` | Now. Five planning fields on `posts`, and one billing boolean. |
-| `09-gates.sql` | **After Stripe**, with `02-pro-gate.sql`. Review links become Pro. |
+| `09-gates.sql` | **After billing**, with `02-pro-gate.sql`. Review links become Pro. |
 | `10-brand-voice.sql` | Now. One `jsonb` column on `brands`, holding how a brand sounds. |
+| `11-lemon-billing.sql` | Now. Renames the two `stripe_` columns on `profiles` to `billing_`. |
 
 Run `npm run check:schema` at any point: it probes the live project with the
 publishable key and names every migration that has not been applied.
@@ -151,5 +152,5 @@ the library just stays on one machine.
 
 ## Still to do
 
-- **Stripe webhook** writes `profiles.plan`. It must use the service role key, because the browser
+- **The billing webhook** writes `profiles.plan`. It must use the secret key, because the browser
   deliberately cannot write that column.

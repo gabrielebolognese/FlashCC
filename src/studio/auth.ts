@@ -166,7 +166,9 @@ export async function loadProfile(userId: string): Promise<Profile | null> {
 
   const { data, error } = await db
     .from("profiles")
-    .select("id, email, display_name, plan, plan_renews_at, plan_ends_at_period_end, stripe_customer_id")
+    .select(
+      "id, email, display_name, plan, plan_renews_at, plan_ends_at_period_end, billing_subscription_id",
+    )
     .eq("id", userId)
     .maybeSingle();
 
@@ -179,7 +181,7 @@ export async function loadProfile(userId: string): Promise<Profile | null> {
     plan: string;
     plan_renews_at: string | null;
     plan_ends_at_period_end: boolean | null;
-    stripe_customer_id: string | null;
+    billing_subscription_id: string | null;
   };
 
   return {
@@ -194,7 +196,10 @@ export async function loadProfile(userId: string): Promise<Profile | null> {
     // which is the safe way round: it shows a renewal date rather than wrongly
     // telling somebody their plan is ending.
     planEndsAtPeriodEnd: row.plan_ends_at_period_end ?? false,
-    hasBilling: row.stripe_customer_id !== null,
+    // A SUBSCRIPTION, not a customer: the provider's portal URL hangs off the
+    // subscription, so somebody whose subscription has fully expired has nothing
+    // left to open and should not be offered a button that cannot work.
+    hasBilling: row.billing_subscription_id !== null,
   };
 }
 

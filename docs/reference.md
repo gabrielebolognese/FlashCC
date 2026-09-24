@@ -37,7 +37,7 @@ have. The pipeline, specifically the attribution of performance to *framework, h
 slide count*, is what none of seventeen audited competitors ship.
 
 The stack is React 19, Vite 6, Tailwind 3, TypeScript with every strict flag on, Supabase for
-accounts and sync, Stripe for billing, and Playwright for export. There is no framework on the
+accounts and sync, Lemon Squeezy for billing, and Playwright for export. There is no framework on the
 server: four routes do not need one.
 
 ---
@@ -59,7 +59,7 @@ CORS handling at all. `scripts/dev.mjs` spawns both as separate shell processes;
 supervisor leaves them running.
 
 Everything works with **no configuration**. No Supabase means no accounts and localStorage only;
-no `ANTHROPIC_API_KEY` means AI drafting degrades to "write it yourself"; no Stripe means no
+no `ANTHROPIC_API_KEY` means AI drafting degrades to "write it yourself"; no Lemon Squeezy means no
 checkout. None of these are error states, the free tier is the no-config state.
 
 ---
@@ -1424,26 +1424,48 @@ rather than papers over.
 
 ## 25. Billing
 
-The browser can do exactly one billing thing: **ask for a Checkout link.** It never states what plan
+The provider is **Lemon Squeezy**, and the reason is that they are the merchant of record: they
+owe the VAT in every country a customer lives in, not us. The alternative is EU-wide VAT
+registration and quarterly filings for a product that may earn nothing. Stripe now offers the same
+under Managed Payments and owns Lemon Squeezy, so this is a choice worth revisiting, not a law; the
+Stripe integration this replaced is in history at `572ebd7`.
+
+The browser can do exactly one billing thing: **ask for a checkout link.** It never states what plan
 someone is on and the server never believes it if it does. Entitlement is decided in one place, a
-webhook whose signature is verified against the Stripe secret, and written with the service role
-key.
+webhook whose signature is verified against the Lemon Squeezy signing secret, and written with the
+Supabase secret key.
 
 Signature verification is load-bearing, not hygiene: without it that endpoint is an open door where
-anyone who guesses the URL POSTs themselves a subscription. The body is read as **raw bytes** for
-the same reason, string concatenation re-encodes, and one multi-byte character on a chunk boundary
-breaks verification in a way that looks exactly like a wrong secret.
+anyone who guesses the URL POSTs themselves a subscription. It is HMAC-SHA256 of the **raw bytes**,
+hex, compared in constant time. Raw for a real reason: string concatenation re-encodes, and one
+multi-byte character on a chunk boundary breaks verification in a way that looks exactly like a
+wrong secret. `timingSafeEqual` **throws** on a length mismatch rather than returning false, so
+lengths are compared first, a short header is an ordinary refusal and not a 500.
 
-`ENTITLED = { active, trialing, past_due }`, a failed payment does not cut access off mid-retry.
-An **unrecognised price id becomes `free`** rather than a guess: a rotated price should cost a
-support ticket, not hand out a tier.
+`ENTITLED = { on_trial, active, past_due, cancelled }`. Two of those need saying:
 
-`checkout.session.completed` re-retrieves the subscription rather than trusting the session, because
-the session carries a snapshot and the subscription carries the truth.
+- **`past_due` is in**, so a failed payment does not cut access off mid-retry.
+- **`cancelled` is in**, because in Lemon Squeezy it means future payments are stopped while the
+  period already paid for runs to `ends_at`. Treating it as unpaid would take away, the moment
+  somebody clicks cancel, the month they have already been charged for.
 
-Stripe returns the browser before the webhook necessarily lands, so the app polls the profile for
-about 20 seconds and says "turning your plan on" rather than showing Free to somebody who has just
-paid.
+`unpaid`, `expired` and `paused` are out. An **unrecognised variant id becomes `free`** rather than
+a guess: a rotated variant should cost a support ticket, not hand out a tier.
+
+**Variants, not prices.** A Lemon Squeezy product holds variants (monthly, yearly) and the variant
+id is what a webhook carries. Ids arrive from the API as numbers and from the environment as
+strings, so both sides are compared as strings.
+
+`custom.user_id` on the checkout is how a payment becomes a *user*. It rides along on every webhook
+the resulting subscription produces, under `meta.custom_data`. Without it the only link between the
+two is an email address, which people change. A lookup by customer id is the fallback.
+
+The provider returns the browser before the webhook necessarily lands, so the app polls the profile
+for about 20 seconds and says "turning your plan on" rather than showing Free to somebody who has
+just paid.
+
+The three decisions that fail silently, is the request genuine, what did they buy, do they have it
+now, are pure functions in `server/lemon.ts` and tested in `lemon.test.ts`.
 
 ### What is gated, and where
 
@@ -1474,8 +1496,8 @@ studio or a dialog above it, and `App` swaps screens rather than nesting them.
 
 ### Honest billing, said out loud
 
-FlashCC already behaved correctly: `ENTITLED` treats `active` as entitled, and Stripe keeps a
-cancelled subscription active until the period it was paid for ends. What was missing was the app
+FlashCC already behaved correctly: `ENTITLED` includes `cancelled`, which in Lemon Squeezy means
+the period already paid for runs on to `ends_at`. What was missing was the app
 being able to SAY so, `plan_renews_at` alone cannot distinguish "renews on the 3rd" from "ends on
 the 3rd", and the account card showed a renewal date either way.
 

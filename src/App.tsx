@@ -108,7 +108,7 @@ function PaywallPrompt() {
     <Upgrade
       plan={sessionPlan()}
       signedIn={sessionUserId() !== null}
-      // The billing portal needs a Stripe customer, which this mount cannot know
+      // The billing portal needs a subscription, which this mount cannot know
       // about. Showing the button and having it fail would be worse than the
       // person opening the panel again from the rail, where it is known.
       manageable={false}

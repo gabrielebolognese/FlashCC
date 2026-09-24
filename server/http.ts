@@ -18,10 +18,10 @@ export const json = (res: ServerResponse, code: number, body: unknown): void => 
 /**
  * The exact bytes, not a decoded string.
  *
- * Stripe signs the raw payload, so anything that re-encodes it, string
- * concatenation included, the moment a multi-byte character lands on a chunk
- * boundary, can produce a body that no longer matches the signature. Every
- * webhook then fails verification, which looks exactly like a wrong secret.
+ * A webhook signature is over the raw payload, so anything that re-encodes it,
+ * string concatenation included, the moment a multi-byte character lands on a
+ * chunk boundary, can produce a body that no longer matches. Every webhook then
+ * fails verification, which looks exactly like a wrong secret.
  */
 export function readRaw(req: IncomingMessage, limit = 1_000_000): Promise<Buffer> {
   return new Promise((resolve, reject) => {

@@ -3,18 +3,19 @@
  *
  * Deliberately thin. Nothing here decides or reports what plan someone is on,
  * that comes back from the database, written by a webhook the server verified
- * against Stripe. A client that told us its own plan would be a client that could
- * tell us any plan.
+ * against Lemon Squeezy. A client that told us its own plan would be a client
+ * that could tell us any plan.
  *
- * Card details never touch this app. Checkout and the billing portal are Stripe's
- * own hosted pages, which is also what keeps card handling out of scope entirely.
+ * Card details never touch this app. Checkout and the billing portal are Lemon
+ * Squeezy's own hosted pages, which is what keeps card handling out of scope,
+ * and they are the merchant of record, which keeps VAT out of scope too.
  */
 import { cloud } from "./cloud.js";
 
 export type BillingStatus = {
   configured: boolean;
   plan: "free" | "pro" | "agency";
-  /** True once Stripe knows this person, so the portal has something to show. */
+  /** True once they have a subscription, so the portal has something to show. */
   manageable: boolean;
 };
 
@@ -55,7 +56,7 @@ export const fetchBillingStatus = (): Promise<BillingStatus> =>
   call<BillingStatus>("/api/billing/status");
 
 /**
- * Leaves the app for Stripe's hosted checkout. A full navigation rather than a
+ * Leaves the app for Lemon Squeezy's hosted checkout. A full navigation rather than a
  * popup: popups get blocked, and the return trip needs a real page load anyway so
  * the session is re-read and the new plan shows up.
  */
@@ -73,7 +74,7 @@ export async function openPortal(): Promise<void> {
 }
 
 /**
- * Stripe sends people back with ?checkout=done, but the webhook that actually
+ * The provider sends people back with ?checkout=done, but the webhook that actually
  * grants the plan may still be in flight. Reading the flag lets the UI say "we
  * are finishing up" instead of showing Free to somebody who has just paid.
  */

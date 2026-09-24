@@ -8,7 +8,7 @@
  * be a worse Canva; gating the loop is the only version of this worth money.
  *
  * Nothing here knows what plan you are on. It is told, from a profile the server
- * wrote after verifying a Stripe webhook.
+ * wrote after verifying a Lemon Squeezy webhook.
  */
 import { Check, ExternalLink, X } from "lucide-react";
 import { useState } from "react";
@@ -63,14 +63,14 @@ export const UNMETERED_PROMISE =
  * cancellation.
  *
  * FlashCC already behaves this way, `ENTITLED` in server/billing.ts keeps a
- * cancelled subscription entitled until Stripe ends the period, and the billing
+ * cancelled subscription entitled until the period ends, and the billing
  * portal is one click from here. What was missing was saying so, which is the
  * whole of 8.2 and costs nothing.
  */
 export const BILLING_TERMS: { title: string; body: string }[] = [
   {
     title: "Cancel yourself, in two clicks",
-    body: "Manage subscription opens Stripe's own portal. No email to support, no retention call, no form.",
+    body: "Manage subscription opens the payment provider's own portal. No email to support, no retention call, no form.",
   },
   {
     title: "You keep what you paid for",
@@ -273,7 +273,7 @@ export function Upgrade({
                   {current
                     ? "Your plan"
                     : busy === tier.id
-                      ? "Opening Stripe…"
+                      ? "Opening checkout…"
                       : !signedIn
                         ? "Sign in to subscribe"
                         : `Choose ${tier.name}`}
@@ -317,7 +317,8 @@ export function Upgrade({
 
         <div className="mt-4 flex items-center gap-3">
           <p className="flex-1 text-caption text-muted">
-            Payment is handled by Stripe. Card details never reach FlashCC.
+            Payment and VAT are handled by Lemon Squeezy, our merchant of record. Card
+            details never reach FlashCC.
           </p>
           {manageable ? (
             <button

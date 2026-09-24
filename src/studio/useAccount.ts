@@ -38,9 +38,9 @@ export type Account = {
   signOut: () => Promise<void>;
   /** True when this machine has work that has never been near an account. */
   hasUnsyncedWork: boolean;
-  /** Stripe has a customer for them, so the billing portal has something to show. */
+  /** They have a subscription, so the billing portal has something to show. */
   manageable: boolean;
-  /** Paid, came back from Stripe, and the webhook has not landed yet. */
+  /** Paid, came back from checkout, and the webhook has not landed yet. */
   activating: boolean;
 };
 
@@ -48,7 +48,7 @@ export type Account = {
 const REFOCUS_QUIET_MS = 30_000;
 /** Long enough to let a burst of edits settle into one push. */
 const DEBOUNCE_MS = 3_000;
-/** How long to keep asking whether the Stripe webhook has granted the plan. */
+/** How long to keep asking whether the webhook has granted the plan. */
 const ACTIVATION_TRIES = 10;
 const ACTIVATION_GAP_MS = 2_000;
 
@@ -170,7 +170,7 @@ export function useAccount(changeSignal: number): Account {
   }, [changeSignal, configured, run]);
 
   /**
-   * Stripe returns the browser the moment payment succeeds, but the plan is
+   * The provider returns the browser the moment payment succeeds, but the plan is
    * granted by a webhook arriving separately, usually within a second, sometimes
    * not. Without this the person who just paid lands back on a page that says
    * Free, which is the worst possible first impression of a subscription. So poll
