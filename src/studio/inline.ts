@@ -72,18 +72,28 @@ export async function inlineDoc(doc: Doc): Promise<Doc> {
   const urls: string[] = [];
   for (const slide of doc.slides) {
     for (const layer of slide.layers) if (layer.src) urls.push(layer.src);
+    // The background picture is remote for exactly the same reason as a layer's
+    // and is easy to miss because it is not in `layers`. Left out, the export
+    // Chromium cannot fetch it and every slide prints without its background.
+    if (slide.image?.src) urls.push(slide.image.src);
   }
 
   const map = await urlMap(urls);
   if (map.size === 0) return doc;
 
-  const slides: Slide[] = doc.slides.map((slide) => ({
-    ...slide,
-    layers: slide.layers.map((l) => {
-      const data = l.src ? map.get(l.src) : undefined;
-      return data && data !== l.src ? { ...l, src: data } : l;
-    }),
-  }));
+  const slides: Slide[] = doc.slides.map((slide) => {
+    const bg = slide.image?.src ? map.get(slide.image.src) : undefined;
+    return {
+      ...slide,
+      ...(slide.image && bg && bg !== slide.image.src
+        ? { image: { ...slide.image, src: bg } }
+        : {}),
+      layers: slide.layers.map((l) => {
+        const data = l.src ? map.get(l.src) : undefined;
+        return data && data !== l.src ? { ...l, src: data } : l;
+      }),
+    };
+  });
 
   return { ...doc, slides };
 }

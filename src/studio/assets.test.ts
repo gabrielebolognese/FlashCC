@@ -256,3 +256,63 @@ describe("organising", () => {
     expect(filterAssets(list, { kind: "font" })).toHaveLength(1);
   });
 });
+
+/**
+ * A slide background is a picture that is NOT in `slide.layers`, which is
+ * exactly why every one of these paths forgot it at first. Each of these
+ * assertions corresponds to a real hole: bytes never migrating to the library,
+ * the full data URL being written to storage on every save, and a synced
+ * background rendering as a broken URL after its signed link expired.
+ */
+describe("a slide background is a picture too", () => {
+  const withBg = (src: string): Doc => {
+    const d = deck([[image(OTHER)]]);
+    const first = d.slides[0]!;
+    return { ...d, slides: [{ ...first, image: { src, fit: "cover", scrim: 0.35 } }] };
+  };
+
+  it("migrates its bytes into the library", () => {
+    const out = hoistInlineAssets(withBg(PNG)).doc;
+    expect(out.slides[0]?.image?.assetId).toBeDefined();
+  });
+
+  it("drops its bytes from what gets written", () => {
+    const hoisted = hoistInlineAssets(withBg(PNG)).doc;
+    const flat = dehydrateDoc(hoisted);
+    expect(flat.slides[0]?.image?.src).toBe("");
+    expect(flat.slides[0]?.image?.assetId).toBeDefined();
+  });
+
+  it("gets a live URL back on the way in", () => {
+    const hoisted = hoistInlineAssets(withBg(PNG)).doc;
+    const id = hoisted.slides[0]?.image?.assetId ?? "";
+    const flat = dehydrateDoc(hoisted);
+    const out = resolveDoc(flat, (a) => (a === id ? "https://signed/bg.png" : undefined));
+    expect(out.slides[0]?.image?.src).toBe("https://signed/bg.png");
+  });
+
+  it("keeps the fit and the scrim through the whole round trip", () => {
+    const hoisted = hoistInlineAssets(withBg(PNG)).doc;
+    const id = hoisted.slides[0]?.image?.assetId ?? "";
+    const out = resolveDoc(dehydrateDoc(hoisted), () => "https://signed/bg.png");
+    expect(out.slides[0]?.image?.fit).toBe("cover");
+    expect(out.slides[0]?.image?.scrim).toBe(0.35);
+    expect(id).not.toBe("");
+  });
+
+  it("is counted among the assets a document depends on", () => {
+    const hoisted = hoistInlineAssets(withBg(PNG)).doc;
+    const id = hoisted.slides[0]?.image?.assetId ?? "";
+    expect(assetIdsIn(hoisted)).toContain(id);
+  });
+
+  /** A document made with no account still has to open. */
+  it("leaves an un-migrated background alone", () => {
+    expect(dehydrateDoc(withBg(PNG)).slides[0]?.image?.src).toBe(PNG);
+  });
+
+  it("does not report an edit when there is nothing to resolve", () => {
+    const flat = dehydrateDoc(hoistInlineAssets(withBg(PNG)).doc);
+    expect(resolveDoc(flat, () => undefined)).toBe(flat);
+  });
+});

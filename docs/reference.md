@@ -756,6 +756,52 @@ without anyone being told.
 
 ---
 
+## 15b. Slide backgrounds
+
+A slide paints in one of three ways, and `paint.ts` is the only thing that decides which:
+
+| | Stored as | Painted as |
+| --- | --- | --- |
+| Solid | `background` | `background` |
+| Gradient | `gradient` | `background-image` over the colour |
+| Picture | `image` | `background-image` over the colour, under a scrim |
+
+**The picture is not a layer**, deliberately. A full-bleed image layer at z-order 0 would look the
+same and would be the Photoshop-model answer, but it is selectable, draggable and deletable by
+accident, and it shifts every other layer's index by one. A background is the thing you put content
+*on*, so it belongs to the slide the way `background` and `gradient` already do.
+
+The colour stays underneath a picture rather than being replaced, because it is what shows through a
+`contain` fit.
+
+**The scrim defaults to 0.35 and that is not a stylistic default.** Text on an unscrimmed photograph
+is the fastest way to make a carousel unreadable, and the contrast rules enforced everywhere else
+cannot see into an image. Dragging it to zero is a choice somebody makes on purpose.
+
+The dimming is listed **first** in `background-image`, because CSS paints the first one nearest the
+viewer. Second would put the photograph over the dimming, which looks identical at 0 and does
+nothing at every other value.
+
+The URL is quoted with **single** quotes. `exporter.tsx` flattens this into an HTML `style="..."`
+attribute, so a double quote closes the attribute and the slide renders blank.
+
+### The five paths a background has to survive
+
+A slide background is the one picture that is not in `slide.layers`, which is why every path that
+walks images forgot it at first. Each of these was a real hole:
+
+| Path | What it does | What it missed |
+| --- | --- | --- |
+| `hoistInlineAssets` | data URL to library asset | bytes stayed inline forever |
+| `dehydrateDoc` | drop bytes the library holds | full data URL written on every save |
+| `resolveDoc` | signed URL back into `src` | broken picture once the link expired |
+| `assetIdsIn` | what the doc depends on | the file could be collected while in use |
+| `inlineDoc` | inline for the export Chromium | every slide printed with no background |
+
+`assets.test.ts` and `paint.test.ts` hold all five.
+
+---
+
 ## 16. Media and fonts
 
 ### Preparing a file

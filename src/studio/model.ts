@@ -94,12 +94,41 @@ export type MediaItem = {
   assetId?: string | undefined;
 };
 
+/**
+ * A picture behind everything on the slide.
+ *
+ * Not a layer, deliberately. A full-bleed image layer at z-index 0 would look
+ * the same and would be the Photoshop-model answer, but it is selectable,
+ * draggable and deletable by accident, and it shifts every other layer's index
+ * by one. A background is the thing you put content ON, so it belongs to the
+ * slide the way `background` and `gradient` already do.
+ *
+ * `src` and `assetId` follow the same rule as a layer's: `src` is what an
+ * `<img>` should point at right now and goes stale, `assetId` is the durable
+ * half, and `assets.resolveDoc` puts a live URL back into `src`.
+ */
+export type SlideImage = {
+  src: string;
+  assetId?: string | undefined;
+  fit?: "cover" | "contain" | undefined;
+  /**
+   * How much black sits between the picture and the text, 0 to 1.
+   *
+   * Not optional in spirit: text on an unscrimmed photograph is the single
+   * fastest way to make a carousel unreadable, and the contrast this product
+   * checks everywhere else does not apply to a picture it cannot see into.
+   */
+  scrim?: number | undefined;
+};
+
 export type Slide = {
   id: string;
   name: string;
   background: string;
   /** Painted instead of `background` when set. */
   gradient?: Gradient | undefined;
+  /** Painted over both of the above, under every layer, when set. */
+  image?: SlideImage | undefined;
   layers: Layer[];
 };
 

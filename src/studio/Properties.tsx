@@ -17,7 +17,8 @@ import { IconButton } from "../ui/IconButton.js";
 import { GradientEditor } from "./GradientEditor.js";
 import { averageColour, makeGradient, type Gradient } from "./gradient.js";
 import { brandIdOf } from "./brand.js";
-import { FORMATS, allFonts, type Layer } from "./model.js";
+import { FORMATS, allFonts, type Layer, type MediaItem, type SlideImage } from "./model.js";
+import { DEFAULT_SCRIM } from "./paint.js";
 import type { Studio } from "./useStudio.js";
 
 /** Properties for the current selection. Nothing selected → the slide itself. */
@@ -36,8 +37,11 @@ export function Properties({ studio }: { studio: Studio }) {
             palette={doc.palette}
             colour={slide?.background ?? "#000000"}
             gradient={slide?.gradient}
+            image={slide?.image}
+            media={doc.media}
             onColour={studio.setBackground}
             onGradient={studio.setBackgroundGradient}
+            onImage={studio.setBackgroundImage}
           />
         </Field>
         <Field label="Canvas">
@@ -328,49 +332,174 @@ function Colour({
  * colour already in use, so the first thing you see is a ramp of the thing you had
  * rather than an unrelated default.
  */
+/**
+ * Solid, gradient or picture, for the slide behind everything.
+ *
+ * The picture tab is always offered, even with nothing uploaded, because a tab
+ * that appears only once you have media is a feature nobody discovers. Empty, it
+ * says where images come from instead of hiding.
+ */
 function PaintPicker({
   palette,
   colour,
   gradient,
+  image,
+  media,
   onColour,
   onGradient,
+  onImage,
 }: {
   palette: string[];
   colour: string;
   gradient: Gradient | undefined;
+  /**
+   * Only the slide takes a picture. A layer's fill is solid or gradient: an
+   * image layer already carries its own `src`, and offering a second, different
+   * way to put a picture in one would be two features that look like one.
+   * Omitting `onImage` is what hides the tab.
+   */
+  image?: SlideImage | undefined;
+  media?: readonly MediaItem[] | undefined;
   onColour: (hex: string) => void;
   onGradient: (g: Gradient | undefined) => void;
+  onImage?: ((i: SlideImage | undefined) => void) | undefined;
 }) {
+  const pictures = media ?? [];
+  const mode: "solid" | "gradient" | "image" = image ? "image" : gradient ? "gradient" : "solid";
+
+  const tab = (id: typeof mode, label: string, onPick: () => void) => (
+    <button
+      type="button"
+      onClick={onPick}
+      className={[
+        "h-6 flex-1 rounded-sm text-caption",
+        mode === id ? "bg-surface-4 text-primary" : "text-tertiary hover:bg-white/[0.04]",
+      ].join(" ")}
+    >
+      {label}
+    </button>
+  );
+
   return (
     <div>
       <div className="mb-2 flex h-7 items-center gap-0.5 rounded-md border border-hairline p-0.5">
-        <button
-          type="button"
-          onClick={() => onGradient(undefined)}
-          className={[
-            "h-6 flex-1 rounded-sm text-caption",
-            gradient ? "text-tertiary hover:bg-white/[0.04]" : "bg-surface-4 text-primary",
-          ].join(" ")}
-        >
-          Solid
-        </button>
-        <button
-          type="button"
-          onClick={() => onGradient(gradient ?? makeGradient([colour, shift(colour)]))}
-          className={[
-            "h-6 flex-1 rounded-sm text-caption",
-            gradient ? "bg-surface-4 text-primary" : "text-tertiary hover:bg-white/[0.04]",
-          ].join(" ")}
-        >
-          Gradient
-        </button>
+        {tab("solid", "Solid", () => {
+          onGradient(undefined);
+          onImage?.(undefined);
+        })}
+        {tab("gradient", "Gradient", () => {
+          onImage?.(undefined);
+          onGradient(gradient ?? makeGradient([colour, shift(colour)]));
+        })}
+        {onImage
+          ? tab("image", "Image", () => {
+              // With nothing uploaded there is no picture to select, so this
+              // stays on Solid and the hint below says where images come from.
+              const first = pictures[0];
+              if (!first) return;
+              onImage(
+                image ?? {
+                  src: first.src,
+                  ...(first.assetId ? { assetId: first.assetId } : {}),
+                  fit: "cover",
+                  scrim: DEFAULT_SCRIM,
+                },
+              );
+            })
+          : null}
       </div>
 
-      {gradient ? (
-        <GradientEditor value={gradient} onChange={onGradient} />
+      {mode === "image" && image && onImage ? (
+        <BackgroundImage image={image} media={pictures} onChange={onImage} />
+      ) : mode === "gradient" ? (
+        <GradientEditor value={gradient!} onChange={onGradient} />
       ) : (
-        <Colour palette={palette} value={colour} onChange={onColour} />
+        <>
+          <Colour palette={palette} value={colour} onChange={onColour} />
+          {onImage && pictures.length === 0 ? (
+            <p className="mt-2 text-caption leading-[15px] text-muted">
+              Drop a picture into Media on the left to use one as the background.
+            </p>
+          ) : null}
+        </>
       )}
+    </div>
+  );
+}
+
+/** The picture itself, how it fills the frame, and how far it is dimmed. */
+function BackgroundImage({
+  image,
+  media,
+  onChange,
+}: {
+  image: SlideImage;
+  media: readonly MediaItem[];
+  onChange: (i: SlideImage | undefined) => void;
+}) {
+  const scrim = image.scrim ?? DEFAULT_SCRIM;
+
+  return (
+    <div>
+      <div className="grid grid-cols-4 gap-1">
+        {media.map((m) => (
+          <button
+            key={m.id}
+            type="button"
+            title={m.name}
+            onClick={() =>
+              onChange({ ...image, src: m.src, ...(m.assetId ? { assetId: m.assetId } : {}) })
+            }
+            className={[
+              "h-10 overflow-hidden rounded-md border-2",
+              m.src === image.src ? "border-accent" : "border-hairline hover:border-surface-5",
+            ].join(" ")}
+          >
+            <img src={m.src} alt="" className="h-full w-full object-cover" />
+          </button>
+        ))}
+      </div>
+
+      <div className="mt-2 flex h-7 items-center gap-0.5 rounded-md border border-hairline p-0.5">
+        {(["cover", "contain"] as const).map((f) => (
+          <button
+            key={f}
+            type="button"
+            onClick={() => onChange({ ...image, fit: f })}
+            className={[
+              "h-6 flex-1 rounded-sm text-caption capitalize",
+              (image.fit ?? "cover") === f
+                ? "bg-surface-4 text-primary"
+                : "text-tertiary hover:bg-white/[0.04]",
+            ].join(" ")}
+          >
+            {f}
+          </button>
+        ))}
+      </div>
+
+      {/* The control that decides whether the words can be read at all. */}
+      <label className="mt-2 block">
+        <span className="flex items-center justify-between text-caption text-tertiary">
+          Dim <span className="font-mono text-muted">{Math.round(scrim * 100)}%</span>
+        </span>
+        <input
+          type="range"
+          min={0}
+          max={100}
+          value={Math.round(scrim * 100)}
+          onChange={(e) => onChange({ ...image, scrim: Number(e.target.value) / 100 })}
+          className="mt-1 h-1 w-full cursor-pointer appearance-none rounded-full bg-surface-4 accent-accent"
+        />
+      </label>
+
+      <button
+        type="button"
+        onClick={() => onChange(undefined)}
+        className="mt-2 h-7 w-full rounded-md border border-hairline text-caption text-tertiary hover:border-accent-dim hover:text-accent"
+      >
+        Remove picture
+      </button>
     </div>
   );
 }

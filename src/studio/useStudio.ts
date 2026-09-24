@@ -8,6 +8,7 @@ import {
   type Layer,
   type MediaItem,
   type Slide,
+  type SlideImage,
   type Tool,
 } from "./model.js";
 import type { Gradient } from "./gradient.js";
@@ -246,12 +247,21 @@ export function useStudio(initial: Doc) {
   );
 
   const setBackground = useCallback(
-    (hex: string) => patchSlide(index, (s) => ({ ...s, background: hex, gradient: undefined }), "bg"),
+    (hex: string) =>
+      // Clears the gradient but NOT the picture: the colour is what shows through
+      // a `contain` fit, so changing it while an image is set is a real edit
+      // rather than a mistake to undo on the user's behalf.
+      patchSlide(index, (s) => ({ ...s, background: hex, gradient: undefined }), "bg"),
     [index, patchSlide],
   );
 
   const setBackgroundGradient = useCallback(
     (gradient: Gradient | undefined) => patchSlide(index, (s) => ({ ...s, gradient }), "bggrad"),
+    [index, patchSlide],
+  );
+
+  const setBackgroundImage = useCallback(
+    (image: SlideImage | undefined) => patchSlide(index, (s) => ({ ...s, image }), "bgimg"),
     [index, patchSlide],
   );
 
@@ -376,6 +386,7 @@ export function useStudio(initial: Doc) {
     moveSlide,
     setBackground,
     setBackgroundGradient,
+    setBackgroundImage,
     setFormat,
     setName,
     replaceDoc,

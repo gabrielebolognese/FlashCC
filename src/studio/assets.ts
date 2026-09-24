@@ -235,11 +235,21 @@ export const libraryBytes = (assets: readonly Asset[]): number =>
 
 /* ── putting a resolved URL back into a document ──────────────────────────── */
 
-/** Every asset a document depends on, deduplicated. */
+/**
+ * Every asset a document depends on, deduplicated.
+ *
+ * This is a **dependency list, and things get deleted from what it leaves out**,
+ * so a picture missing from it is a picture whose file can be collected while
+ * the document is still pointing at it. Slide backgrounds are the easy omission
+ * because they are the one image that does not live in `slide.layers`.
+ */
 export function assetIdsIn(doc: Doc): string[] {
   const ids = new Set<string>();
   for (const m of doc.media) if (m.assetId) ids.add(m.assetId);
-  for (const s of doc.slides) for (const l of s.layers) if (l.assetId) ids.add(l.assetId);
+  for (const s of doc.slides) {
+    if (s.image?.assetId) ids.add(s.image.assetId);
+    for (const l of s.layers) if (l.assetId) ids.add(l.assetId);
+  }
   return [...ids];
 }
 
@@ -272,7 +282,18 @@ export function resolveDoc(doc: Doc, urlOf: (assetId: string) => string | undefi
       touched = true;
       return { ...l, src: url };
     });
-    return slideTouched ? { ...slide, layers } : slide;
+
+    // The background picture goes stale exactly like a layer's, and is easy to
+    // forget precisely because it is not in `layers`.
+    let image = slide.image;
+    const bgUrl = image?.assetId ? urlOf(image.assetId) : undefined;
+    if (image && bgUrl && bgUrl !== image.src) {
+      image = { ...image, src: bgUrl };
+      slideTouched = true;
+      touched = true;
+    }
+
+    return slideTouched ? { ...slide, layers, ...(image ? { image } : {}) } : slide;
   });
 
   // Same object back when nothing moved, so a resolve on every open does not
@@ -363,16 +384,30 @@ export function hoistInlineAssets(doc: Doc, known: readonly Asset[] = []): Hoist
     return { ...m, assetId: asset.id };
   });
 
-  const slides = doc.slides.map((slide) => ({
-    ...slide,
-    layers: slide.layers.map((l) => {
-      if (l.assetId || !l.src || !isDataUrl(l.src)) return l;
-      const asset = assetFor(l.src, l.name || "Image", l.w, l.h);
-      if (!asset) return l;
-      changed += 1;
-      return { ...l, assetId: asset.id };
-    }),
-  }));
+  const slides = doc.slides.map((slide) => {
+    // Backgrounds migrate into the library like anything else, or a document
+    // full of them keeps its bytes inline forever and never dedupes.
+    let image = slide.image;
+    if (image && !image.assetId && isDataUrl(image.src)) {
+      const asset = assetFor(image.src, "Background", doc.width, doc.height);
+      if (asset) {
+        image = { ...image, assetId: asset.id };
+        changed += 1;
+      }
+    }
+
+    return {
+      ...slide,
+      ...(image ? { image } : {}),
+      layers: slide.layers.map((l) => {
+        if (l.assetId || !l.src || !isDataUrl(l.src)) return l;
+        const asset = assetFor(l.src, l.name || "Image", l.w, l.h);
+        if (!asset) return l;
+        changed += 1;
+        return { ...l, assetId: asset.id };
+      }),
+    };
+  });
 
   return { doc: { ...doc, media, slides }, created, changed };
 }
@@ -397,7 +432,11 @@ export function dehydrateDoc(doc: Doc): Doc {
   return {
     ...doc,
     media: doc.media.map((m) => (m.assetId ? { ...m, src: "" } : m)),
-    slides: doc.slides.map((s) => ({ ...s, layers: s.layers.map(strip) })),
+    slides: doc.slides.map((s) => ({
+      ...s,
+      ...(s.image ? { image: strip(s.image) } : {}),
+      layers: s.layers.map(strip),
+    })),
   };
 }
 
