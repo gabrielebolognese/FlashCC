@@ -71,6 +71,30 @@ Rules:
 - No hashtags, no emoji, no "in today's fast-paced world".
 - Return one entry per slot, in order, using the given slot ids.`;
 
+/**
+ * The ceilings a slide's copy has to fit.
+ *
+ * Exported because the prompt states them and the checks enforce them, and two
+ * copies of "90" is how those two quietly stop agreeing.
+ */
+export const HOOK_CHARS = 90;
+export const BODY_CHARS = 220;
+
+export const REWRITE_SYSTEM = `You rewrite single lines of copy for social carousels.
+
+You are given one line, the job it does in its deck, and what to change about it. You return several complete replacements for that line.
+
+Rules:
+- Each alternative is a finished line, ready to publish, not a note about how to write one.
+- Each one takes a genuinely different approach. Rewording the same idea three times is useless.
+- Keep the job the line does. A call to action stays a call to action; a hook stays a hook.
+- Add no claim, number, name or result that the line and the deck do not already contain.
+- Stay inside the character limit you are given.
+- Use the deck's own vocabulary and register. You are editing somebody's writing, not replacing their voice with yours.
+- No em dashes, ever. A comma or a full stop, never a dash.
+- No hashtags, no emoji.
+- Name what each alternative actually did in AT MOST FOUR WORDS: "tighter", "names the cost", "plainer words". Not a sentence, not an explanation. Never "option 1", never "better".`;
+
 export const HOOK_SYSTEM = `You write opening slides for social carousels. The opening slide decides whether slide 2 is ever seen.
 
 You are given a carousel that already exists and its current opening line. Write alternative openings for THAT carousel.
@@ -233,4 +257,136 @@ export function assembleHooks(input: HookInput): Assembled {
   ].join("\n");
 
   return { system: HOOK_SYSTEM, user };
+}
+
+/* ── rewriting one line ───────────────────────────────────────────────────── */
+
+export type RewriteIntent = "shorter" | "punchier" | "simpler" | "angle" | "expand" | "free";
+
+export const REWRITE_INTENTS: readonly RewriteIntent[] = [
+  "shorter",
+  "punchier",
+  "simpler",
+  "angle",
+  "expand",
+  "free",
+];
+
+/**
+ * What each intent actually asks for.
+ *
+ * Written out because "punchier" means nothing to a model on its own, and the
+ * entire value of this feature is whether three alternatives are meaningfully
+ * different from each other rather than three shuffles of the same sentence.
+ *
+ * Each one also says what NOT to do, because the obvious failure of every intent
+ * here is the same: making the line better by making a bigger claim.
+ */
+export const INTENT_RULES: Record<RewriteIntent, string> = {
+  shorter:
+    "Say the same thing in fewer words. Cut qualifiers, hedges and throat-clearing. Never cut the specific detail: a number, a name or a concrete noun is the last thing to go, not the first.",
+  punchier:
+    "Same claim, stronger verb, and put the consequence at the front. Do not reach for a bigger claim to make it land harder.",
+  simpler:
+    "Plainer vocabulary and shorter clauses. Remove jargon and abstraction. The claim itself does not change.",
+  angle:
+    "Same job in the deck, approached from a different direction. A different way into the same point, not a different point.",
+  expand:
+    "Add one more concrete beat: the example, cost or consequence the line implies but does not say. Do not pad with adjectives.",
+  // Replaced by the user's own words in `assembleRewrite`. Present so the record
+  // is exhaustive and a new intent cannot be added without answering this.
+  free: "",
+};
+
+/**
+ * A note is a label, so it has to fit on one line beside a character count.
+ *
+ * The prompt asks for at most four words and a real run came back with "Names
+ * the sensory disconnect without using technical terms", which is a sentence. A
+ * prompt is a preference and this is the guarantee, the same split as
+ * `plainText`. Cut at a word boundary, because a label ending mid-word reads as
+ * a rendering bug rather than as a label.
+ */
+export const MAX_NOTE_CHARS = 32;
+
+export function shortNote(note: string): string {
+  const clean = note.trim().replace(/[.,;:]+$/, "");
+  if (clean.length <= MAX_NOTE_CHARS) return clean;
+
+  const cut = clean.slice(0, MAX_NOTE_CHARS);
+  const at = cut.lastIndexOf(" ");
+  return (at > 8 ? cut.slice(0, at) : cut).replace(/[.,;:]+$/, "");
+}
+
+export const MAX_REWRITE_CHARS = 2000;
+export const MAX_INSTRUCTION_CHARS = 300;
+export const MIN_REWRITE_COUNT = 2;
+export const MAX_REWRITE_COUNT = 5;
+
+export type RewriteInput = {
+  text: string;
+  intent: RewriteIntent;
+  /** Only read when `intent` is `free`. */
+  instruction?: string | undefined;
+  slot?: SlotSpec | undefined;
+  deck?: string[] | undefined;
+  count: number;
+  /** The character ceiling for this slide. Falls back to the slot's own. */
+  limit?: number | undefined;
+  voice?: Voice | undefined;
+};
+
+/** A hook is held to 90; everything else to 220. See `HOOK_CHARS`. */
+export const limitFor = (slot: SlotSpec | undefined, override?: number | undefined): number =>
+  override ?? (slot?.id === "hook" ? HOOK_CHARS : BODY_CHARS);
+
+/**
+ * The rewrite request.
+ *
+ * The line comes LAST, after the job, the instruction and the surrounding deck.
+ * Everything above it is context for a judgement about it, and a model given the
+ * line first starts rewriting before it knows what the line is for.
+ *
+ * The deck is included but numbered without marking which entry is the one being
+ * rewritten, because it may not be in there at all: this route also serves a
+ * layer somebody drew by hand that no slide text contains.
+ */
+export function assembleRewrite(input: RewriteInput): Assembled {
+  const voice = voiceBlock(input.voice);
+  const limit = limitFor(input.slot, input.limit);
+
+  const instruction =
+    input.intent === "free"
+      ? clip((input.instruction ?? "").trim(), MAX_INSTRUCTION_CHARS) ||
+        // An empty free-text box is a request for something different, not a
+        // request for nothing. Refusing would be correct and unhelpful.
+        INTENT_RULES.angle
+      : INTENT_RULES[input.intent];
+
+  const deck = (input.deck ?? []).map((t) => t.trim()).filter(Boolean);
+
+  const user = [
+    `What to change: ${instruction}`,
+    "",
+    `Hard limit: ${limit} characters. Anything longer is unusable.`,
+    ...(input.slot
+      ? ["", `The job this line does: ${input.slot.label}. ${input.slot.note}`]
+      : []),
+    ...(voice ? ["", voice] : []),
+    ...(deck.length > 0
+      ? [
+          "",
+          `The carousel it lives in, for context:\n${clip(
+            deck.map((t, i) => `${i + 1}. ${t}`).join("\n"),
+            MAX_DECK_CHARS,
+          )}`,
+        ]
+      : []),
+    "",
+    `The line to rewrite:\n${clip(input.text.trim(), MAX_REWRITE_CHARS)}`,
+    "",
+    `Write ${input.count} alternatives.`,
+  ].join("\n");
+
+  return { system: REWRITE_SYSTEM, user };
 }

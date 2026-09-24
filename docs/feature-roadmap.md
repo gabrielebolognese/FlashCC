@@ -1332,7 +1332,7 @@ sync until it is applied.
 
 ## Batch 11, Rewrite anything, in place
 
-**Status:** next
+**Status:** done
 **Size:** large
 **Why here:** drafting is one shot. You get eight slides and then you are alone
 with them. Every other tool in this category lets somebody push on a line they
@@ -1482,11 +1482,89 @@ sets and accepting one does not alter the other two.
 - **No streaming.** Three short lines arrive together; a token stream would add
   a loading state to a call that is already fast.
 
+### What the build found
+
+Four things, three of which changed the plan.
+
+**1. A live bug in `/api/hooks`, unrelated to this batch.** The eval harness was
+extended to cover rewriting and every call failed with
+`400 This model does not support the effort parameter`. The hooks route has been
+sending `effort: "medium"` to Haiku since Batch 10 moved it off Opus, which means
+**hook variants have been broken on every call since then**. Nothing caught it
+because the harness only ever exercised drafting. Both routes now send no
+`effort`; it is a reasoning-model control and neither route reasons.
+
+**2. Two of the three entry points in 11.2 did not exist as described.**
+
+- "Under the text field" in Properties: there is no text field there. A layer's
+  words are edited in place on the canvas through `editingId`. The control went
+  to the top of the text block instead.
+- "Right-click a slide" in the filmstrip: there is no context-menu primitive
+  anywhere in this codebase, and adding one for a single item is a new
+  interaction to teach. It went into the hover cluster beside Duplicate and
+  Delete, which is the gesture people already use on those thumbnails.
+
+**3. `slot` cannot be looked up the way 11.1 assumed.** Roles are deliberately
+not stored at runtime, `model.ts` says so in its first paragraph, and
+`doc.framework` is recorded for analytics rather than for layout. The only route
+back to a slot is positional, so `slotAt` returns one **only while the slide
+count still equals the structure's slot count** and otherwise returns nothing. A
+CTA rewritten as a mid-deck point is worse than one rewritten with no slot at
+all, which is the same rule `contextVoice` already applies to brand voice.
+
+**4. Applying to one layer needed a split that the batch did not anticipate.**
+`restateSlide` replaces a slide's *entire* copy, so handing it one layer's new
+text would rebuild the slide from that line alone and delete the other one, which
+a heading-plus-body composition has. Hence `slideTextWith`, which swaps one line
+inside the slide's whole text in the same order `textsOf` reads it.
+
+And **a hand-edited layer is written to directly**, which reads like a violation
+of "never a direct layer write" and is the rule applied properly:
+`restateSlide` keeps hand-edited layers verbatim *and* rebuilds from the text, so
+running it on one would print the new words as a generated layer and keep the old
+hand-placed one, the same line twice. Somebody who dragged a box has also already
+said where it goes.
+
+### 11.5 was not built, and should not be built as written
+
+Multi-select rewrite is unsound in this architecture and the "done when" cannot
+be satisfied honestly.
+
+**Any apply invalidates the rest of the queue.** `restateSlide` rebuilds a slide,
+which creates new layer ids, so a second queued layer on the same slide no longer
+exists. And when a rewrite is long enough to split, the slide count changes and
+every queued slide index after it shifts. So "accepting one does not alter the
+other two" is exactly what cannot be promised: accepting one can invalidate what
+the other two were pointing at.
+
+There is also no multi-slide selection in the filmstrip to build it on. Adding
+one means shift-click, range state and an interaction with the existing drag
+reorder, which is a larger change than the feature it would serve.
+
+The sound version resolves each target freshly from the live document after every
+apply and abandons the rest when the deck's shape changes. That is worth doing if
+anybody asks for it, and is not worth doing on the strength of a plan written
+before the constraint was known.
+
+### Also added, not in the plan
+
+**`shortNote`.** A live run of the `angle` intent returned
+"Names the sensory disconnect without using technical terms" as a note, where the
+interface expects two or three words beside a character count. The prompt now
+asks for at most four words and `shortNote` clamps to 32 characters at a word
+boundary. Same split as `plainText`: the prompt is a preference, the function is
+the guarantee.
+
+**`npm run eval:draft -- --rewrite`.** Every intent against one line, printed for
+a person to read, with the checks that can be automated: options distinct from
+each other and from the original, every option carries a note, no two notes
+identical, nothing over the ceiling. This is what found the `effort` bug.
+
 ---
 
 ## Batch 12, The caption, and the words around the deck
 
-**Status:** queued
+**Status:** next
 **Size:** medium
 **Why here:** `posts.caption` has existed since Batch 8 and is filled in by hand
 every single time. The carousel is the hard part and the product does it; the

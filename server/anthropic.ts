@@ -35,6 +35,10 @@ import { HttpError } from "./http.js";
 export const MODELS = {
   draft: "claude-sonnet-5",
   hooks: "claude-haiku-4-5-20251001",
+  // One line in, three short lines out, no reasoning to do. The argument that
+  // put hooks on Haiku applies harder here: this is the route people press
+  // twenty times while working a line into shape.
+  rewrite: "claude-haiku-4-5-20251001",
 } as const;
 
 /** A hung request otherwise holds a browser tab open until somebody closes it. */

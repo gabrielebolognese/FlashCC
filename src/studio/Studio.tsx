@@ -10,10 +10,10 @@ import { LayersPanel } from "./LayersPanel.js";
 import { MediaPool } from "./MediaPool.js";
 import { slidePaint } from "./paint.js";
 import { LayerView } from "./LayerView.js";
-import type { Doc } from "./model.js";
+import type { Doc, Layer } from "./model.js";
 import { Properties } from "./Properties.js";
 import { buildSlides } from "./compositions.js";
-import { applyBrand, listBrands, stampLogo, themeOf } from "./brand.js";
+import { applyBrand, listBrands, stampLogo, themeOf, voiceOf } from "./brand.js";
 import { logoResolver } from "./library.js";
 import { BrandMenu } from "./BrandMenu.js";
 import { ExportDialog } from "./ExportDialog.js";
@@ -23,6 +23,9 @@ import { sessionPlan } from "./session.js";
 import { ShareDialog } from "./ShareDialog.js";
 import { snapshot } from "./versions.js";
 import { regenerate, restateSlide } from "./regenerate.js";
+import { RewritePicker } from "./RewritePicker.js";
+import { rebuildsOnRewrite, slideTextWith, slotAt } from "./rewrite.js";
+import { deckTexts } from "./transcript.js";
 import { STRUCTURES } from "./structures.js";
 import { THEMES } from "./presets.js";
 import { Toolbar } from "./Toolbar.js";
@@ -30,12 +33,19 @@ import { useStudio } from "./useStudio.js";
 
 export function Studio({ initial, onHome }: { initial: Doc; onHome: () => void }) {
   const studio = useStudio(initial);
-  const { doc } = studio;
+  const { doc, slide } = studio;
   const [naming, setNaming] = useState(false);
   const [pasteOpen, setPasteOpen] = useState(false);
   const [exporting, setExporting] = useState(false);
   const [relaid, setRelaid] = useState<number | null>(null);
   const [hooking, setHooking] = useState(false);
+  /**
+   * Which slide is being rewritten, or null. A number rather than a boolean,
+   * because unlike the hook picker this can be opened on any slide.
+   */
+  const [rewriting, setRewriting] = useState<number | null>(null);
+  /** A single text layer being rewritten from the Properties panel. */
+  const [rewritingLayer, setRewritingLayer] = useState<Layer | null>(null);
   const [sharing, setSharing] = useState(false);
   const [history, setHistory] = useState(false);
   const [pasted, setPasted] = useState("");
@@ -167,10 +177,10 @@ export function Studio({ initial, onHome }: { initial: Doc; onHome: () => void }
           <MediaPool studio={studio} />
         </div>
         <Canvas studio={studio} />
-        <Properties studio={studio} />
+        <Properties studio={studio} onRewrite={(l) => setRewritingLayer(l)} />
       </div>
 
-      <Filmstrip studio={studio} />
+      <Filmstrip studio={studio} onRewrite={(i) => setRewriting(i)} />
 
       {pasteOpen ? (
         <div className="absolute inset-0 z-modal grid place-items-center" style={{ background: "rgba(0,0,0,.6)", backdropFilter: "blur(4px)" }}>
@@ -245,6 +255,80 @@ export function Studio({ initial, onHome }: { initial: Doc; onHome: () => void }
             setHooking(false);
           }}
           onClose={() => setHooking(false)}
+        />
+      ) : null}
+
+      {rewriting !== null ? (
+        <RewritePicker
+          title={`Rewrite slide ${rewriting + 1}`}
+          text={deckTexts(doc)[rewriting] ?? ""}
+          deck={deckTexts(doc)}
+          slot={slotAt(rewriting, doc.slides.length, STRUCTURES.find((f) => f.id === doc.framework)?.slots)}
+          voice={voiceOf(doc, listBrands())}
+          /*
+           * Run against a COPY to answer "what would this do" without doing it.
+           * restateSlide is pure and returns a new document, so asking is free
+           * and the answer is exact rather than an estimate from a character
+           * count that does not know the font.
+           */
+          slidesAfter={(candidate) =>
+            restateSlide(doc, rewriting, candidate, themeOf(doc, listBrands())).doc.slides.length
+          }
+          onPick={(text) => {
+            // Back through the generator, never typed onto the layer: the box
+            // and the font size were measured for the old words.
+            const result = restateSlide(doc, rewriting, text, themeOf(doc, listBrands()));
+            studio.replaceDoc(result.doc);
+            setRewriting(null);
+          }}
+          onClose={() => setRewriting(null)}
+        />
+      ) : null}
+
+      {rewritingLayer ? (
+        <RewritePicker
+          title="Other wordings"
+          text={rewritingLayer.text ?? ""}
+          deck={deckTexts(doc)}
+          slot={slotAt(studio.index, doc.slides.length, STRUCTURES.find((f) => f.id === doc.framework)?.slots)}
+          voice={voiceOf(doc, listBrands())}
+          slidesAfter={
+            rebuildsOnRewrite(rewritingLayer) && slide
+              ? (candidate) =>
+                  restateSlide(
+                    doc,
+                    studio.index,
+                    slideTextWith(slide, rewritingLayer.id, candidate),
+                    themeOf(doc, listBrands()),
+                  ).doc.slides.length
+              : undefined
+          }
+          onPick={(text) => {
+            /*
+             * Two paths, and which one runs is decided by who owns the box.
+             *
+             * A GENERATED layer has a box measured for the old words, so the
+             * slide is rebuilt from its whole text with this one line swapped.
+             * Swapping the slide's entire text for one line would delete the
+             * other layer on a heading-plus-body composition, which is why
+             * `slideTextWith` exists.
+             *
+             * A HAND-EDITED layer is written to directly. `restateSlide` keeps
+             * hand-edited layers verbatim and rebuilds the rest, so running it
+             * here would print the new words as a generated layer and keep the
+             * old hand-placed one: the same line twice. And somebody who dragged
+             * a box somewhere has already said where it goes.
+             */
+            if (slide && rebuildsOnRewrite(rewritingLayer)) {
+              const whole = slideTextWith(slide, rewritingLayer.id, text);
+              const result = restateSlide(doc, studio.index, whole, themeOf(doc, listBrands()));
+              studio.replaceDoc(result.doc);
+            } else {
+              studio.updateLayers([rewritingLayer.id], { text });
+            }
+            setRewritingLayer(null);
+          }}
+          onClose={() => setRewritingLayer(null)}
         />
       ) : null}
 

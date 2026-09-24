@@ -10,6 +10,7 @@ import {
   Italic,
   Trash2,
   Underline,
+  Wand2,
 } from "lucide-react";
 import type { ReactNode } from "react";
 
@@ -22,7 +23,14 @@ import { DEFAULT_SCRIM } from "./paint.js";
 import type { Studio } from "./useStudio.js";
 
 /** Properties for the current selection. Nothing selected → the slide itself. */
-export function Properties({ studio }: { studio: Studio }) {
+export function Properties({
+  studio,
+  onRewrite,
+}: {
+  studio: Studio;
+  /** Opens the rewrite picker for one text layer. Absent hides the control. */
+  onRewrite?: ((layer: Layer) => void) | undefined;
+}) {
   const { selected, selection, slide, doc } = studio;
   const one = selected.length === 1 ? selected[0] : null;
   const set = (patch: Partial<Layer>, coalesce?: string) =>
@@ -102,6 +110,26 @@ export function Properties({ studio }: { studio: Studio }) {
           <Arrange icon={ArrowDownToLine} label="Send to back" onClick={() => studio.reorder("back")} />
         </div>
       </Field>
+
+      {/*
+        The roadmap said this goes "under the text field". There is no text field
+        in this panel: a layer's words are edited in place on the canvas, through
+        `editingId`. So it sits at the top of the text block instead, which is
+        where somebody looking at a text layer starts reading.
+      */}
+      {isText && one && onRewrite ? (
+        <Field label="Rewrite">
+          <button
+            type="button"
+            onClick={() => onRewrite(one)}
+            disabled={!(one.text ?? "").trim()}
+            className="flex h-7 w-full items-center justify-center gap-1.5 rounded-md border border-hairline text-caption text-secondary hover:border-accent-dim hover:text-accent disabled:pointer-events-none disabled:opacity-40"
+          >
+            <Wand2 size={13} strokeWidth={2} />
+            Ask for other wordings
+          </button>
+        </Field>
+      ) : null}
 
       {isText ? (
         <>

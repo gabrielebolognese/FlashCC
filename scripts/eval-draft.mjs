@@ -3,6 +3,7 @@
  *
  *   npm run eval:draft              every framework, the default model
  *   npm run eval:draft -- --compare claude-sonnet-5 vs claude-opus-5, side by side
+ *   npm run eval:draft -- --rewrite every rewrite intent, on one line
  *
  * ── What this can and cannot tell you ────────────────────────────────────────
  *
@@ -28,7 +29,7 @@ import Anthropic from "@anthropic-ai/sdk";
 import { zodOutputFormat } from "@anthropic-ai/sdk/helpers/zod";
 import { z } from "zod";
 
-import { assembleDraft } from "../server/prompts.ts";
+import { assembleDraft, assembleRewrite, REWRITE_INTENTS } from "../server/prompts.ts";
 import { STRUCTURES } from "../src/studio/structures.ts";
 
 /* ── config ───────────────────────────────────────────────────────────────── */
@@ -46,6 +47,7 @@ if (!process.env.ANTHROPIC_API_KEY) {
 }
 
 const compare = process.argv.includes("--compare");
+const rewriteOnly = process.argv.includes("--rewrite");
 const MODELS = compare ? ["claude-sonnet-5", "claude-opus-5"] : ["claude-sonnet-5"];
 
 /**
@@ -139,6 +141,90 @@ function check(slides, structure, briefText) {
   return problems;
 }
 
+
+/* ── rewriting ──────────────────────────────────────────────────── */
+
+/**
+ * The whole value of this route is whether six intents produce six meaningfully
+ * different things. Nothing automated can judge that, so this prints them under
+ * their intent and a person reads down the column.
+ *
+ * What it CAN check: that the options differ from each other and from the
+ * original, that each names what it did, and that none overshot the ceiling.
+ */
+const RewriteSchema = z.object({
+  options: z.array(z.object({ note: z.string(), text: z.string() })),
+});
+
+const LINE =
+  "Cutting on the beat makes your edits feel mechanical, because attention resets when the frame changes rather than when the snare hits.";
+const SLOT = { id: "why", label: "Why it happens", note: "The mechanism behind the problem", placeholder: "" };
+const LIMIT = 220;
+
+async function evalRewrites() {
+  console.log(`\n${"=".repeat(64)}\nrewrite, claude-haiku-4-5\n${"=".repeat(64)}`);
+  console.log(`\n  the line  ${LINE}\n            ${LINE.length} characters\n`);
+
+  let bad = 0;
+  const key = (t) => String(t).toLowerCase().replace(/[^a-z0-9]/g, "");
+
+  for (const intent of REWRITE_INTENTS) {
+    const { system, user } = assembleRewrite({
+      text: LINE,
+      intent,
+      count: 3,
+      slot: SLOT,
+      limit: LIMIT,
+      ...(intent === "free" ? { instruction: "Make it sound like a person, not a manual" } : {}),
+    });
+
+    const started = Date.now();
+    let parsed;
+    try {
+      const response = await client.messages.parse({
+        model: "claude-haiku-4-5-20251001",
+        max_tokens: 2000,
+        system: [{ type: "text", text: system, cache_control: { type: "ephemeral" } }],
+        output_config: { format: zodOutputFormat(RewriteSchema) },
+        messages: [{ role: "user", content: user }],
+      });
+      parsed = response.parsed_output;
+      calls += 1;
+      inTokens += response.usage?.input_tokens ?? 0;
+      outTokens += response.usage?.output_tokens ?? 0;
+    } catch (error) {
+      bad += 1;
+      console.log(`  FAIL ${intent}  CALL FAILED: ${error.message}`);
+      continue;
+    }
+
+    const options = parsed?.options ?? [];
+    const problems = [];
+
+    if (options.length < 2) problems.push(`only ${options.length} option(s)`);
+    if (new Set(options.map((o) => key(o.text))).size !== options.length) {
+      problems.push("two options say the same thing");
+    }
+    if (options.some((o) => key(o.text) === key(LINE))) problems.push("returned the original");
+    if (options.some((o) => !String(o.note ?? "").trim())) problems.push("an option has no note");
+    if (new Set(options.map((o) => key(o.note))).size !== options.length) {
+      problems.push("two notes are identical");
+    }
+    const over = options.filter((o) => o.text.length > LIMIT);
+    if (over.length > 0) problems.push(`${over.length} option(s) over ${LIMIT} chars`);
+
+    if (problems.length > 0) bad += 1;
+    console.log(`  ${problems.length === 0 ? "ok  " : "FAIL"} ${intent}  ${Date.now() - started}ms`);
+    for (const p of problems) console.log(`       ! ${p}`);
+    for (const o of options) {
+      console.log(`       ${String(o.note).padEnd(16)} ${o.text}  [${o.text.length}]`);
+    }
+    console.log("");
+  }
+
+  return bad;
+}
+
 /* ── run ──────────────────────────────────────────────────────────────────── */
 
 const client = new Anthropic({ maxRetries: 1, timeout: 120_000 });
@@ -148,7 +234,7 @@ let calls = 0;
 let inTokens = 0;
 let outTokens = 0;
 
-for (const model of MODELS) {
+for (const model of rewriteOnly ? [] : MODELS) {
   console.log(`\n${"=".repeat(64)}\n${model}\n${"=".repeat(64)}`);
 
   for (const structure of STRUCTURES) {
@@ -191,6 +277,8 @@ for (const model of MODELS) {
     }
   }
 }
+
+if (rewriteOnly || !compare) failures += await evalRewrites();
 
 console.log(
   `\n${"=".repeat(64)}\n${calls} calls, ${inTokens} in, ${outTokens} out, ${failures} failing\n`,

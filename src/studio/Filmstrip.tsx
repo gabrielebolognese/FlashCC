@@ -1,4 +1,4 @@
-import { Copy, Plus, Trash2 } from "lucide-react";
+import { Copy, Plus, Trash2, Wand2 } from "lucide-react";
 import { useState } from "react";
 
 import { slidePaint } from "./paint.js";
@@ -11,7 +11,14 @@ const THUMB_H = 96;
  * The deck, left to right, first slide first. Real miniature renders through the same
  * LayerView the canvas uses, so a thumbnail cannot lie about what a slide looks like.
  */
-export function Filmstrip({ studio }: { studio: Studio }) {
+export function Filmstrip({
+  studio,
+  onRewrite,
+}: {
+  studio: Studio;
+  /** Absent when there is nothing to open, which keeps the button out of the DOM. */
+  onRewrite?: ((index: number) => void) | undefined;
+}) {
   const { doc, index } = studio;
   const [from, setFrom] = useState<number | null>(null);
   const [over, setOver] = useState<number | null>(null);
@@ -92,6 +99,14 @@ export function Filmstrip({ studio }: { studio: Studio }) {
               </span>
 
               <div className="absolute right-1 top-1 hidden gap-0.5 group-hover:flex">
+                {/* The roadmap asked for a right-click menu here. There is no
+                    context-menu primitive anywhere in this codebase, and adding
+                    one for a single item would be a new interaction to teach.
+                    The hover cluster is the gesture people already use on these
+                    thumbnails, so it goes in the cluster. */}
+                {onRewrite ? (
+                  <MiniButton icon={Wand2} label="Rewrite" onClick={() => onRewrite(i)} />
+                ) : null}
                 <MiniButton icon={Copy} label="Duplicate" onClick={() => studio.duplicateSlide(i)} />
                 {doc.slides.length > 1 ? (
                   <MiniButton icon={Trash2} label="Delete" danger onClick={() => studio.deleteSlide(i)} />

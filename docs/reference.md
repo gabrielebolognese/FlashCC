@@ -688,6 +688,56 @@ words deterministically.
 A route that returned a size, a position, a colour or a composition would break this, and the
 breakage is invisible until somebody's deck ships looking wrong.
 
+### Rewriting one line (`/api/rewrite`, `rewrite.ts`, `RewritePicker.tsx`)
+
+The thing that sat between the two routes. Drafting was one shot, so a slide four that was nearly
+right had to be fixed by hand or by redrafting the whole carousel.
+
+**One route, six intents**, because the difference between "shorter" and "punchier" is one line of
+the prompt and six routes differing by one line is six things to keep in step. `INTENT_RULES` in
+`prompts.ts` writes each one out, and every rule also says what *not* to do, because the obvious
+failure of all six is the same: making a line better by making a bigger claim.
+
+Returns `{ options: [{ note, text }], limit }`. **`limit` comes back from the server** rather than
+being a constant on both sides: 90 for a hook, 220 otherwise, and two copies of those numbers is how
+they stop agreeing.
+
+`shortNote` clamps a note to 32 characters at a word boundary. A live run returned "Names the
+sensory disconnect without using technical terms" where the interface shows two or three words. The
+prompt asks for four words maximum and this guarantees it, the same split as `plainText`.
+
+**Applying takes one of two paths, decided by who owns the box:**
+
+| Layer | What runs | Why |
+| --- | --- | --- |
+| generated | `slideTextWith` then `restateSlide` | the box was measured for the old words |
+| hand-edited | a direct `updateLayers` | see below |
+
+`slideTextWith` exists because `restateSlide` replaces a slide's **entire** copy. Handing it one
+layer's new text would rebuild the slide from that line alone and delete the other one, which a
+heading-plus-body composition has. It swaps one line inside the slide's whole text, in the same
+order `textsOf` reads it, and if those two ever disagree the slide quietly reflows.
+
+The direct write for a hand-edited layer looks like a violation of "never a direct layer write" and
+is the rule applied properly: `restateSlide` keeps hand-edited layers verbatim *and* rebuilds from
+the text, so running it on one prints the new words as a generated layer and keeps the old
+hand-placed one, the same line twice. Somebody who dragged a box has also already said where it
+goes.
+
+**`slotAt` refuses to guess.** Roles are not stored at runtime, see §the model, so the only route
+back to a slot is positional, and it is only trustworthy while the slide count still equals the
+structure's slot count. A split, a merge or a reorder breaks it, and a CTA rewritten as a mid-deck
+point is worse than one rewritten with no slot at all.
+
+**`effort` is not sent, to any Haiku route.** Haiku 4.5 rejects the parameter with a 400. This was
+found by extending the eval harness to cover rewriting, and it revealed that `/api/hooks` had been
+sending it since Batch 10 and failing on every call. It is a reasoning-model control and neither
+route reasons.
+
+**Multi-select rewrite is deliberately absent.** See Batch 11 in the roadmap: any apply rebuilds a
+slide and invalidates the ids or indices the rest of a queue points at, so "accepting one does not
+alter the other two" is the one thing that cannot be promised.
+
 ### Hook variants (`/api/hooks`, `variants.ts`, `HookPicker.tsx`)
 
 A separate route rather than a flag on `draft`: one line in, several out, each labelled with the

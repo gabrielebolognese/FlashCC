@@ -10,6 +10,7 @@
 import { createServer, type IncomingMessage, type ServerResponse } from "node:http";
 
 import { billingConfigured, checkout, portal, status, webhook } from "./billing.js";
+import { rewrite } from "./rewrite.js";
 import { draft, draftConfigured, draftStatus, hooks } from "./draft.js";
 import { exportDeck, renderDocument, renderImages } from "./export.js";
 import { HttpError, json } from "./http.js";
@@ -31,6 +32,7 @@ const ROUTES: Record<string, Record<string, Handler>> = {
   POST: {
     "/api/draft": draft,
     "/api/hooks": hooks,
+    "/api/rewrite": rewrite,
     "/api/review/comment": addComment,
     "/api/review/decision": decide,
     "/api/export": exportDeck,

@@ -180,7 +180,12 @@ export async function hooks(req: IncomingMessage, res: ServerResponse): Promise<
       model: MODELS.hooks,
       max_tokens: 4000,
       system: [{ type: "text", text: system, cache_control: { type: "ephemeral" } }],
-      output_config: { effort: "medium", format: zodOutputFormat(HookSchema) },
+      // No `effort`. Haiku 4.5 rejects the parameter outright with a 400,
+      // which made this route fail on every call from the moment it moved off
+      // Opus in Batch 10. Nothing caught it because the eval harness only ever
+      // exercised drafting. Effort is a reasoning-model control and there is no
+      // reasoning here: five one-line rewrites.
+      output_config: { format: zodOutputFormat(HookSchema) },
       messages: [{ role: "user", content: user }],
     }),
   );
