@@ -42,6 +42,7 @@ import { buildSlides, type BuildOptions } from "./compositions.js";
 import { Chip } from "./Dash.js";
 import { makeDoc, type Doc } from "./model.js";
 import { nameFromHook } from "./search.js";
+import { cadenceDates, SLOT_HOUR } from "./calendar.js";
 import { listPosts, postFromDoc, savePosts, schedule, type Platform } from "./pipeline.js";
 import {
   addSpend,
@@ -99,11 +100,14 @@ export function BulkRun({
   build,
   onCancel,
   onOpen,
+  onCalendar,
 }: {
   styles: Style[];
   build: BuildOptions;
   onCancel: () => void;
   onOpen: (doc: Doc) => void;
+  /** Where a dated batch hands over to. See the done phase at the bottom. */
+  onCalendar: () => void;
 }) {
   // The tutorial first, unless it has been read. See hasSeenRunTutorial for why
   // unreadable storage counts as read.
@@ -129,6 +133,10 @@ export function BulkRun({
 
   const real = tidyIdeas(ideas);
   const ready = real.length > 0 && picked.length > 0;
+
+  /** The dates the cadence would use, shown before the run rather than after. */
+  const landing = cadenceDates(startOn, everyDays, totalFor(real.length, perIdea));
+  const weekendCount = landing.filter((d) => d.getDay() === 0 || d.getDay() === 6).length;
 
   const styleById = (id: string): Style => styles.find((s) => s.id === id) ?? styles[0]!;
 
@@ -252,7 +260,9 @@ export function BulkRun({
    */
   function scheduleAll(docs: Doc[]) {
     const numbered = makeSeries<SeriesMember>(docs.map((d) => ({ id: d.id, name: d.name })));
-    const start = new Date(`${startOn}T09:00:00`);
+    // SLOT_HOUR, not a literal 9, so the preview above and the dates written
+    // here cannot drift apart.
+    const start = new Date(`${startOn}T${String(SLOT_HOUR).padStart(2, "0")}:00:00`);
     const gap = Math.max(1, Math.round(everyDays));
 
     const fresh = docs.map((doc, i) => {
@@ -568,6 +578,41 @@ export function BulkRun({
                   </label>
                 </div>
               ) : null}
+
+              {/*
+                The dates themselves, before anything is spent.
+                `cadenceDates` is the same arithmetic the run uses, so this is
+                the plan rather than an illustration of it. Weekends are named
+                because "every 2 days from Friday" quietly means half the batch
+                lands on a Sunday, and nobody works that out in their head.
+              */}
+              {scheduling ? (
+                <div className="mt-3 rounded-2xl border border-hairline bg-surface-1 p-4">
+                  <div className="flex items-center gap-2">
+                    <span className="text-caption text-tertiary">They would land on</span>
+                    <div className="flex-1" />
+                    {weekendCount > 0 ? (
+                      <span className="text-caption text-muted">
+                        {weekendCount} at the weekend
+                      </span>
+                    ) : null}
+                  </div>
+                  <div className="mt-2.5 flex flex-wrap gap-1.5">
+                    {landing.map((d) => (
+                      <span
+                        key={d.toISOString()}
+                        className="flex h-8 items-center rounded-xl border border-hairline px-2.5 text-[13px] text-secondary"
+                      >
+                        {d.toLocaleDateString(undefined, {
+                          weekday: "short",
+                          day: "numeric",
+                          month: "short",
+                        })}
+                      </span>
+                    ))}
+                  </div>
+                </div>
+              ) : null}
             </Ask>
           ) : null}
 
@@ -738,6 +783,22 @@ export function BulkRun({
               </span>
             )}
             <div className="flex-1" />
+            {/*
+              A dated batch is a filled fortnight, and the screen that makes
+              that legible is the calendar. Shown only when there is something
+              to see there, because sending somebody to an empty grid to admire
+              their work is worse than not offering.
+            */}
+            {scheduling && finished.length > 0 ? (
+              <button
+                type="button"
+                onClick={onCalendar}
+                className="flex h-9 items-center gap-1.5 rounded-xl border border-hairline px-3.5 text-body text-secondary hover:border-accent-dim hover:text-accent"
+              >
+                <CalendarDays size={14} strokeWidth={2} />
+                See the calendar
+              </button>
+            ) : null}
             <button
               type="button"
               onClick={onCancel}

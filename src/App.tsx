@@ -42,7 +42,14 @@ type Draft = { structure: Structure; texts: string[]; roles: string[] };
 type Screen =
   | { view: "welcome" }
   | { view: "firstRun" }
-  | { view: "start" }
+  /**
+   * `at` names the screen inside the shell to land on.
+   *
+   * Only set when something handed over with a reason, which today is a batch
+   * that has just dated a fortnight of posts and should drop you on the
+   * calendar showing them rather than on the projects grid.
+   */
+  | { view: "start"; at?: "calendar" }
   | { view: "bulk" }
   | { view: "longform" }
   /**
@@ -232,6 +239,7 @@ function Screens() {
         onCancel={() => setScreen({ view: "start" })}
         // Each carousel is saved as it lands, so this only has to open one.
         onOpen={(doc) => setScreen({ view: "studio", doc })}
+        onCalendar={() => setScreen({ view: "start", at: "calendar" })}
       />
     );
   }
@@ -375,6 +383,7 @@ function Screens() {
       }}
       onBulk={() => setScreen({ view: "bulk" })}
       onLongForm={() => setScreen({ view: "longform" })}
+      initialView={screen.view === "start" ? screen.at : undefined}
     />
   );
 }

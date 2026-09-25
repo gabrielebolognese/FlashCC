@@ -19,7 +19,7 @@ is still current.
 | **Orientation** | [1 What it is](#1-what-it-is) · [2 Running it](#2-running-it) · [3 The invariants](#3-the-invariants) |
 | **The canvas** | [4 Data model](#4-the-data-model) · [5 Canvas](#5-the-canvas) · [6 Text](#6-text-measurement-and-fitting) · [7 Colour](#7-colour-and-contrast) · [8 Gradients](#8-gradients) · [9 Format change](#9-changing-format-reflow) |
 | **Making a deck** | [10 Frameworks](#10-the-four-frameworks) · [11 Generation](#11-generation) · [12 Styles](#12-styles-and-themes) · [13 Onboarding](#13-onboarding) · [14 AI drafting](#14-ai-drafting) · [15 Bulk and long form](#15-bulk-create-and-long-form-ingest) · [16 Media, fonts and assets](#16-media-and-fonts) · [17 Screen flow](#17-screen-flow) |
-| **The product** | [17b Clients and review](#17b-clients-and-review) · [18 Pipeline and series](#18-the-pipeline) · [19 Analytics](#19-analytics) · [19b History](#19b-version-history) · [20 Library](#20-the-library) · [21 Export](#21-export) |
+| **The product** | [17b Clients and review](#17b-clients-and-review) · [18 Pipeline, calendar and series](#18-the-pipeline) · [19 Analytics](#19-analytics) · [19b History](#19b-version-history) · [20 Library](#20-the-library) · [21 Export](#21-export) |
 | **Infrastructure** | [22 Persistence](#22-persistence) · [23 Sync](#23-sync) · [24 Auth](#24-auth) · [25 Billing](#25-billing) · [26 Database](#26-database) · [27 Design tokens](#27-design-tokens) · [28 Testing](#28-testing) |
 | **Reality check** | [29 Known defects](#29-known-defects) |
 
@@ -1447,6 +1447,74 @@ ratio downstream divides by reach, so zero has to be turned away at the door.
 Seven metrics are entered by hand, each labelled with the platform's own word for it, because the
 fastest way to make manual entry hurt is to make people guess which number goes in which box.
 `engagements = likes + comments + shares + saves`, clicks and follows excluded.
+
+### The calendar (`calendar.ts`, `PostCalendar.tsx`)
+
+The queue in `Lists.tsx` answers *what is next*. It cannot answer *what does my week look like* or
+*where is the hole*, because a list has no shape. The calendar is the same records in a grid, week
+or month, under Pipeline in the rail.
+
+All the arithmetic is in `calendar.ts`, pure and DOM-free, because this is where a screen like this
+actually breaks: a month starting on a Sunday, a week straddling two months, a February, a clock
+change.
+
+**Keys are local dates, never `toISOString`.** `scheduledFor` is a UTC instant and a square on a
+calendar is a local day. 23:30 on the 3rd is the 4th in UTC east of Greenwich and the 2nd west of
+it, and it has to read as the 3rd either way. `dayKey` builds `2026-09-25` from `getFullYear`,
+`getMonth`, `getDate`, zero-padded so keys sort as strings.
+
+| Export | What it does |
+| --- | --- |
+| `dayKey`, `startOfWeek`, `addDays`, `addMonths` | The arithmetic. Weeks start **Monday**. |
+| `weekOf`, `monthOf` | 7 `Day`s, or **always** 6 rows of 7. |
+| `byDay`, `whenOf`, `undated` | Posts onto squares, and the ones with no date. |
+| `rhythmOf` | count, gaps, longest gap, platforms. |
+| `mixOf`, `nudgeFor` | What a range is made of, and the one line under it. |
+| `cadenceDates`, `slotOn`, `atSameTimeOn`, `SLOT_HOUR` | Dates a batch will land on, and moving one. |
+| `weekdayLoad`, `weekLabel`, `monthLabel`, `DAY_NAMES` | The rest of the furniture. |
+
+Five decisions worth knowing:
+
+**`addDays` rebuilds from local parts and carries the clock.** Adding 24 hours of milliseconds is
+wrong twice a year: the day a clock goes forward is 23 hours long, so "tomorrow at 9" arrives at 10.
+
+**`addMonths` sets the day to 1 first.** `setMonth` on the 31st of March lands in May, because April
+has no 31st and the overflow rolls forward. Every calendar has this bug once.
+
+**A month is always six rows.** Five will usually do and six is occasionally needed, and a grid that
+changes height as you page through the year makes every control below it jump.
+
+**Gaps are counted from today forward only.** A gap last Tuesday is not a problem anybody can act
+on, and counting it makes the number grow daily for reasons nobody can change. Today is not past,
+so a calendar opened this morning does not report itself as a gap.
+
+**`whenOf` is `postedAt ?? scheduledFor`.** A post that slipped and went out on Thursday belongs on
+Thursday even though its slot said Tuesday. The calendar is a record behind today and a plan ahead
+of it, and that only works if the record is the truth.
+
+`nudgeFor` returns **one** sentence or `null`, in order of what it costs to be wrong about: nothing
+planned, then a run of four or more empty days ahead, then a range that is entirely one pillar, then
+everything going to one platform. Never praise: a line that says "looking good" when it has nothing
+to say teaches people to stop reading it.
+
+`mixOf` counts pillars by their trimmed value and **infers nothing**. "Behind the scenes" and
+"behind-the-scenes" are two pillars, because guessing they are one is how a count starts lying.
+
+In the view, dragging a post reschedules it through `atSameTimeOn`, so the **time of day travels
+with it**: moving a 7pm post to Thursday and having it come back at 9am would be the calendar
+quietly editing a decision somebody made. **A posted post cannot be dragged.** Its date is the
+record of when it went out, and letting a drag rewrite it would change what every insight on the
+other screens is computed from. Drag is not the only path in: the `+` on each square opens a picker
+of everything waiting for a date, because drag does not exist on a touch screen and is awkward
+across six rows of a month.
+
+**Wired to bulk create both ways.** The schedule step of `BulkRun` shows the exact dates the batch
+will land on, from `cadenceDates`, which is the same arithmetic the run itself uses, with a count of
+how many fall at a weekend, since "every 2 days from Friday" quietly means half the batch lands on a
+Sunday. When a dated run finishes, "See the calendar" hands over through
+`Screen = { view: "start", at: "calendar" }` and `Home`'s `initialView`. Going the other way, the
+calendar's header and its empty state offer "Fill it with a batch", which is the honest answer to a
+fortnight of empty squares.
 
 ### Series (`series.ts`, `SeriesDue.tsx`)
 

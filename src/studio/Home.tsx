@@ -10,6 +10,7 @@ import {
   BarChart3,
   Building2,
   CalendarClock,
+  CalendarDays,
   Flame,
   Images,
   KanbanSquare,
@@ -52,6 +53,7 @@ import {
   upcoming,
   type Post,
 } from "./pipeline.js";
+import { PostCalendar } from "./PostCalendar.js";
 import { PostSheet } from "./PostSheet.js";
 import type { THEMES } from "./presets.js";
 import { Projects } from "./Projects.js";
@@ -67,6 +69,7 @@ type View =
   | "brands"
   | "library"
   | "board"
+  | "calendar"
   | "scheduled"
   | "posted"
   | "analytics"
@@ -93,6 +96,7 @@ const NAV: { section: string; items: NavItem[] }[] = [
     section: "Pipeline",
     items: [
       { id: "board", label: "Board", icon: KanbanSquare, count: (c) => c.posts.length },
+      { id: "calendar", label: "Calendar", icon: CalendarDays },
       {
         id: "scheduled",
         label: "Scheduled",
@@ -128,6 +132,10 @@ const TITLES: Record<View, { title: string; sub: string }> = {
     sub: "Every image and face you have uploaded, kept. Stored once, used anywhere.",
   },
   board: { title: "Pipeline", sub: "Idea to posted. Drag a card to move it along." },
+  calendar: {
+    title: "Calendar",
+    sub: "Your week and your month, with the holes in them. Drag a post to move it.",
+  },
   scheduled: { title: "Scheduled", sub: "What is going out, and what has slipped past its slot." },
   posted: { title: "Posted", sub: "What went live. Add the numbers and the insight screens wake up." },
   analytics: { title: "Analytics", sub: "What happened, grouped by how it was built." },
@@ -139,13 +147,21 @@ export function Home({
   onCompose,
   onBulk,
   onLongForm,
+  initialView,
 }: {
   onOpen: (doc: Doc) => void;
   onCompose: (theme: keyof typeof THEMES, framework?: string) => void;
   onBulk: () => void;
   onLongForm: () => void;
+  /**
+   * Which screen to open on. Only used when something outside the shell has a
+   * reason to choose, which today is a finished batch handing over to the
+   * calendar it just filled. An initial value, not a controlled one: the rail
+   * owns the view from the first click onward.
+   */
+  initialView?: View | undefined;
 }) {
-  const [view, setView] = useState<View>("projects");
+  const [view, setView] = useState<View>(initialView ?? "projects");
   const [posts, setPosts] = useState<Post[]>(() => listPosts());
   const [editing, setEditing] = useState<Post | null>(null);
   const [pricing, setPricing] = useState(false);
@@ -325,7 +341,7 @@ export function Home({
               banner people learn to look past, and the board is a fixed-height
               column layout that a banner would squeeze.
             */}
-            {view === "projects" || view === "scheduled" ? (
+            {view === "projects" || view === "scheduled" || view === "calendar" ? (
               <SeriesDue
                 posts={visiblePosts}
                 onOpen={(docId) => {
@@ -354,6 +370,15 @@ export function Home({
 
             {view === "board" ? (
               <Board posts={visiblePosts} onChange={commit} onOpen={setEditing} />
+            ) : null}
+
+            {view === "calendar" ? (
+              <PostCalendar
+                posts={visiblePosts}
+                onChange={commit}
+                onOpen={setEditing}
+                onBulk={onBulk}
+              />
             ) : null}
 
             {view === "scheduled" ? (
