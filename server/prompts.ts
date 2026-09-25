@@ -213,8 +213,21 @@ export type Assembled = { system: string; user: string };
 export function assembleDraft(input: DraftInput): Assembled {
   const voice = voiceBlock(input.voice);
 
+  const n = input.structure.slots.length;
+
   const user = [
     `Framework: ${input.structure.name} (${input.structure.shape})`,
+    "",
+    /*
+     * The count, as a NUMBER, before anything it could conflict with.
+     *
+     * The slot list alone was not enough. A brief saying "give me sixteen
+     * slides" arrived alongside eight slot lines, the model followed the list,
+     * and from outside it looked like the request had been ignored. The list is
+     * still the source of truth, and now it is also said out loud.
+     */
+    `Return exactly ${n} slide${n === 1 ? "" : "s"}, one for each slot below, in order.`,
+    `If the brief asks for a different number, ignore that. ${n} is the number.`,
     "",
     `Slots, in order:\n${slotLines(input.structure.slots)}`,
     ...(voice ? ["", voice] : []),

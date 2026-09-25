@@ -445,3 +445,98 @@ export function insertionIndex(slots: Slot[]): number {
 
 export const repeatableOf = (structure: Structure): Slot | undefined =>
   structure.slots.find((s) => s.repeatable);
+
+/* ── asking for a different number of slides ──────────────────────────────── */
+
+/**
+ * The most slides a draft may ask for.
+ *
+ * Mirrors `MAX_SLIDES` in `compositions.ts` rather than importing it, because
+ * that module imports the renderer and this one imports nothing, which is what
+ * keeps `structures.ts` usable from the server. If the two ever disagree the
+ * generator wins and the extra slides are simply not built, so the failure is
+ * visible rather than silent.
+ */
+export const MAX_DRAFT_SLIDES = 35;
+
+/**
+ * The fewest slides a carousel can be.
+ *
+ * An opening, something in the middle, and a close.
+ *
+ * **This was every fixed slot plus one, which was wrong.** Problem-to-solution
+ * has five fixed slots, so asking for four gave six, and the number somebody
+ * typed was quietly overruled by a rule about the framework. A framework is a
+ * suggested running order, not a minimum word count: somebody who wants four
+ * slides wants four slides, and the right answer is to drop the least essential
+ * jobs rather than to refuse.
+ */
+export const MIN_DRAFT_SLIDES = 3;
+
+export const floorFor = (structure: Structure): number =>
+  Math.min(MIN_DRAFT_SLIDES, structure.slots.length);
+
+/**
+ * The framework's slots, stretched or trimmed to exactly `count`.
+ *
+ * **Why this exists:** the slot list WAS the slide count, so a brief saying
+ * "give me 16" got a prompt listing eight slots and returned eight slides. The
+ * count has to be decided before the call, in the list the model is given,
+ * because a model asked for eight and told sixteen will do one of them and the
+ * other will look like it was ignored.
+ *
+ * Only the repeatable slot grows and shrinks. `insertionIndex` already decides
+ * where a new one belongs, so a longer deck gains middle slides and keeps its
+ * opening and its close, which is the whole point of having chosen a framework.
+ *
+ * **One pass, deliberately.** The alternative is generating the framework's
+ * natural length and then asking for more, which costs a second call and
+ * produces slides written without knowing about each other.
+ */
+export function slotsFor(structure: Structure, count: number): Slot[] {
+  const base = structure.slots;
+  const rep = repeatableOf(structure);
+
+  // Nothing repeats, so there is nothing to stretch. A framework like this has
+  // a fixed shape and the honest answer is to keep it.
+  if (!rep) return [...base];
+
+  const want = Math.max(floorFor(structure), Math.min(MAX_DRAFT_SLIDES, Math.round(count)));
+  if (want === base.length) return [...base];
+
+  if (want > base.length) {
+    const at = insertionIndex(base);
+    const extra = Array.from({ length: want - base.length }, () => rep);
+    return [...base.slice(0, at), ...extra, ...base.slice(at)];
+  }
+
+  /*
+   * Trimmed in order of what can best be spared.
+   *
+   * Repeatable slots first, from the end of their run, so what survives is the
+   * start of the argument rather than an arbitrary middle of it. Only once
+   * those are gone does it take fixed middle slots, again from the end, which
+   * is where the elaboration tends to live.
+   *
+   * The FIRST and LAST slots are never touched at any length. They are the hook
+   * and the ask, the two slides every carousel needs, and a deck missing either
+   * is not a short carousel but a broken one.
+   */
+  const out = [...base];
+  let drop = base.length - want;
+
+  const trim = (pick: (slot: Slot) => boolean) => {
+    for (let i = out.length - 2; i >= 1 && drop > 0; i -= 1) {
+      const slot = out[i];
+      if (slot && pick(slot)) {
+        out.splice(i, 1);
+        drop -= 1;
+      }
+    }
+  };
+
+  trim((slot) => slot.repeatable === true);
+  trim(() => true);
+
+  return out;
+}

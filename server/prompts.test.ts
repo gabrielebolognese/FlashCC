@@ -104,11 +104,43 @@ describe("the draft prompt", () => {
     expect(huge.user.length).toBeLessThan(MAX_BRIEF_CHARS + 2000);
   });
 
+  /**
+   * The count is stated as a number, not left implied by the list.
+   *
+   * A brief saying "give me sixteen slides" arrived alongside eight slot lines
+   * and the model followed the list, which from outside looked like the request
+   * being ignored. The slot list is still the source of truth; it is now also
+   * said out loud, and it says to disregard a count in the brief.
+   */
+  it("says how many slides it wants, and to ignore a different number in the brief", () => {
+    expect(out.user).toContain("Return exactly 3 slides");
+    expect(out.user).toContain("ignore that. 3 is the number");
+
+    const longer = assembleDraft({
+      brief: BRIEF,
+      structure: { ...STRUCTURE, slots: [...STRUCTURE.slots, ...STRUCTURE.slots] },
+    });
+    expect(longer.user).toContain("Return exactly 6 slides");
+  });
+
+  it("gets the singular right for a one-slide framework", () => {
+    const one = assembleDraft({ brief: BRIEF, structure: { ...STRUCTURE, slots: [STRUCTURE.slots[0]!] } });
+    expect(one.user).toContain("Return exactly 1 slide,");
+  });
+
+  /** The count goes before the list, so there is nothing to disagree with first. */
+  it("states the count before the slots it describes", () => {
+    expect(out.user.indexOf("Return exactly")).toBeLessThan(out.user.indexOf("Slots, in order:"));
+  });
+
   /** The golden. A careless edit to the prompt shows up here rather than in a carousel. */
   it("assembles exactly this", () => {
     expect(out.user).toBe(
       [
         "Framework: Problem to Solution (Problem to Fix)",
+        "",
+        "Return exactly 3 slides, one for each slot below, in order.",
+        "If the brief asks for a different number, ignore that. 3 is the number.",
         "",
         'Slots, in order:\n1. id="hook", Hook: Decides whether slide 2 is seen. e.g. "Your videos feel flat."\n2. id="cost", Cost: What it is costing them. e.g. "Every cut lands wrong."\n3. id="cta", Close: Ask for the thing. e.g. "Save this."',
         "",

@@ -609,6 +609,32 @@ process exists.
    positionally. One pass swallowed the CTA whenever the model answered out of order, the three
    `point` slots sharing an id is exactly what breaks a naive match.
 
+### How many slides, and where that number lives
+
+**The slot list IS the slide count.** `assembleDraft` sends one line per slot and asks for one entry
+per slot, so a brief saying "give me 16 slides" alongside eight slot lines produced eight slides and
+looked, from outside, like the request had been ignored.
+
+`slotsFor(structure, n)` in `structures.ts` rebuilds the slot list to exactly `n` **before the
+call**. Repeatable slots grow and shrink first, using the placement `insertionIndex` already
+decides, so a longer deck gains middle slides and keeps its opening and its close. Past that it
+trims fixed middle slots from the end, and **never the first or last slot at any length**: those are
+the hook and the ask, and a deck missing either is not short but broken.
+
+`MIN_DRAFT_SLIDES = 3`, an opening, a middle and a close. This was once "every fixed slot plus one",
+which meant asking problem-to-solution for four gave six. A framework is a suggested running order,
+not a minimum word count.
+
+**One pass, deliberately.** The alternative is generating the framework's natural length and asking
+for more, which costs a second call and produces slides written without knowing about each other.
+
+The number is also stated in the prompt **as a number**, before the list, along with an instruction
+to disregard a different count in the brief. The list alone was not enough.
+
+`Compose` rebuilds its own slot list from `initialTexts.length` rather than trusting the framework.
+It built boxes from `structure.slots`, so a sixteen-slide draft arrived at a screen with eight of
+them and half the carousel was dropped with nothing to show it.
+
 ### Three server modules, and why it is not one
 
 | Module | Holds | Why separate |

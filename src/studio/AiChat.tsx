@@ -1,10 +1,25 @@
-import { AlertCircle, ArrowUp, PenLine, RotateCcw, Sparkles, X } from "lucide-react";
+import {
+  AlertCircle,
+  ArrowUp,
+  Minus,
+  PenLine,
+  Plus,
+  RotateCcw,
+  Sparkles,
+  X,
+} from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 
 import { alignToSlots, draftSlides, type Finding } from "./ai.js";
 import { contextVoice, listBrands } from "./brand.js";
 import { ALL_CLIENTS, loadSelectedClient } from "./clients.js";
-import { labelFor, type Structure } from "./structures.js";
+import {
+  floorFor,
+  labelFor,
+  MAX_DRAFT_SLIDES,
+  slotsFor,
+  type Structure,
+} from "./structures.js";
 
 type Phase =
   | { kind: "idle" }
@@ -32,6 +47,15 @@ export function AiChat({
   const [brief, setBrief] = useState(initialBrief ?? "");
   const [phase, setPhase] = useState<Phase>({ kind: "idle" });
   const [handingOver, setHandingOver] = useState(false);
+  /**
+   * How many slides to ask for.
+   *
+   * A real control rather than something read out of the brief. The slot list
+   * IS the count, so it has to be settled before the call, and a number parsed
+   * out of prose is a number somebody cannot see, cannot correct, and will not
+   * trust the second time it guesses wrong.
+   */
+  const [count, setCount] = useState(structure.slots.length);
   const abort = useRef<AbortController | null>(null);
 
   // A short beat so the screen change is a transition rather than a flicker.
@@ -66,10 +90,14 @@ export function AiChat({
         listBrands(),
         selected === ALL_CLIENTS ? undefined : selected,
       );
-      const drafted = await draftSlides(brief, structure, controller.signal, voice);
+      // Resized BEFORE the call, never after. Generating the framework's
+      // natural length and then asking for more would cost a second call and
+      // produce slides written without knowing about each other.
+      const asked = { ...structure, slots: slotsFor(structure, count) };
+      const drafted = await draftSlides(brief, asked, controller.signal, voice);
       setPhase({
         kind: "drafted",
-        texts: alignToSlots(drafted.slides, structure),
+        texts: alignToSlots(drafted.slides, asked),
         findings: drafted.findings,
       });
     } catch (error) {
@@ -107,7 +135,9 @@ export function AiChat({
 
       <div className="scroll-quiet fcc-rise min-h-0 flex-1 overflow-y-auto">
         <div className="mx-auto flex min-h-full w-full max-w-[720px] flex-col items-center justify-center px-6 py-12">
-          {phase.kind === "drafted" ? (
+          {drafting ? (
+            <Generating count={count} />
+          ) : phase.kind === "drafted" ? (
             <Drafted
               structure={structure}
               texts={phase.texts}
@@ -127,8 +157,8 @@ export function AiChat({
                 What is this carousel about?
               </h1>
               <p className="mt-2 max-w-[540px] text-center text-body leading-[20px] text-tertiary">
-                Describe the post in your own words. It gets drafted into{" "}
-                {structure.slots.length} {structure.name.toLowerCase()} slides you can edit.
+                Describe the post in your own words. It gets drafted into {count}{" "}
+                {structure.name.toLowerCase()} slides you can edit.
               </p>
 
               <div className="mt-8 w-full">
@@ -145,10 +175,14 @@ export function AiChat({
                     rows={3}
                     onChange={(e) => setBrief(e.target.value)}
                     onKeyDown={(e) => {
-                      if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) {
-                        e.preventDefault();
-                        void send();
-                      }
+                      // Enter sends, Shift+Enter breaks the line. The chat
+                      // convention, and this box is a message rather than a
+                      // document. Cmd/Ctrl+Enter still works for the muscle
+                      // memory of anybody who learned it the old way.
+                      if (e.key !== "Enter") return;
+                      if (e.shiftKey) return;
+                      e.preventDefault();
+                      void send();
                     }}
                     placeholder="e.g. Most talking-head edits feel flat because people cut on the beat instead of on movement. I want to show three fixes."
                     className="h-[112px] w-full resize-none rounded-3xl bg-transparent px-5 py-4 pr-16 text-[15px] leading-[24px] text-primary outline-none placeholder:text-muted"
@@ -167,6 +201,45 @@ export function AiChat({
                       <ArrowUp size={17} strokeWidth={2.5} />
                     )}
                   </button>
+                </div>
+
+                <div className="mt-3 flex items-center gap-2 px-1">
+                  <span className="text-caption text-tertiary">How many slides?</span>
+                  <div className="flex h-7 items-center gap-0.5 rounded-lg border border-hairline">
+                    <button
+                      type="button"
+                      aria-label="One fewer slide"
+                      disabled={count <= floorFor(structure)}
+                      onClick={() => setCount((n) => Math.max(floorFor(structure), n - 1))}
+                      className="grid h-full w-7 place-items-center rounded-l-lg text-tertiary hover:text-primary disabled:opacity-30"
+                    >
+                      <Minus size={13} strokeWidth={2.4} />
+                    </button>
+                    <span className="w-7 text-center font-mono text-caption text-primary">{count}</span>
+                    <button
+                      type="button"
+                      aria-label="One more slide"
+                      disabled={count >= MAX_DRAFT_SLIDES}
+                      onClick={() => setCount((n) => Math.min(MAX_DRAFT_SLIDES, n + 1))}
+                      className="grid h-full w-7 place-items-center rounded-r-lg text-tertiary hover:text-primary disabled:opacity-30"
+                    >
+                      <Plus size={13} strokeWidth={2.4} />
+                    </button>
+                  </div>
+
+                  {count === structure.slots.length ? (
+                    <span className="text-caption text-muted">
+                      what {structure.name.toLowerCase()} is normally
+                    </span>
+                  ) : (
+                    <button
+                      type="button"
+                      onClick={() => setCount(structure.slots.length)}
+                      className="text-caption text-tertiary hover:text-accent"
+                    >
+                      back to {structure.slots.length}
+                    </button>
+                  )}
                 </div>
 
                 <button
@@ -195,6 +268,66 @@ export function AiChat({
             </>
           )}
         </div>
+      </div>
+    </div>
+  );
+}
+
+
+/**
+ * The wait, given a shape.
+ *
+ * The form used to stay on screen, dimmed, with a spinner in the send button.
+ * That reads as "your click may not have registered" rather than "this is
+ * working", and the wait here is ten to fifteen seconds, which is long enough
+ * that the difference matters.
+ *
+ * The steps are not progress. Nothing reports progress, and a bar that pretends
+ * to would be lying; they are a description of what is happening, timed to the
+ * call's real shape, so the screen has something true to say while it waits.
+ */
+function Generating({ count }: { count: number }) {
+  const steps = [
+    "Reading your brief",
+    `Planning ${count} slides`,
+    "Writing the hook",
+    "Working through the middle",
+    "Tightening the close",
+  ];
+
+  const [at, setAt] = useState(0);
+
+  useEffect(() => {
+    const id = window.setInterval(() => setAt((n) => Math.min(steps.length - 1, n + 1)), 2600);
+    return () => window.clearInterval(id);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  return (
+    <div className="flex flex-col items-center">
+      <span
+        className="grid h-14 w-14 place-items-center rounded-2xl shadow-overlay"
+        style={{ background: "var(--brand-gold)", color: "var(--on-brand-gold)" }}
+      >
+        <span className="fcc-spin block h-6 w-6 rounded-full border-2 border-black/20 border-t-black/70" />
+      </span>
+
+      <h1 className="mt-6 text-center text-[28px] font-semibold leading-9 tracking-[-0.5px] text-primary">
+        Generating your slides
+      </h1>
+
+      <p className="mt-2 h-6 text-center text-body leading-[20px] text-tertiary">{steps[at]}…</p>
+
+      <div className="mt-6 flex gap-1.5">
+        {steps.map((s, i) => (
+          <span
+            key={s}
+            className={[
+              "block h-1 w-8 rounded-full",
+              i <= at ? "bg-accent" : "bg-surface-4",
+            ].join(" ")}
+          />
+        ))}
       </div>
     </div>
   );

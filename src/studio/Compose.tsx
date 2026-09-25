@@ -14,7 +14,7 @@ import { Fragment, useState } from "react";
 
 import { MAX_SLIDES } from "./compositions.js";
 import { THEMES } from "./presets.js";
-import { labelFor, repeatableOf, type Slot, type Structure } from "./structures.js";
+import { labelFor, repeatableOf, slotsFor, type Slot, type Structure } from "./structures.js";
 import type { Finding } from "./ai.js";
 
 export type ComposeResult = {
@@ -68,9 +68,27 @@ export function Compose({
   onGenerate: (result: ComposeResult) => void;
   onBack: () => void;
 }) {
-  const [fields, setFields] = useState<Field[]>(() =>
-    structure.slots.map((slot, i) => mk(slot, initialTexts?.[i] ?? "")),
-  );
+  const [fields, setFields] = useState<Field[]>(() => {
+    /*
+     * The slot list is rebuilt to fit the draft, not assumed from the framework.
+     *
+     * A draft can now be any length: `AiChat` resizes the framework before it
+     * calls, so sixteen slides arrive at a screen whose framework still says
+     * eight. Mapping over `structure.slots` would silently drop half of them,
+     * and the only sign would be a shorter carousel than the one just
+     * generated.
+     *
+     * Derived from what arrived rather than threaded through as a number,
+     * because the texts are the fact and a count passed alongside them is a
+     * second copy of it that can disagree.
+     */
+    const slots =
+      initialTexts && initialTexts.length > 0
+        ? slotsFor(structure, initialTexts.length)
+        : structure.slots;
+
+    return slots.map((slot, i) => mk(slot, initialTexts?.[i] ?? ""));
+  });
   const [themeId, setThemeId] = useState<keyof typeof THEMES>(initialTheme);
   const [showing, setShowing] = useState<string | null>(null);
   /** The quote strip, collapsed by default so it is an offer and not a wall. */
