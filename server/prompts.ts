@@ -739,3 +739,40 @@ export function assembleRewrite(input: RewriteInput): Assembled {
 
   return { system: REWRITE_SYSTEM, user };
 }
+
+/* ── researching angles for one idea ─────────────────────────────────────── */
+
+export const MAX_IDEA_CHARS = 600;
+
+export const ANGLES_SYSTEM = `You find the carousels inside one idea, using the web to see what is actually being said about it.
+
+Search first. Then work out which distinct carousels the idea could become, given what you found.
+
+Rules:
+- Return the number of angles you are asked for, each a DIFFERENT carousel. Not one idea described several ways.
+- Each angle needs a short title, a one-line statement of the angle, and a brief that would produce that carousel.
+- **Ground every angle in something you actually found.** The whole reason to search is that the result is about the world rather than about the idea's phrasing. An angle you could have written without searching is not worth one of the slots.
+- Prefer a specific finding to a general observation: a number somebody published, a mistake people keep making, a disagreement between two sources, a thing that changed recently.
+- Never state a figure, a date or a claim you did not find. If a search returned nothing usable on some aspect, say less rather than filling it in.
+- Write the brief the way somebody would write it for themselves: what the carousel argues and the specifics behind it. Two or three sentences.
+- No em dashes in anything you write. A comma or a full stop.
+- If the searches find little, return fewer angles. Padding with angles the research does not support is worse than returning two.`;
+
+export type AnglesInput = {
+  idea: string;
+  count: number;
+  voice?: Voice | undefined;
+};
+
+export function assembleAngles(input: AnglesInput): Assembled {
+  const voice = voiceBlock(input.voice);
+
+  const user = [
+    `The idea: ${clip(input.idea.trim(), MAX_IDEA_CHARS)}`,
+    "",
+    `Search the web about this, then return ${input.count} distinct carousel angle${input.count === 1 ? "" : "s"}.`,
+    ...(voice ? ["", voice] : []),
+  ].join("\n");
+
+  return { system: ANGLES_SYSTEM, user };
+}

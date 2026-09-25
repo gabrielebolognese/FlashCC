@@ -15,6 +15,7 @@ import "./env.js";
 import { createServer, type IncomingMessage, type ServerResponse } from "node:http";
 
 import { billingConfigured, checkout, portal, status, webhook } from "./billing.js";
+import { angles } from "./angles.js";
 import { alt, caption } from "./caption.js";
 import { distil } from "./distil.js";
 import { tally } from "./tally.js";
@@ -37,6 +38,7 @@ const ROUTES: Record<string, Record<string, Handler>> = {
     "/api/hooks": hooks,
     "/api/rewrite": rewrite,
     "/api/revise": revise,
+    "/api/angles": angles,
     "/api/caption": caption,
     "/api/alt": alt,
     "/api/distil": distil,

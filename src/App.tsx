@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 
 import { AiChat } from "./studio/AiChat.js";
-import { BulkCreate } from "./studio/BulkCreate.js";
+import { BulkRun } from "./studio/BulkRun.js";
 import { brandToStyle, listBrands } from "./studio/brand.js";
 import { buildSlides } from "./studio/compositions.js";
 import { resolveDocAssets } from "./studio/library.js";
@@ -226,16 +226,12 @@ function Screens() {
 
   if (screen.view === "bulk") {
     return (
-      <BulkCreate
+      <BulkRun
         styles={styles}
         build={build}
         onCancel={() => setScreen({ view: "start" })}
-        onDone={(docs) => {
-          for (const d of docs) saveDoc(d);
-          // Straight into the first one; the rest are waiting on the project list.
-          const first = docs[0];
-          setScreen(first ? { view: "studio", doc: first } : { view: "start" });
-        }}
+        // Each carousel is saved as it lands, so this only has to open one.
+        onOpen={(doc) => setScreen({ view: "studio", doc })}
       />
     );
   }

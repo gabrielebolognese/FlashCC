@@ -2291,7 +2291,7 @@ things remain and each is a different kind of thing:
 
 ## Batch 16, Bulk creation that is worth using
 
-**Status:** next
+**Status:** done
 **Size:** large
 **Why here:** the current bulk create asks somebody to paste a carousel they have
 already written, separated by `---`. That is a text importer wearing the name of
@@ -2457,6 +2457,51 @@ calendar has made a decision for them.
 - **No dollar figure.** See 16.5.
 - **No credits, no limits.** The 3 to 14 range is about how long somebody will
   watch a screen, not about rationing. Invariant 7.
+
+### What the build found
+
+**Research is per IDEA, not per carousel**, which the plan did not say and which
+changes the cost by an order of magnitude. Three ideas is three searched calls
+whatever the run length. Asking per carousel would cost fourteen searches and
+still produce overlapping angles, because each call would have no idea what the
+others had chosen. A live run on one idea took 39 seconds, ran 4 searches and
+returned 34 sources.
+
+**Without search, the do-not-repeat mechanism was a no-op that looked like it
+worked.** `usedHooks` was being read from `steps`, which inside the run loop is
+the closure from before the run started: every entry still "waiting", every hook
+still absent. So it returned nothing on every step and three carousels from one
+idea would have come back as three versions of one carousel, exactly the failure
+the mechanism exists to prevent. The used hooks are now tracked in a local map,
+which is the value that actually changes as the run goes.
+
+**`bulk.ts` could not be deleted, as the plan said, and the reason is worth
+keeping.** `buildDocs` is what `Repurpose` builds through and `BulkBlock` is
+`longform.ts`'s output type. The paste-parsing half went: `parseBulk`,
+`readBulk`, `SEPARATOR`, `SAMPLE_BULK`, `countSlides`, and the four
+hook/payoff helpers. `BatchReview` was reachable from `BulkCreate` alone and
+went with it.
+
+**Posts are written in one go rather than appended.** The pipeline store is a
+whole-list read and write, so adding nine posts one at a time would rewrite the
+file nine times and lose anything another tab wrote in between.
+
+### The web search decision, in practice
+
+`web_search_20260209`, no beta header, on the key this product already holds. No
+second vendor and no crawler of ours. What came back on "short-form video
+editors undercharging" was three angles each grounded in a specific finding, with
+34 real source URLs.
+
+**The error shape is the thing to know.** A failed search returns HTTP 200 with
+`content` as an error OBJECT where a success is an ARRAY. `sourcesFrom` branches
+on that before indexing, and `angles.test.ts` covers it, because inside a
+fourteen-step run the difference is a step that found nothing versus a crash
+that ends the batch.
+
+**Research failing does not end a run.** A search that fails on one idea leaves
+that idea drafted from its own words, rather than stopping before a single
+carousel exists.
 
 ---
 
@@ -2630,8 +2675,7 @@ that define the category. And **nothing is ranked, scored or graded**, because
 the ranking complaint in the research corpus is not about cost, it is about a
 machine asserting which of your sentences is better.
 
-**Batches 1 to 15 are done.** Batch 16 rethinks bulk creation, which shipped in
-Batch 4 as a text importer and was never the feature its name promised.
+**Every batch in this document is done.**
 
 The other open work is `docs/reference.md`
 §29, the defect list, which is deliberately not a roadmap item and should not be

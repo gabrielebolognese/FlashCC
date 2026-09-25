@@ -824,6 +824,65 @@ Shared by `/api/distil` and `/api/voice/learn`, which need the same answer for t
 the quotes section under Reading a source for `canonical`, the strict-match-loose-dedup split, and
 why `plainText` must never touch any of it.
 
+### Making a batch (`BulkRun.tsx`, `run.ts`, `/api/angles`)
+
+A few ideas in, a fortnight of carousels out. Replaces the old bulk create, which asked somebody to
+paste carousels they had already written separated by `---`, a text importer wearing the name of a
+feature.
+
+**The plan is decided before a single call is made**, in `run.ts`, which is pure and therefore
+provable. `planRun` cycles the ideas rather than grouping them: nine carousels from three ideas is
+`1,2,3,1,2,3,1,2,3`. Two reasons, and the second is the real one: it is what "alternate them all"
+means, and a run that stalls at step four has then made one carousel per idea rather than four about
+the first and none about the others. Styles cycle on their own count, so the pairing shifts.
+
+**3 to 14.** Below three this is the single-carousel flow with extra clicks; above fourteen nobody
+watches it finish. Not a ration: nothing counts down and nothing is refused. Invariant 7.
+
+**One at a time, deliberately.** Fourteen calls at once would be faster and would make the
+percentage meaningless, deliver the token count in one lump, and turn one failure into a
+half-finished set with no way to say which half. Each carousel is saved the moment it lands, so
+abandoning at step seven leaves seven real carousels. A failed step is marked and the run continues.
+
+`runPercent` counts **settled** steps, not the one in flight: a bar that jumps when a step starts
+claims it is done, then sits still for fifteen seconds. A failed step counts as settled, because it
+is not coming back and a bar stuck at 71% forever is worse.
+
+### Angles from the live web (`/api/angles`)
+
+**Batch 13 rejected URL fetching and that still stands**: fetching somebody's page server-side makes
+us the party requesting it. `web_search` is an Anthropic **server** tool, so the search and the
+reading happen on their infrastructure, on the key this product already holds, and results arrive
+cited. No second vendor, no second key, no crawler of ours. That difference is the whole reason the
+route exists.
+
+`web_search_20260209`, **no beta header**, on Sonnet 5 and the Opus 5 family.
+
+**Researched per IDEA, not per carousel.** Three ideas is three calls whatever the run length.
+Per-carousel would cost fourteen searches and still overlap, because each call would not know what
+the others chose.
+
+**A failed search returns HTTP 200**, with `content` as an error *object* where success is an
+*array*. `sourcesFrom` branches before indexing, because in a fourteen-step run that is the
+difference between a step finding nothing and a crash ending the batch. Research failing on one idea
+leaves that idea drafted from its own words.
+
+### Keeping the angles apart without search
+
+`briefFor` gives each step the openings already used for **its own idea** and asks for a different
+line. Without it, three carousels drafted from one sentence come back as three versions of one
+carousel, and the model is not being careless: it was asked the same question three times.
+
+The used hooks are tracked in a local map during the run, **not read back from React state**. State
+inside the loop is the closure from before the run started, so reading it returned nothing every
+time and the mechanism was a no-op that looked like it worked.
+
+### Tokens, and what is not shown
+
+Tokens and searches are reported **apart**, and neither is converted to money. A run crosses several
+models at several prices and search bills per search on top of its tokens, so a dollar figure
+computed in the browser would be a number this product cannot stand behind.
+
 ### Reading a source (`/api/distil`, `distil.ts`, `Repurpose.tsx`)
 
 **It returns angles, not a deck.** A long transcript contains several carousels, and a route that

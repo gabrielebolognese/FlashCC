@@ -54,6 +54,9 @@ export const MODELS = {
   // Rewriting a few slides so they still read against the ones left alone is
   // the same job drafting does, on a smaller piece.
   revise: "claude-sonnet-5",
+  // Reads the live web and decides what is worth a carousel. Reasoning over
+  // search results, which is the job this tier is for.
+  angles: "claude-sonnet-5",
 } as const;
 
 /** A hung request otherwise holds a browser tab open until somebody closes it. */
