@@ -32,7 +32,7 @@
  * to show what the tool does. All of it stops under `prefers-reduced-motion`
  * with the finished state left on screen.
  */
-import { ArrowRight, Check, Sparkles, Zap } from "lucide-react";
+import { ArrowRight, Check, Search, Sparkles, Wand2, Zap } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 
 import { applyBrand, makeBrand } from "../studio/brand.js";
@@ -52,11 +52,36 @@ import { prefersReducedMotion, useInView } from "./useInView.js";
 const PITCH = [
   "You don't have a carousel problem.",
   "You have a ninety-minute problem.",
-  "Design it. Export ten files. Rename them.",
-  "Paste ten links into a scheduler.",
+  "Write it. Design it. Export ten files.",
+  "Rename them. Paste ten links into a scheduler.",
   "FlashCC does all of that part.",
-  "You just write the words.",
+  "You bring the idea.",
 ];
+
+const DRAFT_BRIEF =
+  "Most talking-head edits feel flat because people cut on the beat instead of on movement.";
+
+const REVISE_ASK = "In slide 4, make it about what to cut on instead";
+
+const REVISE_DECK = [
+  "Cutting on the beat is why your edits feel robotic.",
+  "Every cut lands on the snare. Precise, and lifeless.",
+  "Attention resets when the frame changes, not when the snare hits.",
+  "So stop cutting on the beat.",
+];
+
+const REVISE_AFTER = "Cut on movement. A hand leaving frame. A door closing.";
+
+const BATCH_ROWS = [
+  "Why cutting on the beat kills an edit",
+  "What editors get wrong about pricing",
+  "Nobody asks what camera you used",
+  "The note that halves revision rounds",
+  "Cut on movement, not on the beat",
+];
+
+/** Real domains, because the feature returns real sources rather than a badge. */
+const BATCH_SOURCES = ["4 searches", "34 sources", "all cited"];
 
 const SPLIT_SOURCE =
   "Every cut lands on the beat and the edit still feels flat. Attention resets when the frame changes, not when the snare hits. Cut on movement instead, a hand leaving frame, a head turning, a door closing.";
@@ -194,9 +219,9 @@ function Hero({ onStart }: { onStart: () => void }) {
           <span style={{ color: "var(--brand-gold)" }}>Posting them isn&rsquo;t.</span>
         </h1>
 
-        <p className="mx-auto mt-6 max-w-[52ch] text-[17px] leading-[27px] text-tertiary md:text-[19px] md:leading-[30px]">
-          Write the words. FlashCC lays them out, checks them against the platform, and hands your
-          scheduler a row that already knows the image URLs.
+        <p className="mx-auto mt-6 max-w-[54ch] text-[17px] leading-[27px] text-tertiary md:text-[19px] md:leading-[30px]">
+          Say what the post is about. FlashCC writes it, lays it out, checks it against the
+          platform, and hands your scheduler a row that already knows the image URLs.
         </p>
 
         <div className="mt-8 flex flex-wrap items-center justify-center gap-3">
@@ -224,6 +249,256 @@ function Hero({ onStart }: { onStart: () => void }) {
 
 /* ── demos ────────────────────────────────────────────────────────────────── */
 
+/**
+ * A brief becoming a deck.
+ *
+ * The slides are laid out by `buildSlides`, like everything else here. What is
+ * staged is the typing and the arrival, because the point of the section is the
+ * shape of the exchange, not the speed of a real call.
+ */
+function DraftDemo() {
+  const [ref, seen] = useInView<HTMLDivElement>();
+  const [step, setStep] = useState(0);
+
+  const deck = useMemo(
+    () =>
+      deckFrom(
+        [
+          "Cutting on the beat is why your edits feel robotic.",
+          "Every cut lands on the snare. Precise, and lifeless.",
+          "Attention resets when the frame changes.",
+          "Cut on movement. A hand leaving frame. A door closing.",
+        ],
+        "ink",
+      ),
+    [],
+  );
+
+  useEffect(() => {
+    if (!seen) return;
+    if (prefersReducedMotion()) {
+      setStep(2);
+      return;
+    }
+    const a = setTimeout(() => setStep(1), 500);
+    const b = setTimeout(() => setStep(2), 1500);
+    return () => {
+      clearTimeout(a);
+      clearTimeout(b);
+    };
+  }, [seen]);
+
+  return (
+    <div ref={ref}>
+      <div className="rounded-2xl border border-hairline bg-surface-1 p-4">
+        <div className="text-[15px] leading-[24px] text-primary">
+          {DRAFT_BRIEF}
+          <span
+            className="ml-0.5 inline-block h-[18px] w-[2px] translate-y-[3px]"
+            style={{
+              background: "var(--accent)",
+              opacity: step === 0 ? 1 : 0,
+              transition: "opacity 300ms ease",
+            }}
+          />
+        </div>
+
+        <div className="mt-3 flex items-center gap-2">
+          <span className="text-caption text-tertiary">How many slides?</span>
+          <span className="rounded-md border border-accent-dim px-1.5 py-0.5 font-mono text-caption text-accent">
+            4
+          </span>
+          <div className="flex-1" />
+          <span
+            className="flex items-center gap-1.5 text-caption text-muted"
+            style={{ opacity: step === 1 ? 1 : 0, transition: "opacity 300ms ease" }}
+          >
+            <Sparkles size={11} strokeWidth={2.4} className="text-accent" />
+            Generating your slides
+          </span>
+        </div>
+      </div>
+
+      <div className="mt-4 grid grid-cols-4 gap-2.5">
+        {deck.slides.map((slide, i) => (
+          <div
+            key={slide.id}
+            className="overflow-hidden rounded-xl border border-hairline"
+            style={{
+              opacity: step >= 2 ? 1 : 0,
+              transform: step >= 2 ? "none" : "translateY(18px) scale(0.95)",
+              transition: `opacity 520ms ease ${i * 110}ms, transform 620ms cubic-bezier(0.22,1,0.36,1) ${i * 110}ms`,
+            }}
+          >
+            <SlidePreview slide={slide} />
+          </div>
+        ))}
+      </div>
+
+      <p className="mt-3 text-caption leading-4 text-muted">
+        Ask for four slides and you get four. Ask for sixteen and you get sixteen.
+      </p>
+    </div>
+  );
+}
+
+/**
+ * Changing one slide by saying so.
+ *
+ * The untouched slides are deliberately shown unchanged rather than re-rendered
+ * differently, because that is the actual behaviour: the route returns only the
+ * slides it changed, so the others come back as the same words.
+ */
+function ReviseDemo() {
+  const [ref, seen] = useInView<HTMLDivElement>();
+  const [step, setStep] = useState(0);
+
+  useEffect(() => {
+    if (!seen) return;
+    if (prefersReducedMotion()) {
+      setStep(1);
+      return;
+    }
+    const t = setTimeout(() => setStep(1), 900);
+    return () => clearTimeout(t);
+  }, [seen]);
+
+  return (
+    <div ref={ref}>
+      <div className="flex items-center gap-2 rounded-2xl border border-accent-dim bg-accent-wash p-3">
+        <Wand2 size={14} strokeWidth={2} className="shrink-0 text-accent" />
+        <span className="text-[15px] text-primary">{REVISE_ASK}</span>
+      </div>
+
+      <div className="mt-4 flex flex-col gap-2">
+        {REVISE_DECK.map((line, i) => {
+          const changed = i === 3;
+          const showing = changed && step >= 1 ? REVISE_AFTER : line;
+          return (
+            <div
+              key={i}
+              className="flex items-center gap-3 rounded-xl border bg-surface-1 p-3"
+              style={{
+                borderColor:
+                  changed && step >= 1 ? "var(--accent-dim)" : "var(--hairline)",
+                transition: "border-color 400ms ease",
+              }}
+            >
+              <span className="grid h-6 w-6 shrink-0 place-items-center rounded-md bg-surface-4 text-[10px] font-semibold text-secondary">
+                {i + 1}
+              </span>
+              <span
+                className="min-w-0 flex-1 truncate text-caption text-primary"
+                style={{
+                  opacity: changed && step === 0 ? 0.45 : 1,
+                  transition: "opacity 400ms ease",
+                }}
+              >
+                {showing}
+              </span>
+              {changed && step >= 1 ? (
+                <span className="shrink-0 text-caption text-accent">changed</span>
+              ) : null}
+            </div>
+          );
+        })}
+      </div>
+
+      <p className="mt-3 text-caption leading-4 text-muted">
+        Only slide four moved. The rest came back as the same words, not rewritten ones.
+      </p>
+    </div>
+  );
+}
+
+/**
+ * A batch being made, with what it read.
+ *
+ * The percentage and the sources are the two things this screen actually shows
+ * while it runs, so they are the two things the demo shows.
+ */
+function BatchDemo() {
+  const [ref, seen] = useInView<HTMLDivElement>();
+  const [at, setAt] = useState(0);
+
+  useEffect(() => {
+    if (!seen) return;
+    if (prefersReducedMotion()) {
+      setAt(BATCH_ROWS.length);
+      return;
+    }
+    const id = setInterval(() => setAt((n) => (n >= BATCH_ROWS.length ? n : n + 1)), 700);
+    return () => clearInterval(id);
+  }, [seen]);
+
+  const percent = Math.round((Math.min(at, BATCH_ROWS.length) / BATCH_ROWS.length) * 100);
+
+  return (
+    <div ref={ref}>
+      <div className="rounded-2xl border border-hairline bg-surface-1 p-4">
+        <div className="flex items-baseline gap-2">
+          <span
+            className="font-mono text-[26px] font-semibold leading-none"
+            style={{ color: "var(--brand-gold)" }}
+          >
+            {percent}%
+          </span>
+          <div className="flex-1" />
+          <span className="text-caption text-muted">9 carousels · 3 ideas</span>
+        </div>
+
+        <div className="mt-2.5 h-1.5 w-full overflow-hidden rounded-full bg-surface-3">
+          <div
+            className="h-full rounded-full"
+            style={{
+              width: `${percent}%`,
+              background: "var(--brand-gold)",
+              transition: "width 600ms cubic-bezier(0.22,1,0.36,1)",
+            }}
+          />
+        </div>
+
+        <div className="mt-3 flex flex-col gap-1.5">
+          {BATCH_ROWS.map((row, i) => (
+            <div
+              key={row}
+              className="flex items-center gap-2.5"
+              style={{
+                opacity: i < at ? 1 : 0.3,
+                transition: "opacity 400ms ease",
+              }}
+            >
+              <span className="grid h-5 w-5 shrink-0 place-items-center rounded-md bg-surface-4 text-[10px] font-semibold text-secondary">
+                {i + 1}
+              </span>
+              <span className="min-w-0 flex-1 truncate text-caption text-primary">{row}</span>
+              {i < at ? (
+                <Check size={12} strokeWidth={2.6} className="shrink-0 text-success" />
+              ) : null}
+            </div>
+          ))}
+        </div>
+      </div>
+
+      <div className="mt-3 flex flex-wrap items-center gap-2">
+        <Search size={12} strokeWidth={2.2} className="text-accent" />
+        <span className="text-caption text-tertiary">Angles built from what it read:</span>
+        {BATCH_SOURCES.map((s) => (
+          <span
+            key={s}
+            className="rounded-md border border-hairline px-1.5 py-0.5 text-caption text-muted"
+          >
+            {s}
+          </span>
+        ))}
+      </div>
+
+      <p className="mt-3 text-caption leading-4 text-muted">
+        Three ideas, taking turns, so the batch is never nine versions of one post.
+      </p>
+    </div>
+  );
+}
 function SplitDemo() {
   const [ref, seen] = useInView<HTMLDivElement>();
   const [step, setStep] = useState(0);
@@ -457,7 +732,7 @@ function CsvDemo() {
 
 const PROOF = [
   { n: "9", label: "schedulers want public image URLs", sub: "None of them host the images." },
-  { n: "0", label: "credits, ever", sub: "Nothing here is metered." },
+  { n: "0", label: "credits, ever", sub: "Drafting, rewriting, research. None of it metered." },
   { n: "∞", label: "reviewers, free", sub: "Others charge $499 a month each." },
 ];
 
@@ -586,18 +861,43 @@ export function Landing({ onStart }: { onStart: () => void }) {
 
       <div id="how">
         <Section
+          eyebrow="Draft"
+          title="Say what it's about."
+          line="A sentence in, a finished carousel out, at the length you asked for. It writes the words and nothing else: every size, position and colour is decided by the layout engine, which is why it never comes back looking like a template with the text swapped."
+        >
+          <DraftDemo />
+        </Section>
+
+        <Section
+          eyebrow="Change"
+          title="Talk to the draft."
+          line="In slide 4, make it about pricing. Make the first three shorter. It changes those and hands the rest back untouched, so fixing one slide never quietly rewrites another."
+          flip
+        >
+          <ReviseDemo />
+        </Section>
+
+        <Section
           eyebrow="Paste"
-          title="Words in. Slides out."
-          line="Paste a post, a newsletter, a transcript. Every cut lands on a sentence end, and each piece gets laid out for you."
+          title="Or bring your own words."
+          line="Paste a post, a newsletter, a transcript, or drop a subtitle file. Every cut lands on a sentence end, and no model touches a word you already wrote."
         >
           <SplitDemo />
         </Section>
 
         <Section
+          eyebrow="Batch"
+          title="Three ideas. A fortnight of posts."
+          line="It reads the web about each idea first, builds the angles from what it finds, and cites them. The ideas take turns, so nine carousels are nine different posts rather than nine versions of one."
+          flip
+        >
+          <BatchDemo />
+        </Section>
+
+        <Section
           eyebrow="Brand"
           title="One brand. Every deck."
-          line="Colours and typefaces saved once, applied to one carousel or thirty, and your logo lands on the cover by itself."
-          flip
+          line="Colours, typefaces and a background picture saved once, applied to one carousel or thirty, and your logo lands on the cover by itself."
         >
           <BrandDemo />
         </Section>
@@ -605,7 +905,8 @@ export function Landing({ onStart }: { onStart: () => void }) {
         <Section
           eyebrow="Check"
           title="It reads the rules so you don't."
-          line="Type too small to survive compression. A deck too long to publish. The crop that eats your hook in the grid. Caught before you post."
+          line="Type too small to survive compression. A deck too long to publish. The crop that eats your hook in the grid. A number the draft invented that your brief never mentioned. Caught before you post."
+          flip
         >
           <CheckDemo />
         </Section>
@@ -614,7 +915,6 @@ export function Landing({ onStart }: { onStart: () => void }) {
           eyebrow="Approve"
           title="Send a link. No account."
           line="Your client comments on the slide they mean, then approves, and the approval is pinned to that exact version, so nobody signs off on something that has changed since."
-          flip
         >
           <ReviewDemo />
         </Section>
@@ -622,7 +922,8 @@ export function Landing({ onStart }: { onStart: () => void }) {
         <Section
           eyebrow="Ship"
           title="Straight into your scheduler."
-          line="Every bulk importer wants public image URLs and none of them host the images. FlashCC hosts your rendered slides and fills the row in."
+          line="Captions written for the platform you are posting to, alt text for every slide, and a row your bulk importer can read. FlashCC hosts the rendered slides, which is the part none of them do."
+          flip
         >
           <CsvDemo />
         </Section>
