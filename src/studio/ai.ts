@@ -99,3 +99,66 @@ export function alignToSlots(drafted: DraftedSlide[], structure: Structure): str
 
   return out;
 }
+
+/* ── changing a draft you already have ────────────────────────────────────── */
+
+export type Revised = {
+  /** The whole deck, so the caller replaces rather than merges. */
+  deck: string[];
+  /** Indexes that moved, so the screen can say which without diffing. */
+  changed: number[];
+  summary: string;
+};
+
+/**
+ * "In slide 4 make it about pricing." "Change the first three to be shorter."
+ *
+ * The thing between accepting a draft and starting over, which were the only
+ * two things you could do with one.
+ *
+ * The server returns only the slides it changed and applies them itself, so a
+ * slide the instruction did not name comes back as the same bytes it was. That
+ * is a property of the route rather than a promise in a prompt: an untouched
+ * slide is never regenerated, so it cannot come back subtly different.
+ */
+export async function reviseDraft(
+  deck: readonly string[],
+  instruction: string,
+  slots?: readonly { id: string; label: string; detail: string; placeholder: string }[],
+  signal?: AbortSignal,
+  voice?: Voice,
+): Promise<Revised> {
+  const res = await fetch("/api/revise", {
+    method: "POST",
+    headers: await authHeader(),
+    ...(signal ? { signal } : {}),
+    body: JSON.stringify({
+      deck: [...deck],
+      instruction,
+      ...(slots
+        ? {
+            slots: slots.map((s) => ({
+              id: s.id,
+              label: s.label,
+              note: s.detail,
+              placeholder: s.placeholder,
+            })),
+          }
+        : {}),
+      ...(hasVoice(voice) ? { voice } : {}),
+    }),
+  });
+
+  if (!res.ok) throw await readRefusal(res);
+
+  const body = (await res.json().catch(() => null)) as Partial<Revised> | null;
+  if (!Array.isArray(body?.deck) || body.deck.length !== deck.length) {
+    throw new Error("The change came back the wrong shape");
+  }
+
+  return {
+    deck: body.deck,
+    changed: Array.isArray(body.changed) ? body.changed : [],
+    summary: typeof body.summary === "string" ? body.summary : "",
+  };
+}

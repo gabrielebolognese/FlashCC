@@ -6,11 +6,12 @@ import {
   Plus,
   RotateCcw,
   Sparkles,
+  Wand2,
   X,
 } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 
-import { alignToSlots, draftSlides, type Finding } from "./ai.js";
+import { alignToSlots, draftSlides, reviseDraft, type Finding } from "./ai.js";
 import { contextVoice, listBrands } from "./brand.js";
 import { ALL_CLIENTS, loadSelectedClient } from "./clients.js";
 import {
@@ -143,6 +144,22 @@ export function AiChat({
               texts={phase.texts}
               onUse={() => onDrafted(phase.texts, phase.findings)}
               onRedo={() => setPhase({ kind: "idle" })}
+              onRevise={async (instruction) => {
+                const slots = slotsFor(structure, phase.texts.length);
+                const voice = contextVoice(listBrands(), undefined);
+                const out = await reviseDraft(phase.texts, instruction, slots, undefined, voice);
+                /*
+                 * The whole deck is replaced, not merged. The server already
+                 * applied the changes to the deck it was given, so merging here
+                 * would be a second implementation of the same thing, and the
+                 * two would eventually disagree about an edge.
+                 *
+                 * Findings are kept: they are about the brief, and a revision
+                 * does not make an invented number any less invented.
+                 */
+                setPhase({ kind: "drafted", texts: out.deck, findings: phase.findings });
+                return { changed: out.changed, summary: out.summary };
+              }}
             />
           ) : (
             <>
@@ -338,15 +355,40 @@ function Drafted({
   texts,
   onUse,
   onRedo,
+  onRevise,
 }: {
   structure: Structure;
   texts: string[];
   onUse: () => void;
   onRedo: () => void;
+  onRevise: (instruction: string) => Promise<{ changed: number[]; summary: string }>;
 }) {
+  const [asking, setAsking] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [changed, setChanged] = useState<number[]>([]);
+  const [said, setSaid] = useState("");
+  const [error, setError] = useState("");
+
+  const ask = () => {
+    const instruction = asking.trim();
+    if (!instruction || busy) return;
+    setBusy(true);
+    setError("");
+    onRevise(instruction)
+      .then((out) => {
+        setChanged(out.changed);
+        setSaid(out.summary);
+        setAsking("");
+      })
+      .catch((e: unknown) => setError(e instanceof Error ? e.message : "Could not make that change"))
+      .finally(() => setBusy(false));
+  };
+
   return (
     <div className="w-full">
-      <div className="mb-5 flex items-center gap-3">
+      {/* Sticky, because a sixteen slide draft pushes these off the top and the
+          two things you can do with a draft should not need scrolling to. */}
+      <div className="sticky top-0 z-10 -mx-1 mb-5 flex items-center gap-3 bg-base px-1 py-2">
         <div>
           <div className="text-[20px] font-semibold leading-7 tracking-[-0.3px] text-primary">
             {texts.filter((t) => t.trim()).length} slides drafted
@@ -372,9 +414,69 @@ function Drafted({
         </button>
       </div>
 
+      {/*
+        Between accepting the draft and starting over, which were the only two
+        things you could do with one. Redo throws away eight good slides to fix
+        the one that is wrong.
+      */}
+      <div className="mb-5 rounded-2xl border border-hairline bg-surface-1 p-3">
+        <div className="flex items-center gap-2">
+          <Wand2 size={14} strokeWidth={2} className="shrink-0 text-accent" />
+          <span className="text-caption text-tertiary">Change something</span>
+        </div>
+
+        <form
+          className="mt-2 flex gap-2"
+          onSubmit={(e) => {
+            e.preventDefault();
+            ask();
+          }}
+        >
+          <input
+            value={asking}
+            disabled={busy}
+            onChange={(e) => setAsking(e.target.value)}
+            maxLength={400}
+            placeholder="In slide 4, talk about pricing instead. Or: make the first three shorter."
+            className="h-9 flex-1 rounded-xl border border-hairline bg-surface-2 px-3 text-caption text-primary outline-none placeholder:text-muted focus:border-accent-dim disabled:opacity-60"
+          />
+          <button
+            type="submit"
+            disabled={!asking.trim() || busy}
+            className="flex h-9 shrink-0 items-center gap-1.5 rounded-xl border border-hairline px-3 text-caption text-secondary hover:border-accent-dim hover:text-accent disabled:pointer-events-none disabled:opacity-40"
+          >
+            {busy ? (
+              <span className="fcc-spin block h-3 w-3 rounded-full border-2 border-hairline border-t-accent" />
+            ) : (
+              <ArrowUp size={13} strokeWidth={2.5} />
+            )}
+            {busy ? "Changing" : "Change"}
+          </button>
+        </form>
+
+        {error ? <p className="mt-2 text-caption leading-4 text-danger">{error}</p> : null}
+
+        {!error && said ? (
+          <p className="mt-2 text-caption leading-4 text-muted">
+            {said}
+            {changed.length > 0
+              ? ` Changed slide${changed.length === 1 ? "" : "s"} ${changed.map((n) => n + 1).join(", ")}.`
+              : " Nothing changed. Try naming the slide."}
+          </p>
+        ) : null}
+      </div>
+
       <div className="flex flex-col gap-2.5">
         {texts.map((text, i) => (
-          <div key={i} className="rounded-2xl border border-hairline bg-surface-1 p-3.5">
+          <div
+            key={i}
+            className={[
+              "rounded-2xl border bg-surface-1 p-3.5",
+              // Marked after a change, so you can see what moved without
+              // rereading the whole deck.
+              changed.includes(i) ? "border-accent-dim" : "border-hairline",
+            ].join(" ")}
+          >
             <div className="mb-1.5 flex items-center gap-2">
               <span className="grid h-5 min-w-5 place-items-center rounded-md bg-surface-4 px-1.5 text-[10px] font-semibold text-secondary">
                 {i + 1}
@@ -382,6 +484,9 @@ function Drafted({
               <span className="text-caption font-semibold text-tertiary">
                 {labelFor(structure.slots, i)}
               </span>
+              {changed.includes(i) ? (
+                <span className="text-caption text-accent">changed</span>
+              ) : null}
             </div>
             <p className="text-[14px] leading-[21px] text-primary">{text}</p>
           </div>

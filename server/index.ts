@@ -19,6 +19,7 @@ import { alt, caption } from "./caption.js";
 import { distil } from "./distil.js";
 import { tally } from "./tally.js";
 import { learnVoice } from "./voice.js";
+import { revise } from "./revise.js";
 import { rewrite } from "./rewrite.js";
 import { draft, draftConfigured, draftStatus, hooks } from "./draft.js";
 import { exportDeck, renderDocument, renderImages } from "./export.js";
@@ -35,6 +36,7 @@ const ROUTES: Record<string, Record<string, Handler>> = {
     "/api/draft": draft,
     "/api/hooks": hooks,
     "/api/rewrite": rewrite,
+    "/api/revise": revise,
     "/api/caption": caption,
     "/api/alt": alt,
     "/api/distil": distil,

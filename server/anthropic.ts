@@ -51,6 +51,9 @@ export const MODELS = {
   // Reading twelve carousels and characterising how somebody writes is a
   // reasoning task with a short answer.
   voice: "claude-sonnet-5",
+  // Rewriting a few slides so they still read against the ones left alone is
+  // the same job drafting does, on a smaller piece.
+  revise: "claude-sonnet-5",
 } as const;
 
 /** A hung request otherwise holds a browser tab open until somebody closes it. */

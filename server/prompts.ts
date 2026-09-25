@@ -552,6 +552,62 @@ export function assembleAlt(deck: readonly string[]): Assembled {
   };
 }
 
+/* ── changing a draft you already have ────────────────────────────────────── */
+
+export const MAX_INSTRUCTION = 400;
+
+export const REVISE_SYSTEM = `You revise a carousel that already exists, following one instruction.
+
+You are given the slides, numbered, and what to change. You return ONLY the slides you changed.
+
+Rules:
+- **Return only the slides the instruction actually asks you to change.** A slide nobody asked about must not appear in your answer at all. Returning it unchanged is not the same thing and is not wanted.
+- Slide numbers are the ones shown. "Slide 4" is the one numbered 4. "The first three" is 1, 2 and 3. "The last one" is the highest number. "The middle" is everything except the first and the last.
+- If the instruction names no slides, work out which ones it is about and change the fewest that could satisfy it.
+- Keep each slide's job. The first slide opens and the last one closes, whatever else changes.
+- A revised slide has to read alongside the ones you did not touch. Do not leave a dangling reference to something you removed.
+- Add no claim, number, name or result the deck does not already contain, unless the instruction supplies it.
+- Keep the lengths: the first slide under 90 characters, the rest under 220.
+- No em dashes, ever. No hashtags, no emoji.
+- If the instruction asks for something you cannot do without inventing material, change what you can and leave the rest alone.`;
+
+export type ReviseInput = {
+  deck: string[];
+  instruction: string;
+  slots?: SlotSpec[] | undefined;
+  voice?: Voice | undefined;
+};
+
+export function assembleRevise(input: ReviseInput): Assembled {
+  const voice = voiceBlock(input.voice);
+
+  // Numbered from 1, matching what the person is looking at on screen. Asking
+  // a model to index from zero against a list a human numbered from one is a
+  // needless translation with an off-by-one waiting in it.
+  const deck = clip(
+    input.deck.map((t, i) => `${i + 1}. ${t.trim()}`).join("\n"),
+    MAX_DECK_CHARS,
+  );
+
+  const jobs = input.slots?.length
+    ? input.slots.map((s, i) => `${i + 1}. ${s.label}: ${s.note}`).join("\n")
+    : "";
+
+  const user = [
+    `What to change: ${clip(input.instruction.trim(), MAX_INSTRUCTION)}`,
+    "",
+    `The carousel has ${input.deck.length} slides and must still have ${input.deck.length} when you are done.`,
+    ...(jobs ? ["", `What each slide is for:\n${jobs}`] : []),
+    ...(voice ? ["", voice] : []),
+    "",
+    `The slides:\n${deck}`,
+    "",
+    "Return only the ones you changed, with their numbers.",
+  ].join("\n");
+
+  return { system: REVISE_SYSTEM, user };
+}
+
 /* ── rewriting one line ───────────────────────────────────────────────────── */
 
 export type RewriteIntent = "shorter" | "punchier" | "simpler" | "angle" | "expand" | "free";

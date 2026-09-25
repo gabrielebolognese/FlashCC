@@ -609,6 +609,31 @@ process exists.
    positionally. One pass swallowed the CTA whenever the model answered out of order, the three
    `point` slots sharing an id is exactly what breaks a naive match.
 
+### Changing a draft you already have (`/api/revise`)
+
+Accepting the draft and starting over were the only two things you could do with one, and Redo
+throws away eight good slides to fix the one that is wrong. This takes an instruction:
+*"In slide 4, talk about pricing instead"*, *"make the first three shorter"*.
+
+**It returns only the slides it changed, and that is the safety property rather than a nicety.** The
+obvious design returns the whole deck revised, and is also the one where asking about slide 4
+quietly rewrites slide 7. Nothing about the result looks wrong, because every slide is plausible:
+they were all written by the same model that wrote the first draft.
+
+Returning `{ slide, text }` for changed slides only makes that structurally impossible. A slide the
+instruction did not name is not in the response, so it comes back as **the same bytes**, not a
+regenerated copy that happens to be similar.
+
+`usableChanges` **drops** a slide number outside the deck rather than clamping it. A clamped index is
+a change applied to the wrong slide, which is worse than a change that did not happen. It is also the
+only way this route could lengthen a carousel nobody asked to lengthen.
+
+Slides are numbered **from 1** in the prompt, matching the screen, so the model and the person are
+looking at the same list. The prompt spells out how the phrases people use map onto numbers: "the
+first three" is 1, 2 and 3; "the last one" is the highest.
+
+The deck length is stated twice and checked on the way back. One call, no second pass.
+
 ### How many slides, and where that number lives
 
 **The slot list IS the slide count.** `assembleDraft` sends one line per slot and asks for one entry
