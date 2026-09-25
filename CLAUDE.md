@@ -41,7 +41,7 @@ history and should never be used to answer a question about how the app works.
 
 | Command | What it does |
 | --- | --- |
-| `npm run dev` | Vite dev server (5173, falls forward if taken) |
+| `npm run dev` | Vite dev server (5173, falls forward if taken). `VITE_PORT=4001 npm run dev` to pick one |
 | `npm run build` | `tsc --noEmit` then `vite build` |
 | `npm run typecheck` | Type check only; run before considering a change done |
 | `npm test` | `vitest run --passWithNoTests` |
