@@ -1,5 +1,5 @@
-import { ArrowLeft, Check, Palette, X } from "lucide-react";
-import { useEffect, useMemo, useState } from "react";
+import { ArrowLeft, Check, ImagePlus, Palette, X } from "lucide-react";
+import { useEffect, useMemo, useRef, useState } from "react";
 
 import { buildSlides } from "./compositions.js";
 import { slidePaint } from "./paint.js";
@@ -8,7 +8,11 @@ import { allFonts } from "./model.js";
 import type { BuildOptions } from "./compositions.js";
 import { PREVIEW_COUNT, previewDeck } from "./preview.js";
 import { StepGuide, Strong } from "./StepGuide.js";
-import { customFrom, DEFAULT_STYLE, type Style } from "./styles.js";
+import { filterAssets, listAssets, type Asset } from "./assets.js";
+import { importImages, urlFor } from "./library.js";
+import type { SlideImage } from "./model.js";
+import { DEFAULT_SCRIM } from "./paint.js";
+import { customFrom, DEFAULT_STYLE, withStyleImage, type Style } from "./styles.js";
 
 const W = 1080;
 const H = 1350;
@@ -79,7 +83,9 @@ function StyleCard({
   onPick: () => void;
 }) {
   const slide = useMemo(
-    () => buildSlides(texts.slice(0, 1), style.theme, roles.slice(0, 1), build)[0],
+    // Through the same stamping the real document gets, so a style with a
+    // picture looks in the grid like it will look on the canvas.
+    () => withStyleImage(buildSlides(texts.slice(0, 1), style.theme, roles.slice(0, 1), build), style)[0],
     [style, texts, roles, build],
   );
   const scale = CARD_H / H;
@@ -260,7 +266,10 @@ function CustomStyle({
 
   const slides = useMemo(
     () =>
-      buildSlides(deck.texts, style.theme, deck.roles as string[], build).slice(0, PREVIEW_COUNT),
+      withStyleImage(
+        buildSlides(deck.texts, style.theme, deck.roles as string[], build),
+        style,
+      ).slice(0, PREVIEW_COUNT),
     [deck, style, build],
   );
 
@@ -335,6 +344,8 @@ function CustomStyle({
               />
             </Section>
 
+            <BackgroundSection style={style} onChange={onChange} />
+
             <p className="mt-5 text-caption leading-[17px] text-muted">
               {borrowed > 0
                 ? `The previews are your own slides, plus ${borrowed} sample${borrowed === 1 ? "" : "s"} to show the layouts your deck is too short to reach.`
@@ -347,6 +358,172 @@ function CustomStyle({
         </div>
       </div>
     </div>
+  );
+}
+
+/**
+ * A picture behind every slide, chosen while choosing the style.
+ *
+ * Here rather than only in the editor because it is a decision about what the
+ * whole deck looks like, and the editor's version is per slide. Setting it here
+ * stamps it onto all of them; changing one afterwards in Properties still works,
+ * because by then it is an ordinary slide background like any other.
+ *
+ * **Pictures come from the library, not from this screen's own store.** There is
+ * no document yet at style-pick time, so there is no `doc.media` to read. The
+ * asset library is the one place that holds images before a document exists, and
+ * an upload here puts it there rather than somewhere only this screen knows
+ * about.
+ */
+function BackgroundSection({
+  style,
+  onChange,
+}: {
+  style: Style;
+  onChange: (s: Style) => void;
+}) {
+  const input = useRef<HTMLInputElement>(null);
+  const [assets, setAssets] = useState<Asset[]>(() => filterAssets(listAssets(), { kind: "image" }));
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState("");
+
+  const image = style.image;
+  const scrim = image?.scrim ?? DEFAULT_SCRIM;
+
+  const set = (patch: Partial<SlideImage>) => {
+    if (!image) return;
+    onChange({ ...style, image: { ...image, ...patch } });
+  };
+
+  const pick = (asset: Asset) => {
+    const src = urlFor(asset);
+    if (!src) return;
+    onChange({
+      ...style,
+      image: { src, assetId: asset.id, fit: image?.fit ?? "cover", scrim },
+    });
+  };
+
+  const take = async (files: FileList | null) => {
+    if (!files || files.length === 0) return;
+    setBusy(true);
+    setError("");
+    try {
+      const result = await importImages(Array.from(files));
+      const next = filterAssets(listAssets(), { kind: "image" });
+      setAssets(next);
+      // Select what was just added, because uploading a picture here is somebody
+      // saying they want that one.
+      const added = result.assets?.[0] ?? next[0];
+      if (added) pick(added);
+      if (result.error) setError(result.error);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Could not read that file");
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <Section label="Background picture">
+      <div className="grid grid-cols-5 gap-1">
+        {assets.slice(0, 9).map((a) => {
+          const src = urlFor(a);
+          return (
+            <button
+              key={a.id}
+              type="button"
+              title={a.name}
+              onClick={() => pick(a)}
+              className={[
+                "h-10 overflow-hidden rounded-md border-2",
+                image?.assetId === a.id ? "border-accent" : "border-hairline hover:border-surface-5",
+              ].join(" ")}
+            >
+              {src ? <img src={src} alt="" className="h-full w-full object-cover" /> : null}
+            </button>
+          );
+        })}
+
+        <button
+          type="button"
+          onClick={() => input.current?.click()}
+          title="Add a picture"
+          className="grid h-10 place-items-center rounded-md border-2 border-dashed border-hairline text-tertiary hover:border-accent-dim hover:text-accent"
+        >
+          {busy ? (
+            <span className="fcc-spin block h-3 w-3 rounded-full border-2 border-hairline border-t-accent" />
+          ) : (
+            <ImagePlus size={14} strokeWidth={2} />
+          )}
+        </button>
+
+        <input
+          ref={input}
+          type="file"
+          accept="image/*"
+          multiple
+          hidden
+          onChange={(e) => void take(e.target.files)}
+        />
+      </div>
+
+      {error ? <p className="text-caption leading-4 text-danger">{error}</p> : null}
+
+      {!image && assets.length === 0 && !error ? (
+        <p className="text-caption leading-4 text-muted">
+          Nothing in your library yet. Add a picture and it becomes the background on every slide.
+        </p>
+      ) : null}
+
+      {image ? (
+        <>
+          <div className="flex h-7 items-center gap-0.5 rounded-md border border-hairline p-0.5">
+            {(["cover", "contain"] as const).map((f) => (
+              <button
+                key={f}
+                type="button"
+                onClick={() => set({ fit: f })}
+                className={[
+                  "h-6 flex-1 rounded-sm text-caption capitalize",
+                  (image.fit ?? "cover") === f
+                    ? "bg-surface-4 text-primary"
+                    : "text-tertiary hover:bg-white/[0.04]",
+                ].join(" ")}
+              >
+                {f}
+              </button>
+            ))}
+          </div>
+
+          {/* The control that decides whether the words can be read at all. */}
+          <label className="block">
+            <span className="flex items-center justify-between text-caption text-tertiary">
+              Dim <span className="font-mono text-muted">{Math.round(scrim * 100)}%</span>
+            </span>
+            <input
+              type="range"
+              min={0}
+              max={100}
+              value={Math.round(scrim * 100)}
+              onChange={(e) => set({ scrim: Number(e.target.value) / 100 })}
+              className="mt-1 h-1 w-full cursor-pointer appearance-none rounded-full bg-surface-4 accent-accent"
+            />
+          </label>
+
+          <button
+            type="button"
+            onClick={() => {
+              const { image: _drop, ...rest } = style;
+              onChange(rest);
+            }}
+            className="h-7 rounded-md border border-hairline text-caption text-tertiary hover:border-accent-dim hover:text-accent"
+          >
+            No picture
+          </button>
+        </>
+      ) : null}
+    </Section>
   );
 }
 

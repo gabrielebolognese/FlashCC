@@ -6,6 +6,7 @@
  * point, not a theme the document keeps referring back to.
  */
 import { makeGradient } from "./gradient.js";
+import type { Slide, SlideImage } from "./model.js";
 import type { Theme } from "./presets.js";
 
 export type Style = {
@@ -13,6 +14,19 @@ export type Style = {
   name: string;
   note: string;
   theme: Theme;
+  /**
+   * A picture behind every slide this style builds.
+   *
+   * On the style rather than on one slide, because a style is what a whole deck
+   * looks like. It is STAMPED onto each slide at generation and then belongs to
+   * the slide, exactly as if it had been set in the editor, so invariant 1
+   * holds: nothing is derived at render time and the background is as editable
+   * per slide afterwards as any other.
+   *
+   * None of the stock styles have one, and cannot: a preset image background
+   * would need a picture to point at, and the pictures belong to the person.
+   */
+  image?: SlideImage | undefined;
 };
 
 const style = (
@@ -119,4 +133,18 @@ export const customFrom = (base: Style): Style => ({
   name: "Custom",
   note: "Yours",
   theme: { ...base.theme },
+  ...(base.image ? { image: { ...base.image } } : {}),
 });
+
+/**
+ * A style's background picture, put onto every slide it built.
+ *
+ * Separate from `buildSlides` on purpose. `compositions.ts` decides layout from
+ * words and knows nothing about pictures, and giving it a background would mean
+ * the generator and the painter both had an opinion about the same thing. This
+ * runs after, once, and then the picture belongs to the slides.
+ */
+export function withStyleImage(slides: Slide[], style: Style): Slide[] {
+  if (!style.image?.src) return slides;
+  return slides.map((s) => ({ ...s, image: { ...style.image! } }));
+}

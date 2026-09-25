@@ -35,7 +35,7 @@ import {
 } from "./studio/onboarding.js";
 import { StylePicker } from "./studio/StylePicker.js";
 import { Welcome } from "./studio/Welcome.js";
-import type { Style } from "./studio/styles.js";
+import { withStyleImage, type Style } from "./studio/styles.js";
 
 type Draft = { structure: Structure; texts: string[]; roles: string[] };
 
@@ -347,7 +347,9 @@ function Screens() {
               t.bg, t.fg, t.accent, t.muted,
               "#ffffff", "#000000", "#e5545a", "#3dbe7a", "#4c86d6", "#db2777",
             ],
-            slides: buildSlides(draft.texts, t, draft.roles, build),
+            // Stamped after building, so the picture belongs to each slide and is
+            // as editable there as any other background. See withStyleImage.
+            slides: withStyleImage(buildSlides(draft.texts, t, draft.roles, build), style),
           };
           saveDoc(doc);
           setScreen({ view: "studio", doc });
