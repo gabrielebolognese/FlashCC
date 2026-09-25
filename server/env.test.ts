@@ -12,7 +12,7 @@ import { describe, expect, it } from "vitest";
  *
  * What went wrong: `process.loadEnvFile()` sat below the imports in `index.ts`.
  * Every import is evaluated before the importing module's body, so `supabase.ts`
- * read `SUPABASE_URL` and `lemon.ts` read `LEMON_API_KEY` into module-level
+ * read `SUPABASE_URL` and `paddle.ts` read `PADDLE_API_KEY` into module-level
  * constants while the environment was still empty, and those constants stayed
  * `undefined` for the life of the process.
  *
@@ -72,6 +72,6 @@ describe("loading the environment", () => {
     // `index.ts` is on this list and is safe: it is the file whose first import
     // is `env.js`, so by the time its own body reads PORT the file is loaded.
     // The other three are safe only because nothing imports them before it.
-    expect(eager).toEqual(["billing.ts", "index.ts", "lemon.ts", "supabase.ts"]);
+    expect(eager).toEqual(["billing.ts", "index.ts", "paddle.ts", "supabase.ts"]);
   });
 });

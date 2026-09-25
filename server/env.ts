@@ -6,7 +6,7 @@
  * It WAS four lines in `index.ts`, below the imports, and that is a bug rather
  * than a style choice. ES modules evaluate every import fully before the
  * importing module's own body runs, so `supabase.ts` read
- * `process.env.SUPABASE_URL` and `lemon.ts` read `process.env.LEMON_API_KEY`
+ * `process.env.SUPABASE_URL` and `paddle.ts` read `process.env.PADDLE_API_KEY`
  * while the environment was still empty. Their module-level constants were
  * `undefined` for the life of the process.
  *

@@ -5,15 +5,16 @@
 -- ─────────────────────────────────────────────────────────────────────────────
 -- WHY THIS EXISTS
 --
--- The billing provider changed from Stripe to Lemon Squeezy, and two columns
--- were named after the old one. The obvious fix is to rename them to
--- `lemon_customer_id` and `lemon_subscription_id`, which would leave the project
--- in exactly the position that made this migration necessary in the first place.
+-- The billing provider changed from Stripe, and two columns were named after it.
+-- The obvious fix is to rename them after whoever is taking the money this week,
+-- which would leave the project in exactly the position that made this migration
+-- necessary in the first place.
 --
 -- So they become `billing_customer_id` and `billing_subscription_id`. A provider
 -- is a detail of how money arrives; the fact that somebody has an account with
--- whoever takes the money is not. If the provider changes a third time, nothing
--- here has to move.
+-- whoever takes the money is not. The provider has since changed again, from
+-- Lemon Squeezy to Paddle, and nothing in here had to move. That is the argument
+-- for the naming, made twice.
 --
 -- ── What this does NOT touch ────────────────────────────────────────────────
 --
@@ -53,7 +54,7 @@ alter table public.profiles add column if not exists billing_customer_id text;
 alter table public.profiles add column if not exists billing_subscription_id text;
 
 comment on column public.profiles.billing_customer_id is
-  'The payment provider''s id for this person. Lemon Squeezy customer id today.';
+  'The payment provider''s id for this person. A Paddle ctm_ id today.';
 comment on column public.profiles.billing_subscription_id is
   'Their current subscription at the provider, or null when they have none.';
 

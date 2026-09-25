@@ -2,7 +2,7 @@
  * The server.
  *
  * It exists for the things a browser must not be trusted with: the Anthropic key,
- * the Lemon Squeezy key, and the Supabase secret key that can write which plan
+ * the Paddle key, and the Supabase secret key that can write which plan
  * someone is on. Vite proxies /api here in dev.
  *
  * No framework. A handful of routes do not need one.

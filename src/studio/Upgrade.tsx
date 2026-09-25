@@ -8,7 +8,7 @@
  * be a worse Canva; gating the loop is the only version of this worth money.
  *
  * Nothing here knows what plan you are on. It is told, from a profile the server
- * wrote after verifying a Lemon Squeezy webhook.
+ * wrote after verifying a Paddle webhook.
  */
 import { Check, ExternalLink, X } from "lucide-react";
 import { useState } from "react";
@@ -164,7 +164,15 @@ export function Upgrade({
     setError(null);
     try {
       await startCheckout(tier.id);
-      // startCheckout navigates away; reaching here means it did not.
+      /*
+       * Cleared, unlike the provider this replaced.
+       *
+       * That one navigated away, so leaving the button spinning cost nothing:
+       * the page was gone. Paddle opens over the app, and somebody who closes
+       * the overlay without paying comes back to this screen. A button still
+       * spinning at that point is a screen they cannot use.
+       */
+      setBusy(null);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Could not start checkout");
       setBusy(null);
@@ -317,7 +325,7 @@ export function Upgrade({
 
         <div className="mt-4 flex items-center gap-3">
           <p className="flex-1 text-caption text-muted">
-            Payment and VAT are handled by Lemon Squeezy, our merchant of record. Card
+            Payment and VAT are handled by Paddle, our merchant of record. Card
             details never reach FlashCC.
           </p>
           {manageable ? (

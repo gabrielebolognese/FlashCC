@@ -37,7 +37,7 @@ have. The pipeline, specifically the attribution of performance to *framework, h
 slide count*, is what none of seventeen audited competitors ship.
 
 The stack is React 19, Vite 6, Tailwind 3, TypeScript with every strict flag on, Supabase for
-accounts and sync, Lemon Squeezy for billing, and Playwright for export. There is no framework on the
+accounts and sync, Paddle for billing, and Playwright for export. There is no framework on the
 server: four routes do not need one.
 
 ---
@@ -59,7 +59,7 @@ CORS handling at all. `scripts/dev.mjs` spawns both as separate shell processes;
 supervisor leaves them running.
 
 Everything works with **no configuration**. No Supabase means no accounts and localStorage only;
-no `ANTHROPIC_API_KEY` means AI drafting degrades to "write it yourself"; no Lemon Squeezy means no
+no `ANTHROPIC_API_KEY` means AI drafting degrades to "write it yourself"; no Paddle means no
 checkout. None of these are error states, the free tier is the no-config state.
 
 ---
@@ -2005,48 +2005,114 @@ rather than papers over.
 
 ## 25. Billing
 
-The provider is **Lemon Squeezy**, and the reason is that they are the merchant of record: they
-owe the VAT in every country a customer lives in, not us. The alternative is EU-wide VAT
-registration and quarterly filings for a product that may earn nothing. Stripe now offers the same
-under Managed Payments and owns Lemon Squeezy, so this is a choice worth revisiting, not a law; the
-Stripe integration this replaced is in history at `572ebd7`.
+The provider is **Paddle**, and the reason is that they are the merchant of record: they owe the
+VAT in every country a customer lives in, not us. The alternative is EU-wide VAT registration and
+quarterly filings for a product that may earn nothing. It was the reason for the merchant of record
+before this one too; the Stripe integration before that is in history at `572ebd7`.
 
-The browser can do exactly one billing thing: **ask for a checkout link.** It never states what plan
+The browser can do exactly one billing thing: **ask for a checkout.** It never states what plan
 someone is on and the server never believes it if it does. Entitlement is decided in one place, a
-webhook whose signature is verified against the Lemon Squeezy signing secret, and written with the
-Supabase secret key.
+webhook whose signature is verified against the Paddle signing secret, and written with the Supabase
+secret key.
 
-Signature verification is load-bearing, not hygiene: without it that endpoint is an open door where
-anyone who guesses the URL POSTs themselves a subscription. It is HMAC-SHA256 of the **raw bytes**,
-hex, compared in constant time. Raw for a real reason: string concatenation re-encodes, and one
-multi-byte character on a chunk boundary breaks verification in a way that looks exactly like a
-wrong secret. `timingSafeEqual` **throws** on a length mismatch rather than returning false, so
-lengths are compared first, a short header is an ordinary refusal and not a 500.
+**Sandbox or live is decided by the API key**, not by a second variable. Paddle runs two entirely
+separate environments with separate ids, and a sandbox key against the live host is a 403 that reads
+like a permissions problem. The key says which it is (`pdl_sdbx_` against `pdl_live_`), so asking
+anybody to state it again is asking them to contradict themselves.
 
-`ENTITLED = { on_trial, active, past_due, cancelled }`. Two of those need saying:
+### The signature
+
+Load-bearing, not hygiene: without it that endpoint is an open door where anyone who guesses the URL
+POSTs themselves a subscription.
+
+```
+Paddle-Signature: ts=1671552777;h1=eb4d0dc...
+signed payload   = `${ts}:${rawBody}`     HMAC-SHA256, hex, constant time
+```
+
+Three ways to get it wrong, all of which fail closed and therefore look like Paddle misbehaving:
+
+- **The timestamp is part of what is signed.** Hashing the body alone verifies nothing that was
+  actually sent. This is the one that differs from the previous provider, whose signature was over
+  the body only, and the one a port would carry across unchanged.
+- **Raw bytes, not the parsed object.** `JSON.parse` then `JSON.stringify` does not reproduce the
+  original byte for byte.
+- **`timingSafeEqual` throws** on a length mismatch rather than returning false, so lengths are
+  compared first: a short header is an ordinary refusal, not a 500 on a route the provider retries.
+
+`SIGNATURE_WINDOW_MS` is **5 minutes**, not the 5 seconds Paddle's own SDKs default to. Five seconds
+is tight enough that a container whose clock has drifted starts refusing real webhooks, and a
+refused webhook means somebody who paid does not get their plan. The HMAC is what stops forgery; the
+window only bounds how long a captured request could be replayed. Unknown parts of the header (`h2`,
+when Paddle versions the scheme) are ignored rather than fatal.
+
+### Entitlement
+
+`ENTITLED = { active, trialing, past_due }`, and the absence is the interesting part.
 
 - **`past_due` is in**, so a failed payment does not cut access off mid-retry.
-- **`cancelled` is in**, because in Lemon Squeezy it means future payments are stopped while the
-  period already paid for runs to `ends_at`. Treating it as unpaid would take away, the moment
-  somebody clicks cancel, the month they have already been charged for.
+- **`canceled` is OUT**, and this is the trap in migrating from Lemon Squeezy. There, `cancelled`
+  meant future payments were stopped while the paid period ran on, so it had to count as entitled.
+  **Paddle does not work that way**: a cancelling subscription stays `active` with a
+  `scheduled_change` of `cancel` until the period ends, and only then becomes `canceled`. Carrying
+  the old set across would have granted a plan, indefinitely, to everybody whose subscription had
+  genuinely ended, and nothing would have looked wrong from the outside.
 
-`unpaid`, `expired` and `paused` are out. An **unrecognised variant id becomes `free`** rather than
-a guess: a rotated variant should cost a support ticket, not hand out a tier.
+So `endsAtPeriodEnd` is a pending `scheduled_change`, not a status, and the date shown is
+`scheduled_change.effective_at` (falling back to `current_billing_period.ends_at`) rather than
+`next_billed_at`, which is when somebody is told their cancelled plan renews next month. A scheduled
+`pause` or `resume` is not an ending.
 
-**Variants, not prices.** A Lemon Squeezy product holds variants (monthly, yearly) and the variant
-id is what a webhook carries. Ids arrive from the API as numbers and from the environment as
-strings, so both sides are compared as strings.
+`paused` is out. An **unrecognised price id becomes `free`** rather than a guess: a rotated price
+should cost a support ticket, not hand out a tier.
 
-`custom.user_id` on the checkout is how a payment becomes a *user*. It rides along on every webhook
-the resulting subscription produces, under `meta.custom_data`. Without it the only link between the
-two is an email address, which people change. A lookup by customer id is the fallback.
+**Prices, not products.** A Paddle product holds prices (monthly, yearly) and a subscription item
+carries the price id. They are at least told apart by their prefix, `pri_` against `pro_`, which is
+one thing Paddle does better than plain numbers, but `npm run paddle:prices` prints them anyway and
+says plainly when what is configured is a product id, because that failure is a charged customer
+left on Free with one line in a log.
 
-The provider returns the browser before the webhook necessarily lands, so the app polls the profile
-for about 20 seconds and says "turning your plan on" rather than showing Free to somebody who has
-just paid.
+`custom_data.user_id` on the transaction is how a payment becomes a *user*. Paddle copies it on to
+the subscription it creates and every webhook carries it from then on. Without it the only link
+between the two is an email address, which people change. A lookup by customer id is the fallback.
+
+### Checkout runs in the page
+
+The one real shape change from the previous provider. Paddle has **no hosted checkout**: the default
+payment link must be a page you host that includes Paddle.js, so there is no URL to send anybody to.
+
+```
+browser  POST /api/billing/checkout      (who they are: a bearer token)
+server   POST /transactions              (what it is: a price id and a user id)
+browser  ← { transactionId, clientToken, environment, successUrl }
+browser  load Paddle.js on the click, Initialize, Checkout.open({ transactionId })
+```
+
+The transaction is created **on the server**, so what is being bought and who is buying it are both
+decided somewhere the browser cannot edit. All that travels back is an id to open.
+
+**Paddle.js is fetched on the click, never at startup.** Somebody who never opens the pricing screen
+never downloads a payment script, and the bundle does not carry one. The promise is the cache, so a
+second click during a slow load waits for that load rather than adding a second `<script>`.
+
+The **client-side token is public by design** and still lives in `.env` rather than a `VITE_`
+variable, so every piece of billing configuration is in one file on one machine. It is handed out by
+`/api/billing/checkout`, to signed-in callers only, which costs nothing and keeps the surfaces
+together.
+
+`successUrl` is a full page load back into the app, which is deliberate: it re-reads the session and
+picks up the plan the webhook has just written. Since the webhook may still be in flight, the app
+polls the profile for about 20 seconds and says "turning your plan on" rather than showing Free to
+somebody who has just paid. The `busy` state on the pricing screen is now **cleared** after the
+overlay opens, because unlike a navigation, somebody who closes it without paying comes back to that
+screen and a button still spinning is a screen they cannot use.
+
+The portal is a **customer** session (`POST /customers/{id}/portal-sessions`), not a subscription
+one, so a lapsed subscriber can still reach their invoices. Its URLs are signed and short-lived, so
+they are fetched per request and never stored.
 
 The three decisions that fail silently, is the request genuine, what did they buy, do they have it
-now, are pure functions in `server/lemon.ts` and tested in `lemon.test.ts`.
+now, are pure functions in `server/paddle.ts` and tested in `paddle.test.ts`.
 
 ### What is gated, and where
 
@@ -2077,10 +2143,10 @@ studio or a dialog above it, and `App` swaps screens rather than nesting them.
 
 ### Honest billing, said out loud
 
-FlashCC already behaved correctly: `ENTITLED` includes `cancelled`, which in Lemon Squeezy means
-the period already paid for runs on to `ends_at`. What was missing was the app
-being able to SAY so, `plan_renews_at` alone cannot distinguish "renews on the 3rd" from "ends on
-the 3rd", and the account card showed a renewal date either way.
+FlashCC already behaved correctly: a subscription cancelling at the end of its period keeps
+everything until that date. What was missing was the app being able to SAY so, `plan_renews_at`
+alone cannot distinguish "renews on the 3rd" from "ends on the 3rd", and the account card showed a
+renewal date either way.
 
 `plan_ends_at_period_end` is written by the webhook through the service role and read by
 `AccountCard`, which now shows **"Renews 3 Oct"** or **"Ends 3 Oct, everything stays unlocked

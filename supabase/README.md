@@ -124,7 +124,7 @@ it should stay deleted. That second half is the one that catches real bugs.
 | `08-pipeline-fields.sql` | Now. Five planning fields on `posts`, and one billing boolean. |
 | `09-gates.sql` | **After billing**, with `02-pro-gate.sql`. Review links become Pro. |
 | `10-brand-voice.sql` | Now. One `jsonb` column on `brands`, holding how a brand sounds. |
-| `11-lemon-billing.sql` | Now. Renames the two `stripe_` columns on `profiles` to `billing_`. |
+| `11-billing-columns.sql` | Now. Renames the two `stripe_` columns on `profiles` to `billing_`. |
 
 Run `npm run check:schema` at any point: it probes the live project with the
 publishable key and names every migration that has not been applied.

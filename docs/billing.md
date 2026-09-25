@@ -1,151 +1,236 @@
-# Billing setup
+# Billing: Paddle, click by click
 
-Lemon Squeezy, end to end. Test mode throughout, switch the store to live only when you are ready
-to charge real people.
+Everything you have to do in a browser to make money arrive, in order. The code
+is already written; this is the configuration it needs.
 
-## Why Lemon Squeezy and not Stripe
+Paddle is the **merchant of record**. They sell the product to the customer and
+then pay you, which makes them the party who owes VAT in every country a
+customer lives in. The alternative is registering for VAT OSS and filing
+quarterly across the EU for a product that might make nothing.
 
-They are the **merchant of record**. They sell the product to the customer and then pay us, which
-makes them the party who owes VAT in every country a customer lives in. The alternative is
-registering for VAT OSS and filing quarterly across the EU for a product that might earn nothing,
-which is a real cost paid up front against a hypothetical one.
+Roughly 40 minutes, most of it waiting for Paddle to approve the account.
 
-What it costs is a percentage on every sale. What it saves is the whole of tax compliance.
+---
 
-> Worth knowing: Stripe now offers the same thing under **Managed Payments**, and Stripe owns
-> Lemon Squeezy. If you ever want to move back, the integration this replaced is in git history at
-> `572ebd7` and enabling Stripe as merchant of record is one parameter on a Checkout Session.
+## Before you start
 
-## How it works, in one paragraph
+| You need | Why |
+| --- | --- |
+| A Paddle account | paddle.com, "Get started". Sign up for **Paddle Billing**, not Classic. |
+| A live site at a real domain | Paddle approves the domain before you can take live payments. |
+| The Supabase secret key already in `.env` | The webhook writes the plan with it. Nothing works without it. |
 
-The browser can do exactly one billing thing: ask the server for a checkout link. It never says
-what plan someone is on, and the server never believes it if it does. What a person actually has
-is decided in one place, `server/billing.ts`, handling a webhook whose signature has been verified
-against the Lemon Squeezy signing secret, and written with the Supabase secret key, because the
-database refuses `profiles.plan` to everyone else. Get that backwards and the paywall is theatre:
-a client that reports its own plan can report any plan.
+Everything below can be done in the **sandbox** first, with no approval and no
+real cards. Do that. The only difference in this codebase is which API key is in
+`.env`, and the key itself says which environment it belongs to.
 
-## 1. The Supabase secret key
+---
 
-**Dashboard, Project Settings, API Keys, "Create secret key"**. It looks like `sb_secret_...`.
+## 1. Sandbox, first
 
-Put it in `.env` as `SUPABASE_SECRET_KEY`. This key bypasses row level security entirely. Do not
-use the legacy `service_role` JWT: Supabase is deprecating it by the end of 2026. The old variable
-name is still read as a fallback.
+Paddle's sandbox is a separate account at **sandbox-vendors.paddle.com**, with
+its own login, its own products and its own ids. Nothing is shared with live.
 
-It never gets a `VITE_` prefix, never goes in the browser, never gets logged.
+1. Go to <https://sandbox-vendors.paddle.com>, sign up.
+2. You are in. There is no approval step for sandbox.
 
-## 2. The store
+Do the whole of the rest of this document in the sandbox, take a test payment,
+see the plan appear on your account, and only then repeat sections 2 to 5 in the
+live dashboard.
 
-[app.lemonsqueezy.com](https://app.lemonsqueezy.com). Create a store if you have not.
+---
 
-**Keep the store in test mode** while you set this up. In Lemon Squeezy test mode is a toggle on
-the store, not a separate set of keys, so check which mode you are in before charging anybody.
+## 2. Two products, two prices
 
-**Settings, Stores** gives you the store id. A plain number.
+**Catalog → Products → New product.**
 
-```
-LEMON_STORE_ID=12345
-```
-
-## 3. Products and variants
-
-**Products, New product**, twice:
-
-| Product | Price | Billing |
+| Field | Pro | Agency |
 | --- | --- | --- |
-| FlashCC Pro | 29.00 | Subscription, monthly |
-| FlashCC Agency | 79.00 | Subscription, monthly |
+| Name | `FlashCC Pro` | `FlashCC Agency` |
+| Tax category | Standard digital goods | Standard digital goods |
+| Description | Whatever the pricing screen says | Whatever the pricing screen says |
 
-Then open each product and copy the **variant id**, not the product id. A product holds variants
-(monthly, yearly) and the variant is what a webhook carries. That distinction costs people an
-afternoon.
+Save each one, then on the product page: **Prices → New price.**
 
-If the product page does not show it, `GET https://api.lemonsqueezy.com/v1/variants` lists them.
+| Field | Value |
+| --- | --- |
+| Type | **Recurring** |
+| Billing period | Monthly |
+| Amount | What `Upgrade.tsx` says. Keep them in step. |
+| Currency | USD, and let Paddle handle the rest |
+
+You now have four ids on screen. **Two of them are traps:**
 
 ```
-LEMON_VARIANT_PRO=111111
-LEMON_VARIANT_AGENCY=222222
+pro_01j...   <- the PRODUCT. Not this one.
+pri_01j...   <- the PRICE. This one.
 ```
 
-## 4. The API key
+Copy the two **`pri_`** ids.
 
-**Settings, API, create an API key**. Into `.env` as `LEMON_API_KEY`.
+---
+
+## 3. The keys
+
+**Developer tools → Authentication.**
+
+### API key
+
+"New API key". Name it `FlashCC server`. Permissions: it needs
+`transaction.write`, `subscription.read` and `customer.write` at a minimum;
+granting read and write on all four of transactions, subscriptions, customers
+and prices is fine and saves a second trip.
+
+Copy it once, now. Paddle shows it exactly once.
+
+It begins `pdl_sdbx_apikey_` in sandbox and `pdl_live_apikey_` in live, and
+**the server reads that prefix** to decide which API host to talk to. There is
+no environment variable to set and no way to point a sandbox key at live data.
+
+### Client-side token
+
+Same screen, "New client-side token". Name it `FlashCC browser`.
+
+This one is **public**. It is handed to the browser so Paddle's checkout can
+open, and it can do nothing else. It still goes in `.env` rather than a `VITE_`
+variable, so all of billing is configured in one file on one machine.
+
+It begins `test_` in sandbox and `live_` in live.
+
+---
+
+## 4. Approve your domain
+
+**Checkout → Website approval → Add website.**
+
+Paddle's checkout refuses to open on a domain it does not know. Add:
+
+- your real domain, and
+- `localhost` if Paddle lets you (in sandbox it does), for development.
+
+**Checkout → Checkout settings → Default payment link.** Set it to your site,
+for example `https://yourdomain.com/`. This is the page Paddle appends
+`?_ptxn=txn_...` to. This app opens checkout with `Paddle.Checkout.open()`
+rather than by navigation, so the default link is a fallback rather than the
+main path, but Paddle requires one to be set before it will create checkouts.
+
+---
 
 ## 5. The webhook
 
-**Settings, Webhooks, add endpoint.**
+**Developer tools → Notifications → New destination.**
 
-In production, point it at `https://yourdomain.com/api/billing/webhook`.
+| Field | Value |
+| --- | --- |
+| Description | `FlashCC` |
+| Notification type | **Webhook** |
+| URL | `https://yourdomain.com/api/billing/webhook` |
+| Events | Everything beginning `subscription.` |
 
-In development Lemon Squeezy cannot reach `localhost`, and unlike Stripe there is no official CLI
-forwarder. Use a tunnel:
+The events that matter are `subscription.created`, `subscription.updated`,
+`subscription.activated`, `subscription.canceled`, `subscription.past_due`,
+`subscription.paused` and `subscription.resumed`. Subscribing to all of them is
+correct: the handler reads whatever state arrives and writes what it means, so
+an extra event is a harmless second write of the same answer.
 
-```
-npx untun@latest tunnel http://localhost:8787
-```
+Do **not** subscribe to `transaction.*`. Those carry an invoice rather than a
+subscription, they have less information, and a renewal raises
+`subscription.updated` anyway. Two writes for one change is not an improvement.
 
-and point the webhook at `<the tunnel url>/api/billing/webhook`.
+Save, then open the destination and copy its **secret key**. It begins
+`pdl_ntfset_`. This is *not* the API key, and the difference matters: the
+webhook route verifies signatures with this one and refuses everything without
+it.
 
-**Signing secret:** you choose it, 6 to 40 characters. The same string goes in `.env` as
-`LEMON_WEBHOOK_SECRET`. Unlike the Stripe CLI it does not rotate, so you set it once.
+---
 
-Subscribe to these events:
-
-- `subscription_created`
-- `subscription_updated`
-- `subscription_cancelled`
-- `subscription_resumed`
-- `subscription_expired`
-- `subscription_paused`
-- `subscription_unpaused`
-
-The `subscription_payment_*` events are deliberately not subscribed to. They carry an invoice
-rather than a subscription, and a renewal that moves the date also raises `subscription_updated`.
-
-Restart the server after editing `.env`.
-
-## 6. Check it
-
-`curl localhost:8787/api/health` should report `"billing":true` and `"secretKey":true`.
-
-Then in the app: sign in, **See Pro**, **Choose Pro**, and pay with the test card
-`4242 4242 4242 4242`, any future expiry, any CVC.
-
-You should land back on the app with a gold banner saying the plan is being turned on, and the
-rail should flip to **Pro** within a second or two. The server logs
-`[billing] <user id> -> pro (active)`.
-
-If the rail stays on Free, check the server log. A `400 Signature verification failed` means
-`LEMON_WEBHOOK_SECRET` does not match what you typed into the dashboard.
-
-## 7. Turn the gate on
-
-Only once the above works end to end:
+## 6. `.env`
 
 ```
-supabase/02-pro-gate.sql
-supabase/09-gates.sql
+PADDLE_API_KEY=pdl_sdbx_apikey_...
+PADDLE_CLIENT_TOKEN=test_...
+PADDLE_WEBHOOK_SECRET=pdl_ntfset_...
+PADDLE_PRICE_PRO=pri_...
+PADDLE_PRICE_AGENCY=pri_...
+PUBLIC_SITE_URL=https://yourdomain.com
 ```
 
-Paste each into the Supabase SQL editor and run it. Until then a free account syncs its pipeline
-like a paying one, and there is nothing to buy.
+Then check it:
 
-After them, a free account can still **read** everything it already has, a lapsed subscriber
-pulling their own history back out is not the moment to look like confiscation, but cannot write
-new pipeline records to the cloud. Carousels are never gated; the editor is the free tier.
+```
+npm run paddle:prices
+```
 
-## What is deliberately not built
+It prints every product and price in the account, marks which id is which, and
+then says plainly whether what you have configured is right. It catches the four
+mistakes that otherwise only show up after somebody has been charged:
 
-- **Invoices, cancelling, card changes.** All of it is Lemon Squeezy's hosted portal, reached from
-  **Manage subscription** in the pricing panel. Building our own would mean handling card details,
-  which is a compliance burden for a screen the provider hosts for free.
+- a **product** id where a price id belongs
+- a price that is not in this account at all
+- the API key in `PADDLE_CLIENT_TOKEN`
+- a sandbox key with a live token, or the reverse
 
-  Note the portal URL is **signed and short-lived**, so it is fetched per request rather than
-  stored, and it hangs off the subscription rather than the customer. Somebody whose subscription
-  has fully expired has nothing left to manage and is told so.
-- **Proration and plan switching logic.** The portal does it.
-- **Dunning.** Their retry and reminder settings do it. Note that `past_due` counts as entitled,
-  so a failed payment does not cut access off mid-retry. Change `ENTITLED` in `server/lemon.ts` if
-  you would rather it did.
-- **Anything metered.** Invariant 7. Plans differ by what they do, never by how many times.
+---
+
+## 7. Take a test payment
+
+1. `npm run dev`, sign in, open the pricing screen, click Pro.
+2. Paddle's checkout opens **over the app**. It does not navigate away.
+3. Pay with a sandbox card: `4242 4242 4242 4242`, any future expiry, any CVC.
+4. You land back on the app with `?checkout=done`.
+5. The account card says "Turning your plan on", then shows Pro.
+
+If step 5 never finishes, the webhook is the thing to look at, not the checkout.
+The payment succeeded; the plan is written by the webhook.
+
+### Webhooks in development
+
+Your machine has no public URL, so Paddle cannot reach it. Two options:
+
+- **Paddle's simulator.** Developer tools → Notifications → Simulations. Send a
+  `subscription.created` to a public URL. Only useful once deployed.
+- **A tunnel.** `npx untun@latest tunnel http://localhost:8787` or ngrok, then
+  point the destination at `https://<tunnel>/api/billing/webhook`. Remember the
+  secret key belongs to the destination, so a new destination means a new
+  secret in `.env`.
+
+---
+
+## 8. Going live
+
+Repeat sections 2 to 5 in the **live** dashboard at vendors.paddle.com. Nothing
+carries over from sandbox: different products, different prices, different keys,
+different webhook secret.
+
+Then swap the five values in the production `.env`. The API key prefix changes
+from `pdl_sdbx_` to `pdl_live_` and the server follows it automatically.
+
+Before you charge anybody real money:
+
+- [ ] `npm run paddle:prices` is clean against the live key
+- [ ] `DEV_PRO` is **removed** from `.env`, or every signed-in account is Pro
+- [ ] `supabase/02-pro-gate.sql` and `supabase/09-gates.sql` have been run
+- [ ] A real card has been charged once and refunded, end to end
+- [ ] Cancelling in the portal leaves the plan working until the period ends
+
+That last one is worth doing by hand. Paddle keeps a cancelling subscription
+`active` with a scheduled change until the period ends, and the account card
+should say **"Ends 3 Oct, everything stays unlocked until then"** rather than a
+renewal date. It is the promise on the pricing screen, and the research is full
+of tools that break it.
+
+---
+
+## What the code does with all this
+
+| File | Job |
+| --- | --- |
+| `server/paddle.ts` | The API calls, and the three pure decisions: is it genuine, what did they buy, do they have it now. |
+| `server/billing.ts` | Four routes: checkout, portal, webhook, status. |
+| `src/studio/billing.ts` | Loads Paddle.js on the click and opens the transaction. |
+| `src/studio/Upgrade.tsx` | The pricing screen, and the promises on it. |
+| `scripts/paddle-prices.mjs` | `npm run paddle:prices`. |
+
+`docs/reference.md` §25 is the reasoning: why `canceled` is not entitled, why
+the signature covers the timestamp, why the replay window is five minutes rather
+than Paddle's five seconds.

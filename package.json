@@ -13,7 +13,7 @@
     "typecheck": "tsc -p tsconfig.json --noEmit && tsc -p tsconfig.server.json --noEmit",
     "test": "vitest run --passWithNoTests",
     "check:schema": "node scripts/check-schema.mjs",
-    "lemon:variants": "node scripts/lemon-variants.mjs",
+    "paddle:prices": "node scripts/paddle-prices.mjs",
     "eval:draft": "tsx scripts/eval-draft.mjs",
     "test:watch": "vitest",
     "dev:web": "vite",

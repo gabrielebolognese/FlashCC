@@ -131,8 +131,9 @@ export async function requirePro(
 
 /**
  * Deliberately provider-neutral. These were named after Stripe, which is what
- * made renaming them necessary when the provider changed; see
- * `11-lemon-billing.sql`.
+ * made renaming them necessary when the provider changed the first time; see
+ * `11-billing-columns.sql`. The provider has now changed twice and nothing in
+ * here had to move, which is the whole argument for the naming.
  */
 export type PlanUpdate = {
   plan: PlanName;

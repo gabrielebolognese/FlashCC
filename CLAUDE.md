@@ -31,7 +31,7 @@ React + Vite + Tailwind + lucide-react. Node >= 20, ESM, strict tsconfig, vitest
 | `docs/feature-roadmap.md` | The batched plan of record. Worked through with `/next-batch`. |
 | `DESIGN_SYSTEM.md` | FlashFX tokens: colour, type, radii, motion. Paints the **app**. |
 | `docs/interaction-principles.md` | Figma research + rules R1–R15 (timing, feedback, density, control budget) |
-| `docs/billing.md` | Lemon Squeezy setup, click by click |
+| `docs/billing.md` | Paddle setup, click by click |
 
 `docs/superseded/` holds four documents describing the design the Photoshop-model rewrite replaced
 (a semantic document, five roles, a template engine). None of them match the code. They are kept for
