@@ -166,3 +166,72 @@ export const addSpend = (a: Spend, b: Partial<Spend>): Spend => ({
 });
 
 export const totalTokens = (s: Spend): number => s.input + s.output + s.cached;
+
+/* ── how many, counted the way people say it ──────────────────────────────── */
+
+/**
+ * Carousels PER IDEA, not a total.
+ *
+ * "Nine carousels, three ideas, three each" is how somebody describes this, and
+ * asking for the total instead made them do the division. It also hid the thing
+ * that matters: an uneven total means one idea gets fewer, and nothing on screen
+ * said which.
+ *
+ * Per idea is uniform by construction, so the batch is always balanced and the
+ * total is something the screen can simply show.
+ */
+export const perIdeaCeiling = (ideaCount: number): number =>
+  ideaCount <= 0 ? 1 : Math.max(1, Math.floor(MAX_RUN / ideaCount));
+
+/**
+ * The floor, which is 1 per idea once there are enough ideas to clear MIN_RUN.
+ *
+ * With one idea it has to be MIN_RUN, because a batch of one carousel is the
+ * ordinary single-carousel flow with a progress bar bolted on.
+ */
+export const perIdeaFloor = (ideaCount: number): number =>
+  ideaCount <= 0 ? MIN_RUN : Math.max(1, Math.ceil(MIN_RUN / ideaCount));
+
+export const clampPerIdea = (ideaCount: number, perIdea: number): number =>
+  Math.max(
+    perIdeaFloor(ideaCount),
+    Math.min(perIdeaCeiling(ideaCount), Math.round(perIdea) || perIdeaFloor(ideaCount)),
+  );
+
+/** What the screen shows, and what `planRun` is given. */
+export const totalFor = (ideaCount: number, perIdea: number): number =>
+  ideaCount <= 0 ? 0 : ideaCount * clampPerIdea(ideaCount, perIdea);
+
+/* ── the tutorial, shown once ─────────────────────────────────────────────── */
+
+const SEEN_RUN_TUTORIAL = "fcc.bulk.seen";
+
+/**
+ * Shown on the first visit and never again unasked.
+ *
+ * Fails to `true` rather than `false` when storage is unreadable. In a private
+ * window every visit is the first one, and a tutorial that reappears every time
+ * somebody opens a screen is worse than one they never saw: the first is an
+ * annoyance they cannot stop, the second is a page they can reach from the
+ * header whenever they want it.
+ */
+export function hasSeenRunTutorial(): boolean {
+  try {
+    return localStorage.getItem(SEEN_RUN_TUTORIAL) === "1";
+  } catch {
+    return true;
+  }
+}
+
+export function markRunTutorialSeen(): void {
+  try {
+    localStorage.setItem(SEEN_RUN_TUTORIAL, "1");
+  } catch {
+    /* nothing to do, and nothing worth telling anybody about */
+  }
+}
+
+/** The steps, in the order they are asked, so the header can count them. */
+export const RUN_STEPS = ["Ideas", "How many", "Look", "Depth", "Ready"] as const;
+
+export type RunSetupStep = (typeof RUN_STEPS)[number];

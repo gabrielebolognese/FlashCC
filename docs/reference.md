@@ -830,6 +830,19 @@ A few ideas in, a fortnight of carousels out. Replaces the old bulk create, whic
 paste carousels they had already written separated by `---`, a text importer wearing the name of a
 feature.
 
+**The setup is one question per step**, with a tutorial on the first visit. A batch is the only flow
+here that spends real money on somebody's behalf and runs for minutes, so the question that decides
+what it costs should not sit between a dropdown and a checkbox at the same weight as both. The
+tutorial is reachable from the header afterwards, and `hasSeenRunTutorial` returns **true** when
+storage is unreadable: in a private window every visit is the first, and a tutorial nobody can stop
+is worse than one nobody saw.
+
+**Counted per idea, not as a total.** "Nine carousels, three ideas, three each" is how somebody says
+it, and asking for the total made them do the division. It also hid the thing that matters: an
+uneven total means one idea silently gets fewer. Per idea is uniform by construction, so
+`perIdeaCeiling` caps it such that the total never passes `MAX_RUN` and the screen just shows the
+multiplication.
+
 **The plan is decided before a single call is made**, in `run.ts`, which is pure and therefore
 provable. `planRun` cycles the ideas rather than grouping them: nine carousels from three ideas is
 `1,2,3,1,2,3,1,2,3`. Two reasons, and the second is the real one: it is what "alternate them all"

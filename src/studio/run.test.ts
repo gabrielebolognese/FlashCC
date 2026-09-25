@@ -8,10 +8,14 @@ import {
   MAX_RUN_STYLES,
   MIN_RUN,
   NO_SPEND,
+  clampPerIdea,
+  perIdeaCeiling,
+  perIdeaFloor,
   planRun,
   runDone,
   runPercent,
   tidyIdeas,
+  totalFor,
   totalTokens,
   usedHooks,
   type RunStep,
@@ -206,5 +210,58 @@ describe("what it cost", () => {
     const before = { ...NO_SPEND };
     addSpend(NO_SPEND, { input: 5 });
     expect(NO_SPEND).toEqual(before);
+  });
+});
+
+/**
+ * "Nine carousels, three ideas, three each" is how somebody says this. Asking
+ * for the total made them do the division, and hid that an uneven total means
+ * one idea silently gets fewer.
+ */
+describe("carousels per idea", () => {
+  it("multiplies out to the total", () => {
+    expect(totalFor(3, 3)).toBe(9);
+    expect(totalFor(1, 5)).toBe(5);
+    expect(totalFor(2, 4)).toBe(8);
+  });
+
+  it("never lets the total pass the ceiling", () => {
+    expect(perIdeaCeiling(1)).toBe(MAX_RUN);
+    expect(perIdeaCeiling(3)).toBe(4);
+    expect(perIdeaCeiling(5)).toBe(2);
+    expect(perIdeaCeiling(14)).toBe(1);
+    for (const ideas of [1, 2, 3, 5, 7, 14]) {
+      expect(totalFor(ideas, 99)).toBeLessThanOrEqual(MAX_RUN);
+    }
+  });
+
+  /** A batch of one carousel is the single-carousel flow with a progress bar. */
+  it("makes one idea produce at least the floor", () => {
+    expect(perIdeaFloor(1)).toBe(MIN_RUN);
+    expect(totalFor(1, 1)).toBe(MIN_RUN);
+  });
+
+  it("lets one each be enough once there are enough ideas", () => {
+    expect(perIdeaFloor(3)).toBe(1);
+    expect(perIdeaFloor(5)).toBe(1);
+    expect(totalFor(3, 1)).toBe(3);
+  });
+
+  it("is always balanced, so no idea quietly gets fewer", () => {
+    for (const ideas of [1, 2, 3, 4, 5]) {
+      for (const per of [1, 2, 3, 4]) {
+        expect(totalFor(ideas, per) % ideas).toBe(0);
+      }
+    }
+  });
+
+  it("copes with no ideas yet", () => {
+    expect(totalFor(0, 3)).toBe(0);
+    expect(perIdeaCeiling(0)).toBe(1);
+  });
+
+  it("rounds rather than producing a fraction", () => {
+    expect(clampPerIdea(2, 2.4)).toBe(2);
+    expect(clampPerIdea(2, 2.6)).toBe(3);
   });
 });
