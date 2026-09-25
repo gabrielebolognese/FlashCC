@@ -2289,6 +2289,177 @@ things remain and each is a different kind of thing:
 
 ---
 
+## Batch 16, Bulk creation that is worth using
+
+**Status:** next
+**Size:** large
+**Why here:** the current bulk create asks somebody to paste a carousel they have
+already written, separated by `---`. That is a text importer wearing the name of
+a feature. The thing anybody actually wants is to hand over a few ideas and get
+a fortnight of carousels back, each on a different angle, scheduled.
+
+### 16.1 Delete the one that is there, but not all of it
+
+`BulkCreate.tsx` (274 lines) and `BatchReview.tsx`, which is reachable from
+nowhere else, both go. `App.tsx` loses the `bulk` view.
+
+**`bulk.ts` does not go**, and this is the thing to get right before deleting
+anything. `buildDocs` is what `Repurpose` builds through, and `BulkBlock` is
+`longform.ts`'s output type. Those two stay. What dies with the panel is the
+paste-parsing half: `parseBulk`, `readBulk`, `SEPARATOR`, `SAMPLE_BULK`,
+`countSlides`, `hookOf`, `payoffOf`, `setHook`, `setPayoff`, `BulkSource`.
+`bulk.test.ts` trims to what survives.
+
+**Done when:** `npm run build` passes with no reference to the paste separator
+anywhere, and Repurpose still builds a carousel.
+
+### 16.2 The run sheet, which is pure and therefore testable
+
+The whole plan is decided before a single call is made: how many carousels, from
+which idea, in which style. That is arithmetic, and it belongs in a pure module
+where it can be proved rather than in a component where it can be watched.
+
+`src/studio/run.ts`:
+
+```
+type Step = { n: number; idea: string; ideaIndex: number; styleId: string };
+function planRun(ideas: string[], count: number, styleIds: string[]): Step[]
+```
+
+**Ideas cycle.** Nine carousels from three ideas is 1, 2, 3, 1, 2, 3, 1, 2, 3,
+which is what somebody means by "alternate them all". Not three of idea one then
+three of idea two: the point of cycling is that consecutive carousels are about
+different things, so a run that stalls halfway still leaves a usable spread
+rather than everything about one idea.
+
+**Styles alternate independently.** One style means every carousel gets it. Two
+means step one, step two, step one, and because the two cycles have different
+lengths the pairing varies, which is the point.
+
+**3 to 14.** Below three this is the ordinary single-carousel flow with extra
+clicks. Above fourteen the run takes long enough that somebody walks away, and a
+14-carousel run is already a fortnight of posting.
+
+**Done when:** `planRun(["a","b","c"], 9, ["x"])` gives idea indexes
+`0,1,2,0,1,2,0,1,2`, and with two styles the style ids alternate.
+
+### 16.3 Search depth, and a roadmap decision being reversed deliberately
+
+With "search depth" on, each carousel gets an angle researched from the live web
+rather than invented from the idea alone.
+
+**Batch 13 rejected URL fetching**, and the reason still stands: *"somebody
+else's page is somebody else's content, fetching it server-side makes us the one
+requesting it."* That rejection was about **us** running the fetch.
+
+**Anthropic's `web_search` server tool is a different thing.** It runs on
+Anthropic's infrastructure, on the existing `ANTHROPIC_API_KEY`: no second
+vendor, no second key, no scraper of ours pointed at anybody's site, and results
+arrive with citations attached. That is what makes this a deliberate revisit
+rather than drift, and it is the only reason this part of the batch is
+buildable at all.
+
+Two facts that shape the design:
+
+- The tool type is `web_search_20260209` on Sonnet 5 and the Opus 5 family. **No
+  beta header.** Older models take the basic `web_search_20250305` variant.
+- **A web search error returns HTTP 200**, with a `web_search_tool_result` block
+  whose `content` is an error OBJECT where a success is an ARRAY. Branching on
+  that before indexing is the difference between a handled failure and a crash
+  inside a fourteen-step run.
+
+`/api/angles`: `{ idea, count, voice? }` in, and out a list of
+`{ title, angle, brief, sources: [{ title, url }] }`.
+
+**Reddit and YouTube are not scraped.** Reddit blocked every research pass in
+this project's own evidence caveats, and YouTube needs its own key and quota.
+What the search tool finds on those sites, it finds; what it does not, it does
+not, and the sources list says which.
+
+**Search costs money per search, on top of tokens.** That has to be visible,
+which is what 16.5 is for.
+
+**Done when:** a run with search depth on produces carousels whose angles carry
+at least one source URL each, and search failing on step 4 does not stop steps
+5 to 14.
+
+### 16.4 One at a time, and visibly
+
+A stepped screen, not a spinner and a wait:
+
+- Which step is running, out of how many
+- A percentage, and it is real: steps finished over steps planned
+- The idea and style this step is using
+- Tokens used so far
+- Each carousel appearing in a list as it finishes, **openable immediately**
+
+**Sequential, not parallel**, and that is a decision rather than laziness.
+Fourteen calls at once would be faster and would also make the progress
+meaningless, make the token count arrive in one lump at the end, and turn one
+failure into a half-finished set with no way to say which half. One at a time
+means a run can be watched, stopped, and resumed from where it stopped.
+
+**A failed step does not end the run.** It is marked, the run continues, and the
+step can be retried on its own afterwards. Fourteen carousels lost to one 429 is
+the failure mode this shape exists to avoid.
+
+**Each carousel is saved as it completes**, so closing the tab halfway leaves
+seven real carousels rather than nothing.
+
+**Done when:** a 5-carousel run shows a moving percentage, lists each carousel as
+it lands, and a deliberately failed step 3 leaves 4 usable carousels and a
+retry.
+
+### 16.5 Tokens used, stated honestly
+
+`response.usage` already carries `input_tokens`, `output_tokens`,
+`cache_creation_input_tokens` and `cache_read_input_tokens`, and `logUsage` in
+`anthropic.ts` already reads them. They are logged server-side and never
+reach the browser; this returns them per call and the run accumulates.
+
+Two honesties the interface has to keep:
+
+- **Tokens are not money.** Six models at four prices are in play across a run,
+  and a token count converted to dollars by the browser would be a number this
+  product cannot stand behind. It says tokens.
+- **Web search bills separately**, per search, and is not in the token count. The
+  interface says how many searches ran alongside the token total rather than
+  quietly folding one into the other.
+
+This is not metering. Invariant 7 stands: nothing counts down, nothing is
+refused for being over, and the number is there because somebody running
+fourteen carousels deserves to know what it cost, not to be limited by it.
+
+**Done when:** the run shows a token total that grows per step and a search
+count kept separate from it.
+
+### 16.6 Scheduled, because a fortnight of carousels needs dates
+
+`postFromDoc(doc, platform)` and `schedule(post, whenISO)` already exist, and
+`makeSeries` already numbers a set in order. This is mostly wiring.
+
+A cadence on the run sheet: start date, every N days, platform. Each finished
+carousel becomes a `Post` at stage `scheduled`, dated, and numbered as a series
+in run order, which is the order the ideas cycled in.
+
+**Scheduling is optional and off by default.** A run that just makes fourteen
+carousels is a legitimate use, and a product that silently fills somebody's
+calendar has made a decision for them.
+
+**Done when:** a scheduled 9-carousel run appears in the pipeline as 9 posts on
+9 dates, and an unscheduled run creates no posts at all.
+
+### What this batch deliberately does not do
+
+- **No auto-posting.** Already rejected on evidence and unchanged by any of this.
+- **No parallel generation.** See 16.4.
+- **No scraping Reddit or YouTube ourselves.** See 16.3.
+- **No dollar figure.** See 16.5.
+- **No credits, no limits.** The 3 to 14 range is about how long somebody will
+  watch a screen, not about rationing. Invariant 7.
+
+---
+
 ## Explicitly not building
 
 Each of these was considered and rejected on evidence.
@@ -2459,7 +2630,10 @@ that define the category. And **nothing is ranked, scored or graded**, because
 the ranking complaint in the research corpus is not about cost, it is about a
 machine asserting which of your sentences is better.
 
-**Every batch in this document is done.** The open work is `docs/reference.md`
+**Batches 1 to 15 are done.** Batch 16 rethinks bulk creation, which shipped in
+Batch 4 as a text importer and was never the feature its name promised.
+
+The other open work is `docs/reference.md`
 §29, the defect list, which is deliberately not a roadmap item and should not be
 folded into one, and the two migrations that wait on billing: `02-pro-gate.sql`
 and `09-gates.sql`.
