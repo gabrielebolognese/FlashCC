@@ -117,10 +117,12 @@ export type RunStep = Step & {
   error?: string | undefined;
 };
 
+const isSettled = (state: StepState): boolean => state === "done" || state === "failed";
+
 /**
  * How far along, as a percentage.
  *
- * Counted from steps that have FINISHED, not from the one in flight. A bar that
+ * Counted from work that has FINISHED, not from what is in flight. A bar that
  * jumps to 40% when step four starts is telling somebody four are done when
  * three are, and the difference shows up as a bar that sits still for fifteen
  * seconds and then leaps.
@@ -128,11 +130,31 @@ export type RunStep = Step & {
  * A failed step counts as finished. It is not coming back on its own, and a
  * percentage that stalls forever at 71% because one step failed is worse than
  * one that reaches 100 with a step marked failed.
+ *
+ * ── Research counts, and that is a bug fix ─────────────────────────────────
+ *
+ * `research` is one state per idea, and it belongs in this number. It used to be
+ * left out, on the reasoning that the bar measured carousels and research is not
+ * a carousel. What that produced in practice was a run sitting at **0% for two
+ * and a half minutes** while three searched calls went out one after another,
+ * with every row below reading "Waiting". A measured run took 58s, 42s and 42s
+ * before the first carousel was even asked for. Nobody waits in front of a 0%
+ * that long; they conclude it is broken, and they are not being unreasonable.
+ *
+ * Weighted as one unit per idea against one unit per carousel, which is rough,
+ * and rough is fine. What is not fine is a progress bar that reports no progress
+ * while the thing is working.
  */
-export const runPercent = (steps: readonly RunStep[]): number => {
-  if (steps.length === 0) return 0;
-  const settled = steps.filter((s) => s.state === "done" || s.state === "failed").length;
-  return Math.round((settled / steps.length) * 100);
+export const runPercent = (
+  steps: readonly RunStep[],
+  research: readonly StepState[] = [],
+): number => {
+  const total = steps.length + research.length;
+  if (total === 0) return 0;
+
+  const settled =
+    steps.filter((s) => isSettled(s.state)).length + research.filter(isSettled).length;
+  return Math.round((settled / total) * 100);
 };
 
 export const runDone = (steps: readonly RunStep[]): boolean =>
@@ -232,6 +254,93 @@ export function markRunTutorialSeen(): void {
 }
 
 /** The steps, in the order they are asked, so the header can count them. */
-export const RUN_STEPS = ["Ideas", "How many", "Look", "Depth", "Ready"] as const;
+export const RUN_STEPS = ["Ideas", "How many", "Length", "Look", "Depth", "Recap"] as const;
 
 export type RunSetupStep = (typeof RUN_STEPS)[number];
+
+/* ── how long each carousel should be ─────────────────────────────── */
+
+export type RunLength = "small" | "medium" | "long" | "auto";
+
+/**
+ * Four options, one of them an opt-out.
+ *
+ * A band rather than a number, because nobody knows whether they want 11 slides
+ * or 12 and offering the choice implies the difference matters. The number inside
+ * each band is the one the drafting prompt is given, and it is the middle of the
+ * band rather than its edge: asked for "8 to 12" a model would pick an end, and
+ * the end it picks is the short one.
+ *
+ * `auto` sends the framework's own slot count, which is what every run did before
+ * this question existed. It is named "Let me decide" rather than "Default"
+ * because from the outside that is what it does: the framework decides.
+ */
+export const LENGTHS: { id: RunLength; label: string; hint: string; slides: number | null }[] = [
+  { id: "small", label: "Short", hint: "Up to 6 slides. One point, made and left.", slides: 6 },
+  { id: "medium", label: "Medium", hint: "8 to 12 slides. Room to build an argument.", slides: 10 },
+  { id: "long", label: "Long", hint: "12 to 16 slides. A walkthrough.", slides: 14 },
+  { id: "auto", label: "Let me decide", hint: "Whatever the framework is shaped for.", slides: null },
+];
+
+export const lengthLabel = (id: RunLength): string =>
+  LENGTHS.find((l) => l.id === id)?.label ?? id;
+
+/** The slide count to ask for. `natural` is the framework's own, used by `auto`. */
+export const slidesFor = (id: RunLength, natural: number): number =>
+  LENGTHS.find((l) => l.id === id)?.slides ?? natural;
+
+/* ── the recap ──────────────────────────────────────────── */
+
+/**
+ * The whole run in one sentence.
+ *
+ * "12 Problem → Solution carousels, cycling between 3 ideas". Said in one line
+ * because the last step before spending money should be readable at a glance,
+ * and a list of six labelled rows is not: it is six things to check rather than
+ * one thing to recognise.
+ *
+ * The cycling clause is dropped for a single idea, where it would be a lie
+ * dressed as detail.
+ */
+export function recapHeadline(
+  total: number,
+  framework: string,
+  ideaCount: number,
+  length: RunLength,
+): string {
+  const size = length === "auto" ? "" : `${lengthLabel(length).toLowerCase()} `;
+  const one = `${total} ${size}${framework} carousel${total === 1 ? "" : "s"}`;
+  return ideaCount <= 1 ? one : `${one}, cycling between ${ideaCount} ideas`;
+}
+
+/* ── the pause between steps ────────────────────────────────── */
+
+/**
+ * Half a second between one question and the next.
+ *
+ * Deliberately fake. Nothing is computed here, and that is the point: a step
+ * that changes instantly reads as the page having glitched rather than as an
+ * answer having been taken, and this flow now has six of them in a row. R6 in
+ * the interaction principles puts the floor for a state change somebody should
+ * notice at around 300ms; 500 is comfortably above it and still under the
+ * threshold where a wait becomes something to resent.
+ */
+export const SETTLE_MS = 500;
+
+/**
+ * What the pause says, per step.
+ *
+ * Different words each time, because the same word six times reads as a spinner
+ * with a caption and stops being information. Each one names what was just
+ * taken, so the pause is a receipt rather than a delay.
+ */
+const SETTLING = [
+  "Saving your ideas",
+  "Working out the batch",
+  "Setting the length",
+  "Loading the styles",
+  "Calibrating",
+  "Starting the run",
+] as const;
+
+export const settleNote = (at: number): string => SETTLING[at] ?? "Working";

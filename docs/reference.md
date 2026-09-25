@@ -1098,15 +1098,94 @@ see §11, rather than writing new text onto a layer whose box was measured for t
 
 ## 15. Bulk create, and long-form ingest
 
-`---` on its own line separates carousels; a blank line separates slides.
+### The run (`run.ts`, `BulkRun.tsx`)
+
+A few ideas in, a fortnight of carousels out. This replaced a bulk create that asked somebody to
+paste carousels they had already written, separated by `---`, which was a text importer wearing the
+name of a feature. `bulk.ts` is down to `BulkBlock` and `buildDocs`, which long form still uses.
+
+All the planning is in `run.ts`, pure and tested. `BulkRun.tsx` follows the list it produces.
+
+**Six questions, one per step**, from `RUN_STEPS`: Ideas, How many, Length, Look, Depth, Recap. A
+tutorial shows once before the first one (`hasSeenRunTutorial`, which returns **true** when storage
+is unreadable: a tutorial that reappears on every visit is worse than one somebody never saw, and
+the header has a permanent way back to it).
+
+**Ideas cycle, they do not group.** Nine carousels from three ideas is 1, 2, 3, 1, 2, 3, 1, 2, 3.
+That is what somebody means by "alternate them all", and a run that stalls at step four has then
+produced one carousel about each idea rather than four about the first and nothing about the others.
+Styles cycle on their own count, so with two styles and three ideas the pairing shifts as it goes.
+
+**Counted per idea, not as a total** (`perIdeaCeiling`, `perIdeaFloor`, `totalFor`). "Nine
+carousels, three ideas, three each" is how people say it, and asking for the total made them do the
+division. It also hid the thing that matters: an uneven total means one idea gets fewer and nothing
+said which. `MIN_RUN` 3, `MAX_RUN` 14, a fortnight of daily posting, not a ration: past fourteen
+nobody watches it finish, which is the only thing the ceiling is about. Invariant 7 stands.
+
+**Length** is `LENGTHS`: Short 6, Medium 10, Long 14, or "Let me decide", which sends the
+framework's own slot count. The number inside a band is its **middle, never its edge**: asked for "8
+to 12" a model picks an end and the end it picks is the short one. The screen reports
+`slotsFor(structure, slidesFor(...)).length`, not the number requested, because `slotsFor` refuses to
+stretch a framework with no repeatable slot and showing the request would be a promise the run does
+not keep.
+
+**Every step is told what its siblings already said** (`briefFor`). Three carousels drafted from one
+sentence with no knowledge of each other come back as three versions of one carousel; the model is
+not being careless, it was asked the same question three times. Each brief carries the **openings**
+of the carousels already made from its idea, openings rather than whole decks because the hook is
+what an angle IS.
+
+**Each carousel is saved the moment it lands.** Closing the tab at step seven leaves seven real
+carousels. A failed step is marked and the run carries on: thirteen carousels lost to one rate limit
+is the failure this shape exists to avoid.
+
+#### The 0% bug, and what it taught
+
+A reported run "stuck at 0%, generates nothing" was doing all of the work. The server log for it:
 
 ```
-parseBulk: normalise CRLF → split /^[ \t]*-{3,}[ \t]*$/m → trim, drop empties
-           → split each on /\n\s*\n/ → title = nameFromHook(first line)
+[ai] angles claude-sonnet-5 58275ms   [ai] angles 42321ms   [ai] angles 41931ms
+[ai] draft  claude-sonnet-5  7089ms   ... twelve of them, all fine
 ```
 
-`"A --- B"` on one line does not split, and neither does `"Cut on motion - not on beat"`. Empty
-blocks are dropped.
+Research ran **sequentially, one idea at a time**, and was left out of the percentage on the
+reasoning that the bar measured carousels. So a working run sat on 0% for **142 seconds** with every
+row below reading "Waiting" before the first carousel was even asked for. Nobody waits in front of
+that, and concluding it is broken is not unreasonable. Three changes, and the first is the fix:
+
+1. **The ideas are researched in parallel.** They are independent calls about different ideas, so
+   there was never a reason to queue them, and running them together costs exactly the same tokens
+   and exactly the same searches. 142s becomes about 58.
+2. **Research counts toward the bar.** `runPercent(steps, research)` weights one idea against one
+   carousel, which is rough, and rough is fine; a bar reporting no progress while the thing works is
+   not.
+3. **It is visible.** A row per idea with its own state, a line under the bar naming what is
+   happening now, and a **ticking clock**, because a bar that has not moved and a run that has hung
+   are otherwise the same picture.
+
+`RESEARCH_MS` (180s) and `DRAFT_MS` (120s) cap each call through `AbortSignal.timeout`, since a
+request that never returns is the one failure mode that looks exactly like one still working. An
+abort is reported as "Took too long, skipped" rather than the browser's "The operation was aborted".
+
+`SETTLE_MS` is 500, a deliberately fake half-second between questions with a different word each
+time (`settleNote`). Nothing is computed in it: six steps that swap instantly read as the page
+glitching rather than as answers being taken, and the last one lands on a bar that starts at zero.
+
+`recapHeadline` is the whole run in one sentence, "12 medium Problem → Solution carousels, cycling
+between 3 ideas", above the itemised version. Six labelled rows are six things to check; one
+sentence is one thing to recognise, which is what somebody actually does before pressing the button.
+The cycling clause is dropped for a single idea, where it would be a lie dressed as detail.
+
+**Spend is tokens and searches, never money** (`Spend`, `addSpend`). A run crosses several models at
+several prices and web search bills per search on top of its tokens, so a figure in dollars computed
+here would be one this product cannot stand behind. Both halves are facts.
+
+A dated run hands over to the calendar, see §18.
+
+### The old text importer
+
+`---` on its own line separated carousels and a blank line separated slides. Gone, along with the
+panel it fed. `"A --- B"` on one line never split, and neither did `"Cut on motion - not on beat"`.
 
 ### Long form: one asset, several carousels (`longform.ts`, `Repurpose.tsx`)
 

@@ -33,7 +33,7 @@ import {
   Trash2,
   X,
 } from "lucide-react";
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 import { researchAngles, type Source } from "./angles.js";
 import { alignToSlots, draftSlides } from "./ai.js";
@@ -43,12 +43,20 @@ import { Chip } from "./Dash.js";
 import { makeDoc, type Doc } from "./model.js";
 import { nameFromHook } from "./search.js";
 import { cadenceDates, SLOT_HOUR } from "./calendar.js";
-import { listPosts, postFromDoc, savePosts, schedule, type Platform } from "./pipeline.js";
+import {
+  listPosts,
+  platformLabel,
+  postFromDoc,
+  savePosts,
+  schedule,
+  type Platform,
+} from "./pipeline.js";
 import {
   addSpend,
   briefFor,
   clampPerIdea,
   hasSeenRunTutorial,
+  LENGTHS,
   markRunTutorialSeen,
   MAX_RUN,
   MAX_RUN_STYLES,
@@ -56,13 +64,19 @@ import {
   perIdeaCeiling,
   perIdeaFloor,
   planRun,
+  recapHeadline,
   RUN_STEPS,
   runPercent,
+  SETTLE_MS,
+  settleNote,
+  slidesFor,
   tidyIdeas,
   totalFor,
   totalTokens,
+  type RunLength,
   type RunStep,
   type Spend,
+  type StepState,
 } from "./run.js";
 import { makeSeries, type SeriesMember } from "./series.js";
 import { loadDoc, saveDoc } from "./storage.js";
@@ -80,6 +94,10 @@ const TUTORIAL = [
     line: "Three each from three ideas is nine carousels. Fourteen is the most in one run, because past that nobody watches it finish.",
   },
   {
+    title: "Choose how long each one is",
+    line: "Short, medium or long, or leave it to the framework. Whichever you pick, the drafting is told exactly how many slides to write, so a long carousel is long all the way down rather than padded at the end.",
+  },
+  {
     title: "Pick a look",
     line: "A framework for the shape of the argument, and one style, or two and it alternates them carousel by carousel.",
   },
@@ -89,11 +107,34 @@ const TUTORIAL = [
   },
   {
     title: "Watch them arrive",
-    line: "One at a time, with a percentage and what it has spent. Each carousel is saved the moment it lands, so you can stop whenever and keep what is done. Any of them opens for editing.",
+    line: "The research runs first, all your ideas at once, which takes about a minute. Then the carousels arrive one at a time with a percentage, a clock and what it has spent. Each one is saved the moment it lands, so you can stop whenever and keep what is done.",
   },
 ];
 
 type Phase = "tutorial" | "setup" | "running" | "done";
+
+/**
+ * Caps on the two calls, so a hang cannot masquerade as work.
+ *
+ * Generous rather than tight: a searched angles call measured 58 seconds and a
+ * draft around 7, and a run that gives up on a slow-but-fine request is worse
+ * than one that waits. These are the ceilings past which something is wrong, not
+ * targets.
+ */
+const RESEARCH_MS = 180_000;
+const DRAFT_MS = 120_000;
+
+/**
+ * Why one step failed, in words.
+ *
+ * An aborted fetch reports "The operation was aborted", which describes what the
+ * browser did rather than what happened. The cap above is the only thing that
+ * aborts anything here, so it can say so.
+ */
+const reasonFor = (e: unknown): string => {
+  if (e instanceof DOMException && e.name === "AbortError") return "Took too long, skipped";
+  return e instanceof Error ? e.message : "Could not draft this one";
+};
 
 export function BulkRun({
   styles,
@@ -116,6 +157,7 @@ export function BulkRun({
   const [ideas, setIdeas] = useState<string[]>([""]);
   /** Per idea, not a total. See perIdeaCeiling for why. */
   const [perIdea, setPerIdea] = useState(3);
+  const [length, setLength] = useState<RunLength>("medium");
   const [structure, setStructure] = useState<Structure>(() => STRUCTURES[0]!);
   const [picked, setPicked] = useState<string[]>(() => [styles[0]?.id ?? "ink"]);
   const [deep, setDeep] = useState(true);
@@ -126,13 +168,53 @@ export function BulkRun({
   const [platform, setPlatform] = useState<Platform>("linkedin");
 
   const [steps, setSteps] = useState<RunStep[]>([]);
+  /**
+   * One state per idea, for the research pass.
+   *
+   * Held apart from `steps` because it is a different shape of work: three calls
+   * about ideas, not fourteen about carousels. It counts toward the percentage
+   * all the same, see `runPercent`.
+   */
+  const [research, setResearch] = useState<StepState[]>([]);
   const [spend, setSpend] = useState<Spend>(NO_SPEND);
   const [sources, setSources] = useState<Source[]>([]);
   const [note, setNote] = useState("");
   const stop = useRef(false);
 
+  /** The half-second beat between questions. See SETTLE_MS. */
+  const [settling, setSettling] = useState(false);
+  const settleTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  /*
+   * A clock, for one reason: a run that is working and a run that has hung look
+   * identical when the only thing on screen is a percentage that has not moved.
+   * A second counter ticking is the cheapest possible proof of life.
+   */
+  const [startedAt, setStartedAt] = useState(0);
+  const [tick, setTick] = useState(0);
+
+  useEffect(() => {
+    if (phase !== "running") return;
+    const id = setInterval(() => setTick(Date.now()), 1000);
+    return () => clearInterval(id);
+  }, [phase]);
+
+  // A pending settle must not fire into an unmounted tree.
+  useEffect(() => () => {
+    if (settleTimer.current) clearTimeout(settleTimer.current);
+  }, []);
+
   const real = tidyIdeas(ideas);
   const ready = real.length > 0 && picked.length > 0;
+
+  /**
+   * The slide count a carousel will ACTUALLY be, not the one that was asked for.
+   *
+   * `slotsFor` refuses to stretch a framework with no repeatable slot, and keeps
+   * the shape instead. Showing the requested number would then be a promise the
+   * run does not keep, so the screen reports what it is going to do.
+   */
+  const askedSlots = slotsFor(structure, slidesFor(length, structure.slots.length)).length;
 
   /** The dates the cadence would use, shown before the run rather than after. */
   const landing = cadenceDates(startOn, everyDays, totalFor(real.length, perIdea));
@@ -148,8 +230,11 @@ export function BulkRun({
 
     stop.current = false;
     setSteps(plan.map((s) => ({ ...s, state: "waiting" })));
+    setResearch(deep ? real.map(() => "waiting" as StepState) : []);
     setSpend(NO_SPEND);
     setSources([]);
+    setStartedAt(Date.now());
+    setTick(Date.now());
     setPhase("running");
 
     const voice = contextVoice(listBrands(), undefined);
@@ -175,22 +260,50 @@ export function BulkRun({
      */
     const used = new Map<number, string[]>();
     if (deep) {
-      setNote("Reading around your ideas");
-      for (let i = 0; i < real.length && !stop.current; i += 1) {
-        const wanted = plan.filter((s) => s.ideaIndex === i).length;
-        try {
-          const out = await researchAngles(real[i]!, wanted, voice);
-          angles.set(i, out.angles.map((a) => a.brief));
-          setSources((prev) => [...prev, ...out.sources]);
-          running = addSpend(running, { ...out.usage, searches: out.searches });
-          setSpend(running);
-        } catch {
-          // Research is an improvement, not a requirement. A failed search on one
-          // idea leaves that idea drafted from its own words rather than ending
-          // the run before a single carousel exists.
-          angles.set(i, []);
-        }
-      }
+      setNote("Reading the web about your ideas");
+      setResearch(real.map(() => "running" as StepState));
+
+      /*
+       * Every idea at once, and this is a fix rather than a flourish.
+       *
+       * These ran one after another, and a measured three-idea run spent 58s,
+       * 42s and 42s on them: two and a half minutes before the first carousel
+       * was even asked for, with the bar reading 0% and every row below reading
+       * "Waiting". The run was working the whole time and looked completely
+       * dead, which is the same thing as broken to the person watching it.
+       *
+       * They are independent calls about different ideas, so there was never a
+       * reason to queue them. Running them together costs exactly the same
+       * tokens and exactly the same searches.
+       */
+      await Promise.all(
+        real.map(async (idea, i) => {
+          const wanted = plan.filter((s) => s.ideaIndex === i).length;
+          try {
+            const out = await researchAngles(
+              idea,
+              wanted,
+              voice,
+              // A cap, because a request that never returns is the one failure
+              // mode that looks exactly like one that is still working.
+              AbortSignal.timeout(RESEARCH_MS),
+            );
+            angles.set(i, out.angles.map((a) => a.brief));
+            setSources((prev) => [...prev, ...out.sources]);
+            // Read and written synchronously after the await, so two ideas
+            // finishing together cannot lose one of the two tallies.
+            running = addSpend(running, { ...out.usage, searches: out.searches });
+            setSpend(running);
+            setResearch((prev) => prev.map((s, j) => (j === i ? "done" : s)));
+          } catch {
+            // Research is an improvement, not a requirement. A failed search on
+            // one idea leaves that idea drafted from its own words rather than
+            // ending the run before a single carousel exists.
+            angles.set(i, []);
+            setResearch((prev) => prev.map((s, j) => (j === i ? "failed" : s)));
+          }
+        }),
+      );
     }
 
     setNote("");
@@ -207,8 +320,15 @@ export function BulkRun({
         const which = plan.slice(0, i).filter((p) => p.ideaIndex === step.ideaIndex).length;
         const brief = researched[which] ?? briefFor(step, used.get(step.ideaIndex) ?? []);
 
-        const asked = { ...structure, slots: slotsFor(structure, structure.slots.length) };
-        const drafted = await draftSlides(brief, asked, undefined, voice);
+        // The length question, applied. `auto` sends the framework's own count,
+        // which is what every run did before the question existed.
+        // `askedSlots` above is this same call's length, which is what the recap
+        // showed. One expression, so the promise and the request cannot diverge.
+        const asked = {
+          ...structure,
+          slots: slotsFor(structure, slidesFor(length, structure.slots.length)),
+        };
+        const drafted = await draftSlides(brief, asked, AbortSignal.timeout(DRAFT_MS), voice);
         const texts = alignToSlots(drafted.slides, asked);
 
         const style = styleById(step.styleId);
@@ -238,11 +358,7 @@ export function BulkRun({
         );
       } catch (e) {
         setSteps((prev) =>
-          prev.map((s, j) =>
-            j === i
-              ? { ...s, state: "failed", error: e instanceof Error ? e.message : "Could not draft this one" }
-              : s,
-          ),
+          prev.map((s, j) => (j === i ? { ...s, state: "failed", error: reasonFor(e) } : s)),
         );
       }
     }
@@ -301,14 +417,33 @@ export function BulkRun({
     const ceiling = perIdeaCeiling(real.length);
     const floor = perIdeaFloor(real.length);
 
+    const last = at === RUN_STEPS.length - 1;
+
+    // Back is immediate. The beat below is there to make an answer feel taken,
+    // and going back is not an answer.
     const back = () => (at === 0 ? setPhase("tutorial") : setAt(at - 1));
-    const next = () => (at === RUN_STEPS.length - 1 ? void go() : setAt(at + 1));
+
+    /**
+     * Half a second of "saving", then the next question.
+     *
+     * Nothing is computed in it. Six questions that each swap instantly read as
+     * the page glitching rather than as answers being taken, and the last one
+     * lands on a progress bar that starts at zero, which needs a beat most of all.
+     */
+    const next = () => {
+      if (settling) return;
+      setSettling(true);
+      settleTimer.current = setTimeout(() => {
+        setSettling(false);
+        if (last) void go();
+        else setAt(at + 1);
+      }, SETTLE_MS);
+    };
 
     const canNext =
-      at === 0 ? real.length > 0 : at === 2 ? picked.length > 0 : true;
+      at === 0 ? real.length > 0 : at === 3 ? picked.length > 0 : true;
 
-    const label =
-      at === RUN_STEPS.length - 1 ? `Make ${total} carousels` : "Continue";
+    const label = last ? `Make ${total} carousel${total === 1 ? "" : "s"}` : "Continue";
 
     return (
       <Shell
@@ -317,7 +452,15 @@ export function BulkRun({
         note={`Step ${at + 1} of ${RUN_STEPS.length}`}
         onHelp={() => setPhase("tutorial")}
       >
-        <Steps at={at} onBack={back} onNext={next} canNext={canNext} nextLabel={label}>
+        <Steps
+          at={at}
+          onBack={back}
+          onNext={next}
+          canNext={canNext}
+          nextLabel={label}
+          settling={settling}
+          settleNote={settleNote(at)}
+        >
           {at === 0 ? (
             <Ask
               title="What are your ideas?"
@@ -418,6 +561,69 @@ export function BulkRun({
 
           {at === 2 ? (
             <Ask
+              title="How long should each one be?"
+              line="A band, not a number. Whatever this says, the drafting is told exactly how many slides to write, so a long carousel is long the whole way down rather than padded at the end."
+            >
+              <div className="flex flex-col gap-2.5">
+                {LENGTHS.map((l) => {
+                  const on = length === l.id;
+                  return (
+                    <button
+                      key={l.id}
+                      type="button"
+                      onClick={() => setLength(l.id)}
+                      className={[
+                        "flex items-center gap-3.5 rounded-2xl border p-5 text-left",
+                        on ? "border-accent bg-accent-wash" : "border-hairline bg-surface-1",
+                      ].join(" ")}
+                    >
+                      {/*
+                        A radio, drawn rather than a real input, because only one
+                        can be chosen and a row of checkboxes says the opposite.
+                      */}
+                      <span
+                        className={[
+                          "grid h-5 w-5 shrink-0 place-items-center rounded-full border",
+                          on ? "border-accent" : "border-surface-5",
+                        ].join(" ")}
+                      >
+                        {on ? (
+                          <span
+                            className="block h-2.5 w-2.5 rounded-full"
+                            style={{ background: "var(--accent)" }}
+                          />
+                        ) : null}
+                      </span>
+                      <span className="min-w-0 flex-1">
+                        <span className="block text-[17px] font-semibold text-primary">
+                          {l.label}
+                        </span>
+                        <span className="mt-1 block text-[14px] leading-[21px] text-muted">
+                          {l.hint}
+                        </span>
+                      </span>
+                      {l.slides === null ? null : (
+                        <span className="shrink-0 font-mono text-[15px] text-tertiary">
+                          {l.slides}
+                        </span>
+                      )}
+                    </button>
+                  );
+                })}
+              </div>
+
+              <p className="mt-3 text-caption leading-4 text-muted">
+                {length === "auto"
+                  ? `${structure.name} is shaped for ${structure.slots.length} slides, so that is what each one will be.`
+                  : askedSlots === slidesFor(length, structure.slots.length)
+                    ? `Each carousel will be ${askedSlots} slides.`
+                    : `${structure.name} has a fixed shape, so each one will be ${askedSlots} slides whatever is chosen here.`}
+              </p>
+            </Ask>
+          ) : null}
+
+          {at === 3 ? (
+            <Ask
               title="How should they look?"
               line="One style for all of them, or two and it alternates: first carousel one, second the other, and on."
             >
@@ -481,7 +687,7 @@ export function BulkRun({
             </Ask>
           ) : null}
 
-          {at === 3 ? (
+          {at === 4 ? (
             <Ask
               title="How deeply should it look?"
               line="With research on it searches the web about each idea and builds the angles from what it finds, with the sources listed."
@@ -616,32 +822,74 @@ export function BulkRun({
             </Ask>
           ) : null}
 
-          {at === 4 ? (
+          {at === 5 ? (
             <Ask
-              title={`${total} carousels, one at a time`}
-              line="Each one is saved the moment it lands, so you can stop whenever and keep what is done."
+              title="Recap"
+              line="The last screen before it starts spending. Each carousel is saved the moment it lands, so you can stop whenever and keep what is done."
             >
-              <div className="flex flex-col gap-2.5">
-                <Line label="Ideas" value={real.join(" · ")} />
+              {/*
+                The whole run in one sentence, at headline size, above the
+                itemised version. Six labelled rows are six things to check; one
+                sentence is one thing to recognise, and recognition is what
+                somebody actually does here before pressing the button.
+              */}
+              <div className="rounded-2xl border border-accent-dim bg-accent-wash p-5">
+                <p className="text-[21px] font-semibold leading-[29px] tracking-[-0.3px] text-primary">
+                  {recapHeadline(total, structure.name, real.length, length)}
+                </p>
+                <ol className="mt-3 flex flex-col gap-1.5">
+                  {real.map((idea, i) => (
+                    <li key={i} className="flex gap-2.5 text-[14px] leading-[21px] text-secondary">
+                      <span className="shrink-0 font-mono text-tertiary">{i + 1}</span>
+                      <span className="min-w-0 flex-1">{idea}</span>
+                    </li>
+                  ))}
+                </ol>
+              </div>
+
+              <div className="mt-3 flex flex-col gap-2.5">
                 <Line
                   label="Each idea gets"
-                  value={`${clampPerIdea(real.length, perIdea)} carousel${clampPerIdea(real.length, perIdea) === 1 ? "" : "s"}`}
+                  value={`${clampPerIdea(real.length, perIdea)} carousel${clampPerIdea(real.length, perIdea) === 1 ? "" : "s"}, ${askedSlots} slides each`}
                 />
-                <Line label="Framework" value={structure.name} />
                 <Line
                   label={picked.length === 2 ? "Styles, alternating" : "Style"}
-                  value={picked.map((id) => styleById(id).name).join(" then ")}
+                  value={picked.map((id) => styleById(id).name).join(", then ")}
                 />
-                <Line label="Research" value={deep ? "Reads the web first" : "From your own words"} />
                 <Line
-                  label="Schedule"
+                  label="Research"
                   value={
-                    scheduling
-                      ? `${platform}, every ${everyDays === 1 ? "day" : `${everyDays} days`} from ${startOn}`
-                      : "Not scheduled"
+                    deep
+                      ? `Reads the web first, ${real.length} search${real.length === 1 ? "" : "es"} running together`
+                      : "From your own words, no searching"
+                  }
+                />
+                <Line
+                  label="Scheduled"
+                  value={
+                    scheduling && landing.length > 0
+                      ? `${platformLabel(platform)}, every ${
+                          everyDays === 1 ? "day" : `${everyDays} days`
+                        }, ${landing[0]!.toLocaleDateString(undefined, {
+                          weekday: "short",
+                          day: "numeric",
+                          month: "short",
+                        })} to ${landing.at(-1)!.toLocaleDateString(undefined, {
+                          weekday: "short",
+                          day: "numeric",
+                          month: "short",
+                        })}`
+                      : "Not scheduled, they just go in Projects"
                   }
                 />
               </div>
+
+              {deep ? (
+                <p className="mt-3 text-caption leading-4 text-muted">
+                  Reading the web takes about a minute before the first carousel starts. The bar
+                  moves as each idea comes back.
+                </p>
+              ) : null}
             </Ask>
           ) : null}
         </Steps>
@@ -651,9 +899,15 @@ export function BulkRun({
 
   /* ── running, and done ─────────────────────────────────────────────────── */
 
-  const percent = runPercent(steps);
+  // Research included, deliberately. See runPercent: leaving it out is what made
+  // a working run sit on 0% for two and a half minutes.
+  const percent = runPercent(steps, research);
   const finished = steps.filter((s) => s.state === "done");
   const failed = steps.filter((s) => s.state === "failed");
+  const researching = research.some((r) => r === "running");
+
+  const seconds = startedAt ? Math.max(0, Math.floor((tick - startedAt) / 1000)) : 0;
+  const clock = `${Math.floor(seconds / 60)}:${String(seconds % 60).padStart(2, "0")}`;
 
   return (
     <Shell
@@ -665,6 +919,11 @@ export function BulkRun({
         <div className="sticky top-0 z-10 bg-base pb-3 pt-1">
           <div className="flex items-center gap-2">
             <span className="font-mono text-[26px] font-semibold leading-8 text-primary">{percent}%</span>
+            {/*
+              A ticking clock, because a bar that has not moved and a run that
+              has hung are the same picture otherwise.
+            */}
+            <span className="font-mono text-caption text-muted">{clock}</span>
             <div className="flex-1" />
             {/*
               Tokens and searches apart, and no money. A run crosses several
@@ -680,10 +939,73 @@ export function BulkRun({
           <div className="mt-2 h-1.5 w-full overflow-hidden rounded-full bg-surface-3">
             <div
               className="h-full rounded-full"
-              style={{ width: `${percent}%`, background: "var(--brand-gold)" }}
+              style={{
+                width: `${percent}%`,
+                background: "var(--brand-gold)",
+                // The only transition on this screen, and it is on width rather
+                // than on colour, which the house rule forbids.
+                transition: "width 400ms cubic-bezier(0.22,1,0.36,1)",
+              }}
             />
           </div>
+
+          {/*
+            What is happening, right now, under the bar.
+            A percentage alone cannot distinguish "reading the web" from "hung",
+            and the small note in the header was not where anybody was looking.
+          */}
+          {phase === "running" ? (
+            <div className="mt-2 flex items-center gap-2">
+              <span className="fcc-spin block h-3 w-3 shrink-0 rounded-full border-2 border-hairline border-t-accent" />
+              <span className="text-caption text-secondary">
+                {researching
+                  ? `Reading the web about ${research.length} idea${research.length === 1 ? "" : "s"}, all at once`
+                  : `Carousel ${Math.min(finished.length + failed.length + 1, steps.length)} of ${steps.length}`}
+              </span>
+            </div>
+          ) : null}
         </div>
+
+        {/*
+          The research pass, shown as work rather than hidden behind a note.
+          Three searched calls are around a minute of the run and used to be
+          invisible: the rows below all said "Waiting" and the bar said 0%.
+        */}
+        {research.length > 0 ? (
+          <div className="mt-3 rounded-2xl border border-hairline bg-surface-1 p-3">
+            <div className="flex items-center gap-2 pb-2">
+              <Search size={13} strokeWidth={2} className="shrink-0 text-accent" />
+              <span className="text-caption text-tertiary">
+                {researching ? "Reading the web about each idea" : "Read the web"}
+              </span>
+              <div className="flex-1" />
+              {researching ? (
+                <span className="text-caption text-muted">about a minute</span>
+              ) : null}
+            </div>
+            <div className="flex flex-col gap-1.5">
+              {research.map((state, i) => (
+                <div key={i} className="flex items-center gap-2.5">
+                  {state === "running" ? (
+                    <span className="fcc-spin block h-3.5 w-3.5 shrink-0 rounded-full border-2 border-hairline border-t-accent" />
+                  ) : state === "done" ? (
+                    <Check size={13} strokeWidth={2.6} className="shrink-0 text-success" />
+                  ) : state === "failed" ? (
+                    <AlertCircle size={13} strokeWidth={2} className="shrink-0 text-danger" />
+                  ) : (
+                    <span className="block h-3.5 w-3.5 shrink-0 rounded-full border border-hairline" />
+                  )}
+                  <span className="min-w-0 flex-1 truncate text-caption text-secondary">
+                    {real[i]}
+                  </span>
+                  <span className="shrink-0 text-caption text-muted">
+                    {state === "failed" ? "its own words instead" : state === "done" ? "angles ready" : ""}
+                  </span>
+                </div>
+              ))}
+            </div>
+          </div>
+        ) : null}
 
         <div className="mt-3 flex flex-col gap-2">
           {steps.map((s, i) => (
@@ -708,7 +1030,9 @@ export function BulkRun({
                     : s.state === "running"
                       ? "Drafting…"
                       : s.state === "waiting"
-                        ? "Waiting"
+                        ? researching
+                          ? "Waiting for the research"
+                          : "Waiting"
                         : styleById(s.styleId).name}
                 </div>
               </div>
@@ -830,7 +1154,7 @@ function Tutorial({ onContinue }: { onContinue: () => void }) {
         How to use bulk create
       </h1>
       <p className="mt-3 text-[17px] leading-[26px] text-tertiary">
-        Five questions, then it makes the carousels one at a time while you watch.
+        Six questions, then it makes the carousels one at a time while you watch.
       </p>
 
       <ol className="mt-9 flex flex-col gap-7">
@@ -883,6 +1207,8 @@ function Steps({
   onNext,
   canNext,
   nextLabel,
+  settling,
+  settleNote,
   children,
 }: {
   at: number;
@@ -890,6 +1216,8 @@ function Steps({
   onNext: () => void;
   canNext: boolean;
   nextLabel: string;
+  settling: boolean;
+  settleNote: string;
   children: React.ReactNode;
 }) {
   return (
@@ -928,13 +1256,29 @@ function Steps({
         </button>
         <button
           type="button"
-          disabled={!canNext}
+          disabled={!canNext || settling}
           onClick={onNext}
           style={{ background: "var(--brand-gold)", color: "var(--on-brand-gold)" }}
           className="flex h-12 flex-1 items-center justify-center gap-2 rounded-2xl text-[16px] font-semibold shadow-overlay hover:brightness-110 disabled:pointer-events-none disabled:opacity-40"
         >
-          {nextLabel}
-          <ArrowRight size={17} strokeWidth={2.5} />
+          {settling ? (
+            <>
+              {/*
+                The spinner borrows the button's own text colour rather than the
+                accent, because on gold the accent is invisible.
+              */}
+              <span
+                className="fcc-spin block h-4 w-4 rounded-full border-2 border-transparent"
+                style={{ borderTopColor: "var(--on-brand-gold)", borderRightColor: "var(--on-brand-gold)" }}
+              />
+              {settleNote}
+            </>
+          ) : (
+            <>
+              {nextLabel}
+              <ArrowRight size={17} strokeWidth={2.5} />
+            </>
+          )}
         </button>
       </div>
     </div>

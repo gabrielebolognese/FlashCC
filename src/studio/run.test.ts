@@ -9,19 +9,30 @@ import {
   MIN_RUN,
   NO_SPEND,
   clampPerIdea,
+  LENGTHS,
+  lengthLabel,
   perIdeaCeiling,
   perIdeaFloor,
   planRun,
+  recapHeadline,
+  RUN_STEPS,
   runDone,
   runPercent,
+  SETTLE_MS,
+  settleNote,
+  slidesFor,
   tidyIdeas,
   totalFor,
   totalTokens,
   usedHooks,
   type RunStep,
+  type StepState,
 } from "./run.js";
 
 const IDEAS = ["Cut on movement", "Price by value", "Gear matters least"];
+
+const steps = (states: RunStep["state"][]): RunStep[] =>
+  states.map((state, i) => ({ ...planRun(IDEAS, 3, ["ink"])[i % 3]!, state }));
 
 describe("how many carousels", () => {
   it("clamps to a range somebody will actually watch", () => {
@@ -163,9 +174,6 @@ describe("keeping the angles apart", () => {
 });
 
 describe("how far along", () => {
-  const steps = (states: RunStep["state"][]): RunStep[] =>
-    states.map((state, i) => ({ ...planRun(IDEAS, 3, ["ink"])[i % 3]!, state }));
-
   /**
    * Counted from what has FINISHED, not from what is in flight. A bar that jumps
    * when a step starts claims a step is done when it is not, and then sits still
@@ -263,5 +271,102 @@ describe("carousels per idea", () => {
   it("rounds rather than producing a fraction", () => {
     expect(clampPerIdea(2, 2.4)).toBe(2);
     expect(clampPerIdea(2, 2.6)).toBe(3);
+  });
+});
+
+/**
+ * The bug this guards is the one somebody actually reported: a run that was
+ * working sat on 0% for two and a half minutes because the three searched calls
+ * ahead of the drafting counted for nothing.
+ */
+describe("research counts toward the bar", () => {
+  const three = steps(["waiting", "waiting", "waiting"]);
+
+  it("moves off zero when an idea comes back, before any carousel exists", () => {
+    const research: StepState[] = ["done", "running", "waiting"];
+    expect(runPercent(three, research)).toBe(17);
+    expect(runPercent(three, [])).toBe(0);
+  });
+
+  it("weights one idea against one carousel", () => {
+    expect(runPercent(steps(["done"]), ["done"])).toBe(100);
+    expect(runPercent(steps(["done", "waiting"]), ["done", "done"])).toBe(75);
+  });
+
+  it("counts a failed search as settled, since it is not coming back", () => {
+    expect(runPercent(steps(["waiting"]), ["failed", "failed"])).toBe(67);
+  });
+
+  it("still answers zero for a run with nothing in it at all", () => {
+    expect(runPercent([], [])).toBe(0);
+  });
+});
+
+describe("how long each carousel should be", () => {
+  it("offers three bands and one opt-out, and only the opt-out has no number", () => {
+    expect(LENGTHS.map((l) => l.id)).toEqual(["small", "medium", "long", "auto"]);
+    expect(LENGTHS.filter((l) => l.slides === null).map((l) => l.id)).toEqual(["auto"]);
+  });
+
+  it("asks for the middle of a band, not its edge", () => {
+    // Told "8 to 12" a model picks an end, and the end it picks is the short one.
+    expect(slidesFor("small", 8)).toBe(6);
+    expect(slidesFor("medium", 8)).toBe(10);
+    expect(slidesFor("long", 8)).toBe(14);
+  });
+
+  it("hands the framework's own count back for auto, and for anything unknown", () => {
+    expect(slidesFor("auto", 8)).toBe(8);
+    expect(slidesFor("auto", 11)).toBe(11);
+    expect(slidesFor("nonsense" as never, 9)).toBe(9);
+  });
+
+  it("gets longer as the band does", () => {
+    const sizes = LENGTHS.filter((l) => l.slides !== null).map((l) => l.slides!);
+    expect([...sizes].sort((a, b) => a - b)).toEqual(sizes);
+  });
+
+  it("names them in words somebody would use", () => {
+    expect(lengthLabel("small")).toBe("Short");
+    expect(lengthLabel("auto")).toBe("Let me decide");
+  });
+});
+
+describe("the recap sentence", () => {
+  it("is the whole run in one line", () => {
+    expect(recapHeadline(12, "Problem → Solution", 3, "medium")).toBe(
+      "12 medium Problem → Solution carousels, cycling between 3 ideas",
+    );
+  });
+
+  it("drops the cycling clause for one idea, where it would be a lie", () => {
+    expect(recapHeadline(3, "Educational", 1, "long")).toBe("3 long Educational carousels");
+  });
+
+  it("says nothing about size when the framework decides it", () => {
+    expect(recapHeadline(6, "Story", 2, "auto")).toBe(
+      "6 Story carousels, cycling between 2 ideas",
+    );
+  });
+
+  it("counts one carousel as one", () => {
+    expect(recapHeadline(1, "Story", 1, "small")).toBe("1 short Story carousel");
+  });
+});
+
+describe("the beat between questions", () => {
+  it("is long enough to notice and short enough not to resent", () => {
+    expect(SETTLE_MS).toBeGreaterThanOrEqual(300);
+    expect(SETTLE_MS).toBeLessThanOrEqual(800);
+  });
+
+  it("says something different at every step, so it is not a spinner with a caption", () => {
+    const notes = RUN_STEPS.map((_, i) => settleNote(i));
+    expect(new Set(notes).size).toBe(RUN_STEPS.length);
+    expect(notes.every((n) => n.length > 0)).toBe(true);
+  });
+
+  it("has something to say past the end rather than nothing", () => {
+    expect(settleNote(99)).toBe("Working");
   });
 });
