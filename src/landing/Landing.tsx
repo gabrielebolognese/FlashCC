@@ -938,6 +938,23 @@ export function Landing({ onStart }: { onStart: () => void }) {
           <a href="#pricing" className="text-caption text-tertiary hover:text-primary">
             Pricing
           </a>
+          {/*
+            Real links to real pages, not a modal. A payment provider reviewing
+            the account has to be able to reach these from the homepage, and so
+            does anybody who wants to read them before paying.
+          */}
+          <a href="/terms" className="text-caption text-tertiary hover:text-primary">
+            Terms
+          </a>
+          <a href="/privacy" className="text-caption text-tertiary hover:text-primary">
+            Privacy
+          </a>
+          <a
+            href="mailto:support@flashcc.app"
+            className="text-caption text-tertiary hover:text-primary"
+          >
+            Contact
+          </a>
           <button
             type="button"
             onClick={onStart}

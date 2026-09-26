@@ -12,6 +12,9 @@ import { Home } from "./studio/Home.js";
 import { Repurpose } from "./studio/Repurpose.js";
 import type { Finding } from "./studio/ai.js";
 import { Landing } from "./landing/Landing.js";
+import { LegalPage } from "./legal/LegalPage.js";
+import { PRIVACY } from "./legal/privacy.js";
+import { TERMS } from "./legal/terms.js";
 import { ReviewLink } from "./studio/ReviewLink.js";
 import { onPaywall } from "./studio/gate.js";
 import { sessionPlan, sessionUserId } from "./studio/session.js";
@@ -108,6 +111,21 @@ const REVIEW_TOKEN = typeof window === "undefined" ? null : tokenFromPath(window
  */
 const APP_PATH = "/app";
 
+/**
+ * The two legal documents, matched by path.
+ *
+ * Read at module scope alongside the review token, for the same reasons. They are
+ * checked before the landing page because they are the pages a payment provider
+ * reviews and a reader arrives at directly, and neither needs a session, a
+ * profile or a single byte of local storage to render.
+ */
+const LEGAL = [PRIVACY, TERMS];
+
+const legalDoc = () =>
+  typeof window === "undefined"
+    ? undefined
+    : LEGAL.find((d) => window.location.pathname.replace(/\/+$/, "") === d.path);
+
 const atApp = (): boolean =>
   typeof window !== "undefined" && window.location.pathname.startsWith(APP_PATH);
 
@@ -160,6 +178,13 @@ export function App() {
   // A stranger with a link gets the review page and nothing else, no onboarding,
   // no welcome, and emphatically no pricing panel. See ReviewLink.tsx.
   if (REVIEW_TOKEN) return <ReviewLink token={REVIEW_TOKEN} />;
+
+  // Terms and privacy, before anything that needs a session. A visitor who came
+  // for a clause gets the clause.
+  const legal = legalDoc();
+  if (legal) {
+    return <LegalPage doc={legal} onHome={() => window.location.assign("/")} />;
+  }
 
   // Everything that is not /app or a review link is the front door.
   if (!atApp()) return <Landing onStart={openApp} />;
