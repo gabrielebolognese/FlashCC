@@ -68,7 +68,7 @@ export const fetchBillingStatus = (): Promise<BillingStatus> =>
 
 type Paddle = {
   Environment: { set: (env: string) => void };
-  Initialize: (options: { token: string }) => void;
+  Initialize: (options: { token: string; pwCustomer?: { id: string } }) => void;
   Checkout: {
     open: (options: {
       transactionId: string;
@@ -98,7 +98,7 @@ const SCRIPT = "https://cdn.paddle.com/paddle/v2/paddle.js";
  */
 let loading: Promise<Paddle> | null = null;
 
-function loadPaddle(token: string, environment: string): Promise<Paddle> {
+function loadPaddle(token: string, environment: string, customerId?: string): Promise<Paddle> {
   if (loading) return loading;
 
   loading = new Promise<Paddle>((resolve, reject) => {
@@ -109,7 +109,18 @@ function loadPaddle(token: string, environment: string): Promise<Paddle> {
         return;
       }
       if (environment === "sandbox") paddle.Environment.set("sandbox");
-      paddle.Initialize({ token });
+      /*
+       * `pwCustomer` is for Paddle Retain, and it must be the PADDLE customer
+       * id (`ctm_...`), which is why it comes from the server rather than from
+       * anything in here. Omitted entirely for a first purchase, when Paddle has
+       * not created a customer yet, rather than sent as an empty object.
+       *
+       * Initialize runs once per page load, so somebody who becomes a customer
+       * during this session gets it on their next load. Re-initialising to pick
+       * it up sooner is not worth the state it would need: Retain acts on
+       * existing subscriptions, and by definition they have reloaded since.
+       */
+      paddle.Initialize({ token, ...(customerId ? { pwCustomer: { id: customerId } } : {}) });
       resolve(paddle);
     };
 
@@ -142,6 +153,8 @@ type CheckoutHandoff = {
   clientToken: string;
   environment: string;
   successUrl: string;
+  /** Present only once Paddle has a customer for them. For Retain. */
+  customerId?: string;
 };
 
 /**
@@ -160,7 +173,7 @@ export async function startCheckout(plan: "pro" | "agency"): Promise<void> {
     body: JSON.stringify({ plan }),
   });
 
-  const paddle = await loadPaddle(handoff.clientToken, handoff.environment);
+  const paddle = await loadPaddle(handoff.clientToken, handoff.environment, handoff.customerId);
 
   paddle.Checkout.open({
     transactionId: handoff.transactionId,

@@ -221,6 +221,55 @@ of tools that break it.
 
 ---
 
+## 9. Webhook address allowlist
+
+Already built, and it needs no configuration in the common case.
+`server/paddleips.ts` fetches Paddle's own addresses from
+<https://api.paddle.com/ips> (`data.ipv4_cidrs`), caches them for 12 hours, and
+refuses a webhook that did not come from one.
+
+Two things about it worth knowing before you deploy:
+
+**It fails open.** If that endpoint cannot be reached, requests are allowed
+through to the signature check with a warning. The signature is the real
+boundary; failing closed would mean an outage at Paddle's status endpoint stops
+plans reaching people who have paid, which is an outage we caused ourselves with
+a defence-in-depth layer.
+
+**Behind a proxy, set `TRUST_PROXY_HOPS`.** Default 0, which judges the socket
+address. On Fly, Railway, Render, Vercel or behind your own nginx, set it to 1.
+Get this wrong in the other direction and the allowlist trusts a header anybody
+can send, which makes it worthless: `x-forwarded-for` is caller-supplied, and the
+entry your own proxy wrote is the LAST one, not the first.
+
+If real webhooks start being refused, the log line names the address they
+actually arrived from, which is usually a proxy nobody remembered was there.
+
+---
+
+## 10. Before verification: what your site needs
+
+Paddle reviews the website before it lets you take live payments, and this is
+where it is usually refused. Checked against Paddle's current guidance:
+
+| Requirement | Why it fails |
+| --- | --- |
+| **Terms & Conditions**, live and linked from navigation | Must name the company or sole trader brand |
+| **Privacy Policy**, live and linked | |
+| **Refund / Cancellation Policy**, live and linked | Paddle expects **at least a 30 day money-back guarantee** |
+| **Buyer support details**, email and phone, clearly on the site | Two clicks from the homepage or fewer |
+| A **pricing page** whose prices match the live Paddle catalog | A mismatch is a refusal |
+| **HTTPS** with a valid certificate | |
+| Every domain running Checkout **serves the real product** | Not parked, not a placeholder, not a 404 |
+| Only domains **related to what you sell** submitted for approval | Unrelated products raise chargeback risk and hurt approval |
+
+Domain review is a **manual** review, roughly 5 to 7 business days, so submit it
+early and do the rest while it runs. Sandbox approves domains automatically and
+live does not, which is why a checkout that worked all through testing fails the
+first time you point it at live.
+
+---
+
 ## What the code does with all this
 
 | File | Job |
@@ -229,6 +278,7 @@ of tools that break it.
 | `server/billing.ts` | Four routes: checkout, portal, webhook, status. |
 | `src/studio/billing.ts` | Loads Paddle.js on the click and opens the transaction. |
 | `src/studio/Upgrade.tsx` | The pricing screen, and the promises on it. |
+| `server/paddleips.ts` | The webhook address allowlist, fetched from Paddle and cached. |
 | `scripts/paddle-prices.mjs` | `npm run paddle:prices`. |
 
 `docs/reference.md` §25 is the reasoning: why `canceled` is not entitled, why

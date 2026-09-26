@@ -71,7 +71,16 @@ describe("loading the environment", () => {
 
     // `index.ts` is on this list and is safe: it is the file whose first import
     // is `env.js`, so by the time its own body reads PORT the file is loaded.
-    // The other three are safe only because nothing imports them before it.
-    expect(eager).toEqual(["billing.ts", "index.ts", "paddle.ts", "supabase.ts"]);
+    // The other four are safe only because nothing imports them before it.
+    expect(eager).toEqual([
+      "billing.ts",
+      "index.ts",
+      "paddle.ts",
+      // TRUST_PROXY_HOPS, which decides how far into x-forwarded-for the
+      // webhook allowlist looks. Reading it late would be safer still, but it
+      // cannot change while the process runs and a module constant says so.
+      "paddleips.ts",
+      "supabase.ts",
+    ]);
   });
 });

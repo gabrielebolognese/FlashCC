@@ -32,6 +32,7 @@ import {
   WEBHOOK_SECRET,
   type PaddleSubscription,
 } from "./paddle.js";
+import { fromPaddle } from "./paddleips.js";
 import { readBilling, requireCaller, setPlan, userIdForCustomer } from "./supabase.js";
 
 const SITE = process.env.PUBLIC_SITE_URL ?? "http://localhost:5173";
@@ -64,10 +65,23 @@ export async function checkout(req: IncomingMessage, res: ServerResponse): Promi
 
   const transactionId = await createTransaction({ priceId, userId: caller.id });
 
+  /*
+   * Their Paddle customer id, when they already have one, for Paddle Retain.
+   *
+   * Retain's `pwCustomer` has to be the **Paddle** customer id (`ctm_...`), not
+   * our user id and not an email: it is how Retain finds the subscription it is
+   * trying to save. It comes from our own row rather than from the browser for
+   * the obvious reason, and it is absent for a first purchase, because Paddle
+   * creates the customer when the payment lands. Harmless when Retain is not
+   * enabled on the account: Paddle.js ignores it.
+   */
+  const { customerId } = await readBilling(caller.id);
+
   json(res, 200, {
     transactionId,
     clientToken: CLIENT_TOKEN,
     environment: PADDLE_ENV,
+    ...(customerId ? { customerId } : {}),
     // Paddle sends them back here itself once the payment lands. The flag is
     // what lets the UI say "finishing up" rather than showing Free to somebody
     // who has just paid, since the webhook may still be in flight.
@@ -112,6 +126,19 @@ type PaddleEvent = {
  */
 export async function webhook(req: IncomingMessage, res: ServerResponse): Promise<void> {
   if (!WEBHOOK_SECRET) throw new HttpError(503, "No PADDLE_WEBHOOK_SECRET on this server");
+
+  /*
+   * Address first, signature second.
+   *
+   * Only to save the HMAC on junk traffic and to narrow things if the secret
+   * ever leaks. It deliberately **fails open** when Paddle's address list cannot
+   * be fetched, because the signature is the real boundary and an outage at
+   * their status endpoint must not stop plans reaching people who have paid. See
+   * paddleips.ts.
+   */
+  if (!(await fromPaddle(req))) {
+    throw new HttpError(403, "Not from Paddle");
+  }
 
   const raw = await readRaw(req);
   const signature = req.headers["paddle-signature"];
