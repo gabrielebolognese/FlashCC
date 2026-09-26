@@ -2,9 +2,10 @@ import { describe, expect, it } from "vitest";
 
 import { COMPANY, danglingAnchors, inlines, parse, plain, type LegalDoc } from "./legal.js";
 import { PRIVACY } from "./privacy.js";
+import { REFUND_DAYS, REFUNDS, RENEWAL_REFUND_DAYS } from "./refunds.js";
 import { TERMS } from "./terms.js";
 
-const DOCS: LegalDoc[] = [PRIVACY, TERMS];
+const DOCS: LegalDoc[] = [PRIVACY, TERMS, REFUNDS];
 
 /**
  * Two kinds of test here, and the second kind is the point.
@@ -117,9 +118,15 @@ describe.each(DOCS.map((d) => [d.title, d] as const))("%s", (_title, doc) => {
     expect(text.toLowerCase()).not.toContain("flashfx");
   });
 
+  /**
+   * Split from the positive check on purpose. Every document must never name the
+   * old domain; only the two that describe where the Services live have a reason
+   * to name the new one, and the refund policy is about money rather than about a
+   * website. Asserting the positive here would have been a test insisting on a
+   * sentence that does not belong.
+   */
   it("never points at the old domain", () => {
     expect(text.toLowerCase()).not.toContain("flashfx.app");
-    expect(text).toContain(COMPANY.site);
   });
 
   /**
@@ -159,6 +166,14 @@ describe.each(DOCS.map((d) => [d.title, d] as const))("%s", (_title, doc) => {
   });
 });
 
+describe("the documents that describe the Services", () => {
+  it("names the site those Services are at", () => {
+    for (const doc of [PRIVACY, TERMS]) {
+      expect(plain(parse(doc.body))).toContain(COMPANY.site);
+    }
+  });
+});
+
 describe("the privacy notice specifically", () => {
   const text = plain(parse(PRIVACY.body));
 
@@ -194,13 +209,72 @@ describe("the terms specifically", () => {
   });
 
   /**
-   * Not a requirement, a **record**: there is no money-back guarantee in here,
-   * only cancellation at the end of the paid term. Paddle expects at least 30
-   * days stated on the site. If a refund policy is added, this test should be
-   * the thing that changes with it.
+   * The terms still carry only the cancellation clause. The money-back guarantee
+   * lives in its own policy, which is where Paddle's review looks for it, and
+   * this asserts the terms' own wording did not drift while that was written.
    */
-  it("has no money-back guarantee yet, which is a known gap", () => {
-    expect(text.toLowerCase()).not.toContain("money-back");
+  it("keeps its cancellation clause, with the guarantee in the refund policy", () => {
     expect(text).toContain("cancellation will take effect at the end of the current paid term");
+  });
+});
+
+describe("the refund policy specifically", () => {
+  const text = plain(parse(REFUNDS.body));
+
+  /**
+   * The number Paddle's seller verification asks for. Their own buyer policy is
+   * 14 days statutory in the EU and as little as 5 elsewhere, and it says the
+   * highest level of rights applies, so this figure is the operative one for our
+   * customers and it has to be at least 30.
+   */
+  it("promises at least the 30 days Paddle expects of a seller", () => {
+    expect(REFUND_DAYS).toBeGreaterThanOrEqual(30);
+    expect(text).toContain(`${REFUND_DAYS} days of your first payment`);
+    expect(text.toLowerCase()).toContain("money-back guarantee");
+  });
+
+  /** Never below the statutory window it is measured against. */
+  it("never offers a renewal less than the statutory 14 days", () => {
+    expect(RENEWAL_REFUND_DAYS).toBeGreaterThanOrEqual(14);
+  });
+
+  it("names Paddle as the party that issues the refund", () => {
+    expect(text).toContain("Paddle");
+    expect(text).toContain("merchant of record");
+    expect(text).toContain("paddle.net");
+  });
+
+  it("says statutory rights are not reduced, and that the higher one wins", () => {
+    expect(text.toLowerCase()).toContain("statutory");
+    expect(text).toContain("the law wins");
+  });
+
+  it("says how to ask and how long it takes", () => {
+    expect(text).toContain("original payment method");
+    expect(text).toMatch(/\d+ working days/);
+  });
+
+  /**
+   * Invariant 7 reaching the exit. A refund that subtracted for usage would be a
+   * rationing system arriving at the door, and it would contradict the promise
+   * the pricing screen makes two clicks earlier.
+   */
+  it("deducts nothing for use, because nothing is metered", () => {
+    expect(text).toContain("Nothing is deducted for use");
+    expect(text.toLowerCase()).toContain("no credits to subtract");
+  });
+
+  /**
+   * The four promises on the pricing screen are the ones people read first. A
+   * refund policy contradicting any of them would make one surface a lie.
+   */
+  it("agrees with the pricing screen about cancelling and about your work", () => {
+    expect(text).toContain("Cancelling and refunding are different things");
+    expect(text).toContain("your work stays yours");
+    expect(text.toLowerCase()).toContain("no retention call");
+  });
+
+  it("does not refuse a refund for any of the reasons people complain about", () => {
+    expect(text).toContain("We do not refuse a refund because you used the product");
   });
 });

@@ -84,6 +84,15 @@ export const BILLING_TERMS: { title: string; body: string }[] = [
     title: "A price you agreed to is the price",
     body: "If it ever changes, you get told before it takes effect, and you can leave first. Nobody wakes up to a different number.",
   },
+  {
+    /*
+     * Added with the refund policy, and it belongs in this list rather than only
+     * on that page: the other four promises are all about not being trapped, and
+     * this is the one that says so with a number. See src/legal/refunds.ts.
+     */
+    title: "Thirty days to change your mind",
+    body: "Ask within 30 days of your first payment and you get all of it back, no reason needed. Nothing is deducted for what you made in the meantime, because nothing here is metered.",
+  },
 ];
 
 export const PLANS: Tier[] = [

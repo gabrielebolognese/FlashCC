@@ -254,9 +254,9 @@ where it is usually refused. Checked against Paddle's current guidance:
 
 | Requirement | Why it fails |
 | --- | --- |
-| **Terms & Conditions**, live and linked from navigation | Must name the company or sole trader brand |
-| **Privacy Policy**, live and linked | |
-| **Refund / Cancellation Policy**, live and linked | Paddle expects **at least a 30 day money-back guarantee** |
+| **Terms & Conditions**, live and linked from navigation | **Done:** `/terms`. Must name the company or sole trader brand |
+| **Privacy Policy**, live and linked | **Done:** `/privacy` |
+| **Refund / Cancellation Policy**, live and linked | **Done:** `/refunds`, 30 days on a first payment, 14 on a renewal |
 | **Buyer support details**, email and phone, clearly on the site | Two clicks from the homepage or fewer |
 | A **pricing page** whose prices match the live Paddle catalog | A mismatch is a refusal |
 | **HTTPS** with a valid certificate | |
@@ -278,6 +278,7 @@ first time you point it at live.
 | `server/billing.ts` | Four routes: checkout, portal, webhook, status. |
 | `src/studio/billing.ts` | Loads Paddle.js on the click and opens the transaction. |
 | `src/studio/Upgrade.tsx` | The pricing screen, and the promises on it. |
+| `src/legal/refunds.ts` | The refund policy. `REFUND_DAYS` is the number Paddle checks for. |
 | `server/paddleips.ts` | The webhook address allowlist, fetched from Paddle and cached. |
 | `scripts/paddle-prices.mjs` | `npm run paddle:prices`. |
 

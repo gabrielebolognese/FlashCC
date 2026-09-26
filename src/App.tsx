@@ -14,6 +14,7 @@ import type { Finding } from "./studio/ai.js";
 import { Landing } from "./landing/Landing.js";
 import { LegalPage } from "./legal/LegalPage.js";
 import { PRIVACY } from "./legal/privacy.js";
+import { REFUNDS } from "./legal/refunds.js";
 import { TERMS } from "./legal/terms.js";
 import { ReviewLink } from "./studio/ReviewLink.js";
 import { onPaywall } from "./studio/gate.js";
@@ -119,7 +120,7 @@ const APP_PATH = "/app";
  * reviews and a reader arrives at directly, and neither needs a session, a
  * profile or a single byte of local storage to render.
  */
-const LEGAL = [PRIVACY, TERMS];
+const LEGAL = [PRIVACY, TERMS, REFUNDS];
 
 const legalDoc = () =>
   typeof window === "undefined"

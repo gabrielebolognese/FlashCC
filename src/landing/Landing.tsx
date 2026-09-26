@@ -949,6 +949,9 @@ export function Landing({ onStart }: { onStart: () => void }) {
           <a href="/privacy" className="text-caption text-tertiary hover:text-primary">
             Privacy
           </a>
+          <a href="/refunds" className="text-caption text-tertiary hover:text-primary">
+            Refunds
+          </a>
           <a
             href="mailto:support@flashcc.app"
             className="text-caption text-tertiary hover:text-primary"
