@@ -796,9 +796,26 @@ function Pricing({ onStart }: { onStart: () => void }) {
           </p>
         </div>
 
+        {/*
+          VAT and the refund window, said where the prices are.
+
+          Not a footnote: promise four on the pricing panel is that the price you
+          agreed to is the price, and a visitor who reads 29 euros here and meets
+          a tax-inclusive number at Paddle's checkout has met exactly the surprise
+          that promise is about. The thirty days is here for the same reason it is
+          in the panel, which is that it is the reason to try it at all.
+        */}
         <div className="mt-10 flex flex-col items-center">
           <Cta onStart={onStart} label="Make one now" />
           <p className="mt-3 text-caption text-muted">Free forever. No card to start.</p>
+          <p className="mt-1.5 max-w-[52ch] text-center text-caption leading-4 text-muted">
+            Prices in euros, excluding VAT, which Paddle adds at checkout based on where you
+            are. Paid plans come with{" "}
+            <a href="/refunds" className="text-tertiary underline underline-offset-2 hover:text-accent">
+              30 days to change your mind
+            </a>
+            .
+          </p>
         </div>
       </div>
     </section>

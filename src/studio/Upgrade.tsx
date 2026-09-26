@@ -19,6 +19,13 @@ import type { Plan } from "./cloud.js";
 type Tier = {
   id: Plan;
   name: string;
+  /**
+   * Euros, everywhere, because the terms say every payment is in Euros and the
+   * Paddle catalog is priced in Euros. A screen showing dollars against a
+   * contract promising Euros is the mismatch Paddle's verification looks for, and
+   * it is also the "price you agreed to is the price" promise broken before
+   * anybody has paid anything.
+   */
   price: string;
   cadence: string;
   line: string;
@@ -99,7 +106,7 @@ export const PLANS: Tier[] = [
   {
     id: "free",
     name: "Free",
-    price: "$0",
+    price: "€0",
     cadence: "forever",
     line: "Make carousels, and keep them safe.",
     features: [
@@ -113,7 +120,7 @@ export const PLANS: Tier[] = [
   {
     id: "pro",
     name: "Pro",
-    price: "$29",
+    price: "€29",
     cadence: "a month",
     line: "The loop: post it, measure it, learn from it.",
     featured: true,
@@ -131,7 +138,7 @@ export const PLANS: Tier[] = [
   {
     id: "agency",
     name: "Agency",
-    price: "$79",
+    price: "€79",
     cadence: "a month",
     line: "More than one brand, more than one person.",
     features: [
@@ -334,6 +341,7 @@ export function Upgrade({
 
         <div className="mt-4 flex items-center gap-3">
           <p className="flex-1 text-caption text-muted">
+            Prices exclude VAT, which Paddle adds at checkout based on where you are.
             Payment and VAT are handled by Paddle, our merchant of record. Card
             details never reach FlashCC.
           </p>

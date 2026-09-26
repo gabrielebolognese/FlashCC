@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import { COMPANY, danglingAnchors, inlines, parse, plain, type LegalDoc } from "./legal.js";
+import { PLANS } from "../studio/Upgrade.js";
 import { PRIVACY } from "./privacy.js";
 import { REFUND_DAYS, REFUNDS, RENEWAL_REFUND_DAYS } from "./refunds.js";
 import { TERMS } from "./terms.js";
@@ -276,5 +277,24 @@ describe("the refund policy specifically", () => {
 
   it("does not refuse a refund for any of the reasons people complain about", () => {
     expect(text).toContain("We do not refuse a refund because you used the product");
+  });
+});
+
+/**
+ * The terms say every payment is in Euros. The pricing screen is the other half
+ * of that sentence, and a screen showing dollars against a contract promising
+ * euros is both the mismatch Paddle's verification looks for and the "price you
+ * agreed to is the price" promise broken before anybody has paid.
+ */
+describe("the prices and the terms agree", () => {
+  it("states every plan in euros", () => {
+    for (const tier of PLANS) {
+      expect(tier.price).toContain("€");
+      expect(tier.price).not.toContain("$");
+    }
+  });
+
+  it("is the currency the terms commit to", () => {
+    expect(plain(parse(TERMS.body))).toContain("All payments shall be in Euros");
   });
 });

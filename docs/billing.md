@@ -56,8 +56,8 @@ Save each one, then on the product page: **Prices → New price.**
 | --- | --- |
 | Type | **Recurring** |
 | Billing period | Monthly |
-| Amount | What `Upgrade.tsx` says. Keep them in step. |
-| Currency | USD, and let Paddle handle the rest |
+| Amount | What `Upgrade.tsx` says, in euros. 29 for Pro, 79 for Agency. Keep them in step. |
+| Currency | **EUR.** The terms say every payment is in Euros and the pricing screen shows euros, so the catalog has to match or verification finds the mismatch. Let Paddle handle every other currency from it. |
 
 You now have four ids on screen. **Two of them are traps:**
 
