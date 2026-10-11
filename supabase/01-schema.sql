@@ -28,7 +28,7 @@
 -- 4. THE PLAN IS NOT USER-WRITABLE. `profiles.plan` has its INSERT and UPDATE
 --    privileges narrowed to a column list that excludes it, so a signed-in user
 --    can set their display name but can neither edit their way to Pro nor create
---    themselves there on first sign-in. Only the service role (your Stripe
+--    themselves there on first sign-in. Only the service role (your billing
 --    webhook) can write it. RLS alone would NOT do this, an owner policy on the
 --    row lets them write every column in it.
 -- ─────────────────────────────────────────────────────────────────────────────
@@ -42,8 +42,8 @@ create table if not exists public.profiles (
   email                  text,
   display_name           text,
   plan                   text not null default 'free',
-  stripe_customer_id     text,
-  stripe_subscription_id text,
+  billing_customer_id     text,
+  billing_subscription_id text,
   plan_renews_at         timestamptz,
   created_at             timestamptz not null default now(),
   server_updated_at      timestamptz not null default now(),

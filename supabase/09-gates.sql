@@ -1,6 +1,6 @@
 -- FlashCC, turn the remaining gates on
 --
--- RUN THIS LAST, and only once Stripe is wired and something is actually setting
+-- RUN THIS LAST, and only once billing is wired and something is actually setting
 -- `profiles.plan`. Before that, every account is 'free' and this takes review
 -- links away from you as well as from everybody else.
 --

@@ -5,16 +5,16 @@
 -- ─────────────────────────────────────────────────────────────────────────────
 -- WHY THIS EXISTS
 --
--- The billing provider changed from Stripe, and two columns were named after it.
+-- The billing provider changed, and two columns had been named after the old one.
 -- The obvious fix is to rename them after whoever is taking the money this week,
 -- which would leave the project in exactly the position that made this migration
 -- necessary in the first place.
 --
 -- So they become `billing_customer_id` and `billing_subscription_id`. A provider
 -- is a detail of how money arrives; the fact that somebody has an account with
--- whoever takes the money is not. The provider has since changed again, from
--- Lemon Squeezy to Paddle, and nothing in here had to move. That is the argument
--- for the naming, made twice.
+-- whoever takes the money is not. The provider has changed more than once since
+-- and nothing in here has had to move again, which is the argument for the
+-- naming, made more than once.
 --
 -- ── What this does NOT touch ────────────────────────────────────────────────
 --

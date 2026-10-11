@@ -1,6 +1,6 @@
 -- FlashCC, turn the paywall on
 --
--- DO NOT RUN THIS YET. Run it when Stripe is wired and something is actually
+-- DO NOT RUN THIS YET. Run it when billing is wired and something is actually
 -- setting profiles.plan, or every account including yours loses the pipeline.
 --
 -- What it does: makes the cloud copy of the pipeline a Pro feature in the

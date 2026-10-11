@@ -2008,7 +2008,8 @@ rather than papers over.
 The provider is **Paddle**, and the reason is that they are the merchant of record: they owe the
 VAT in every country a customer lives in, not us. The alternative is EU-wide VAT registration and
 quarterly filings for a product that may earn nothing. It was the reason for the merchant of record
-before this one too; the Stripe integration before that is in history at `572ebd7`.
+before this one too. Earlier integrations are in git history and nothing of them remains in the
+tree.
 
 The browser can do exactly one billing thing: **ask for a checkout.** It never states what plan
 someone is on and the server never believes it if it does. Entitlement is decided in one place, a
@@ -2051,7 +2052,8 @@ when Paddle versions the scheme) are ignored rather than fatal.
 `ENTITLED = { active, trialing, past_due }`, and the absence is the interesting part.
 
 - **`past_due` is in**, so a failed payment does not cut access off mid-retry.
-- **`canceled` is OUT**, and this is the trap in migrating from Lemon Squeezy. There, `cancelled`
+- **`canceled` is OUT**, and it is the trap when porting an integration from a provider whose
+  cancelled status still entitles. In such a provider `cancelled`
   meant future payments were stopped while the paid period ran on, so it had to count as entitled.
   **Paddle does not work that way**: a cancelling subscription stays `active` with a
   `scheduled_change` of `cancel` until the period ends, and only then becomes `canceled`. Carrying

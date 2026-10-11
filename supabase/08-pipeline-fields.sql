@@ -44,10 +44,17 @@ create index if not exists posts_campaign_idx on public.posts (user_id, campaign
 -- ─────────────────────────────────────────────────────────────────────────────
 -- HONEST BILLING: ONE BOOLEAN
 --
--- FlashCC already behaves correctly here. `ENTITLED` in server/billing.ts treats
--- `active` as entitled, and Stripe keeps a cancelled subscription active until
--- the period it was paid for ends, so "you keep what you paid for" has been
--- true since billing shipped.
+-- FlashCC already behaves correctly here: a subscription that is cancelling
+-- keeps everything until the end of the period it was paid for, so "you keep
+-- what you paid for" has been true since billing shipped.
+--
+-- HOW that is true is provider-specific and must not be assumed. Some providers
+-- keep a cancelling subscription in a `cancelled` status that still entitles;
+-- others keep it `active` and carry the cancellation as a pending scheduled
+-- change, and only mark it cancelled once it is genuinely over. Reading the
+-- status alone, with the wrong provider in mind, grants a plan to people whose
+-- subscription ended. Whatever is wired, the entitlement rule lives in one
+-- tested function in `server/` and not in a comment here.
 --
 -- What was missing was the app being able to SAY so. `plan_renews_at` alone
 -- cannot distinguish "renews on the 3rd" from "ends on the 3rd", and showing a
@@ -56,7 +63,7 @@ create index if not exists posts_campaign_idx on public.posts (user_id, campaign
 -- month" with "no emails, no reminders", Later charging $180 four months after a
 -- cancellation.
 --
--- Written only by the Stripe webhook through the service role. The browser
+-- Written only by the billing webhook through the service role. The browser
 -- cannot set it, for the same reason it cannot set `plan`.
 -- ─────────────────────────────────────────────────────────────────────────────
 
@@ -73,7 +80,7 @@ grant update (display_name) on public.profiles to authenticated;
 
 -- ─────────────────────────────────────────────────────────────────────────────
 -- To check it: set a post's objective to something not in the list and confirm
--- Postgres refuses it. Then cancel a subscription in the Stripe portal and
+-- Postgres refuses it. Then cancel a subscription in the provider's portal and
 -- confirm the account card changes from "Renews" to "Ends" WITHOUT the plan
 -- dropping, access runs to the end of the period, which is the promise.
 -- ─────────────────────────────────────────────────────────────────────────────

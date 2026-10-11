@@ -80,9 +80,9 @@ export const paddleConfigured = (): boolean =>
  * Paddle's own SDKs default to five seconds. That is tight enough that a
  * container whose clock has drifted a few seconds starts refusing real
  * webhooks, and a refused webhook here means somebody who paid does not get
- * their plan. Five minutes is Stripe's figure and the right trade: the HMAC is
- * what stops forgery, and the window only bounds how long a captured request
- * could be replayed.
+ * their plan. Five minutes is the usual figure elsewhere in the industry and the
+ * right trade: the HMAC is what stops forgery, and the window only bounds how
+ * long a captured request could be replayed.
  */
 export const SIGNATURE_WINDOW_MS = 5 * 60 * 1000;
 

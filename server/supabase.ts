@@ -130,10 +130,13 @@ export async function requirePro(
 }
 
 /**
- * Deliberately provider-neutral. These were named after Stripe, which is what
- * made renaming them necessary when the provider changed the first time; see
- * `11-billing-columns.sql`. The provider has now changed twice and nothing in
- * here had to move, which is the whole argument for the naming.
+ * Deliberately provider-neutral, and that is load-bearing rather than tidy.
+ *
+ * These columns were once named after a payment provider, which is what made a
+ * rename necessary the first time the provider changed; see
+ * `11-billing-columns.sql`. It has changed more than once since and nothing in
+ * here has had to move again. A provider is a detail of how money arrives; the
+ * fact that somebody has an account with whoever takes it is not.
  */
 export type PlanUpdate = {
   plan: PlanName;
