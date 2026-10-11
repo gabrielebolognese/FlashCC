@@ -8,12 +8,10 @@
  * be a worse Canva; gating the loop is the only version of this worth money.
  *
  * Nothing here knows what plan you are on. It is told, from a profile the server
- * wrote after verifying a Paddle webhook.
+ * wrote after verifying a payment provider's webhook.
  */
-import { Check, ExternalLink, X } from "lucide-react";
-import { useState } from "react";
+import { Check, X } from "lucide-react";
 
-import { openPortal, startCheckout } from "./billing.js";
 import type { Plan } from "./cloud.js";
 
 type Tier = {
@@ -164,45 +162,22 @@ export function Upgrade({
   onSignIn: () => void;
   onClose: () => void;
 }) {
-  const [busy, setBusy] = useState<Plan | null>(null);
-  const [error, setError] = useState<string | null>(null);
-
-  const choose = async (tier: Tier) => {
-    if (tier.id === "free" || busy) return;
-
+  /*
+   * There is no checkout to open.
+   *
+   * The payment integration was removed to be rebuilt, so this panel does what
+   * it can still honestly do: show the plans, show the promises, and say plainly
+   * that it cannot take money yet. The alternative, a button that looks live and
+   * throws, is worse than a button that says what is true.
+   *
+   * Signing in still works and is still worth offering, because an account is
+   * what the plan will eventually attach to.
+   */
+  const choose = (tier: Tier) => {
+    if (tier.id === "free") return;
     if (!signedIn) {
       onClose();
       onSignIn();
-      return;
-    }
-
-    setBusy(tier.id);
-    setError(null);
-    try {
-      await startCheckout(tier.id);
-      /*
-       * Cleared, unlike the provider this replaced.
-       *
-       * That one navigated away, so leaving the button spinning cost nothing:
-       * the page was gone. Paddle opens over the app, and somebody who closes
-       * the overlay without paying comes back to this screen. A button still
-       * spinning at that point is a screen they cannot use.
-       */
-      setBusy(null);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Could not start checkout");
-      setBusy(null);
-    }
-  };
-
-  const manage = async () => {
-    setBusy("free");
-    setError(null);
-    try {
-      await openPortal();
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Could not open the billing portal");
-      setBusy(null);
     }
   };
 
@@ -279,8 +254,8 @@ export function Upgrade({
 
                 <button
                   type="button"
-                  disabled={current || busy !== null}
-                  onClick={() => void choose(tier)}
+                  disabled={current || (tier.id !== "free" && signedIn)}
+                  onClick={() => choose(tier)}
                   style={
                     tier.featured && !current
                       ? { background: "var(--brand-gold)", color: "var(--on-brand-gold)" }
@@ -288,7 +263,9 @@ export function Upgrade({
                   }
                   className={[
                     "mt-4 flex h-9 items-center justify-center rounded-xl text-body-strong",
-                    current || busy !== null ? "pointer-events-none opacity-60" : "",
+                    current || (tier.id !== "free" && signedIn)
+                      ? "pointer-events-none opacity-60"
+                      : "",
                     tier.featured && !current
                       ? "hover:brightness-110"
                       : "border border-hairline text-secondary hover:text-primary",
@@ -296,11 +273,11 @@ export function Upgrade({
                 >
                   {current
                     ? "Your plan"
-                    : busy === tier.id
-                      ? "Opening checkout…"
+                    : tier.id === "free"
+                      ? "Your plan"
                       : !signedIn
-                        ? "Sign in to subscribe"
-                        : `Choose ${tier.name}`}
+                        ? "Sign in first"
+                        : "Not open yet"}
                 </button>
               </div>
             );
@@ -333,29 +310,19 @@ export function Upgrade({
           </div>
         </div>
 
-        {error ? (
-          <p className="mt-4 rounded-2xl border border-danger-dim bg-danger-wash px-3.5 py-2.5 text-body text-danger">
-            {error}
-          </p>
-        ) : null}
-
         <div className="mt-4 flex items-center gap-3">
           <p className="flex-1 text-caption text-muted">
-            Prices exclude VAT, which Paddle adds at checkout based on where you are.
-            Payment and VAT are handled by Paddle, our merchant of record. Card
-            details never reach FlashCC.
+            Paid plans are not open yet. Prices exclude VAT, which the payment provider adds
+            at checkout based on where you are. Payment and VAT are handled by Paddle, our
+            merchant of record. Card details never reach FlashCC.
           </p>
-          {manageable ? (
-            <button
-              type="button"
-              onClick={() => void manage()}
-              disabled={busy !== null}
-              className="flex h-8 shrink-0 items-center gap-1.5 rounded-xl border border-hairline px-3 text-caption text-secondary hover:text-primary disabled:pointer-events-none disabled:opacity-60"
-            >
-              Manage subscription
-              <ExternalLink size={12} strokeWidth={2} />
-            </button>
-          ) : null}
+          {/*
+            The "Manage subscription" button lived here and opened the provider's
+            own portal. It needs a route to fetch a signed portal link, so it
+            comes back with the rebuild. `manageable` is kept on the props because
+            it is read from `profiles`, not from a provider, so it is still true
+            or false regardless of what is wired.
+          */}
         </div>
       </div>
     </>

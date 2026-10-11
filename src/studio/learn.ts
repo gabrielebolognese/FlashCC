@@ -12,7 +12,7 @@
  * result would look wrong.
  */
 
-import { authHeader } from "./billing.js";
+import { authHeader } from "./bearer.js";
 import { brandIdOf, type Voice } from "./brand.js";
 import { readRefusal } from "./gate.js";
 import { handEditedCount } from "./regenerate.js";

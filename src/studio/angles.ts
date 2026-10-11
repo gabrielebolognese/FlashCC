@@ -7,7 +7,7 @@
  * angles, since each call would have no idea what the others chose.
  */
 
-import { authHeader } from "./billing.js";
+import { authHeader } from "./bearer.js";
 import { hasVoice, type Voice } from "./brand.js";
 import { readRefusal } from "./gate.js";
 

@@ -2005,116 +2005,92 @@ rather than papers over.
 
 ## 25. Billing
 
-The provider is **Paddle**, and the reason is that they are the merchant of record: they owe the
-VAT in every country a customer lives in, not us. The alternative is EU-wide VAT registration and
-quarterly filings for a product that may earn nothing. It was the reason for the merchant of record
-before this one too. Earlier integrations are in git history and nothing of them remains in the
-tree.
+**There is no payment integration.** It was removed deliberately, to be rebuilt. `/api/health`
+reports `billing: false`, the server banner says `NO BILLING`, and the pricing panel shows the plans
+and says paid plans are not open yet.
 
-The browser can do exactly one billing thing: **ask for a checkout.** It never states what plan
-someone is on and the server never believes it if it does. Entitlement is decided in one place, a
-webhook whose signature is verified against the Paddle signing secret, and written with the Supabase
-secret key.
+What survived, because none of it belongs to a provider:
 
-**Sandbox or live is decided by the API key**, not by a second variable. Paddle runs two entirely
-separate environments with separate ids, and a sandbox key against the live host is a 403 that reads
-like a permissions problem. The key says which it is (`pdl_sdbx_` against `pdl_live_`), so asking
-anybody to state it again is asking them to contradict themselves.
+| Kept | Why |
+| --- | --- |
+| `profiles.plan`, `billing_customer_id`, `billing_subscription_id`, `plan_ends_at_period_end` | Provider-neutral by design. See `11-billing-columns.sql`. |
+| `requirePro`, `readBilling`, `setPlan`, `userIdForCustomer` in `server/supabase.ts` | The gate and the one privileged write. Every AI route depends on `requirePro`. |
+| `devPro()` | The testing switch, see below. |
+| `PLANS`, `BILLING_TERMS`, `REVIEWER_PROMISE`, `UNMETERED_PROMISE` in `Upgrade.tsx` | Pricing and the promises. Content, not plumbing. |
+| `/privacy`, `/terms`, `/refunds` | Paddle is still the intended provider and the policies name it. |
+| `authHeader`, moved to `src/studio/bearer.ts` | Nine modules import it and none of them take money. It lived in the deleted `billing.ts`. |
 
-### The signature
+### What the rebuild has to get right
 
-Load-bearing, not hygiene: without it that endpoint is an open door where anyone who guesses the URL
-POSTs themselves a subscription.
+This is the expensive part, and it is kept because it was learned twice rather than guessed. The
+integration that was removed got all of it right; a rewrite that skips any of it reintroduces a bug
+that is invisible from the outside.
 
-```
-Paddle-Signature: ts=1671552777;h1=eb4d0dc...
-signed payload   = `${ts}:${rawBody}`     HMAC-SHA256, hex, constant time
-```
+**The webhook is the only thing permitted to change a plan.** The browser can ask for a checkout and
+nothing else. Entitlement is decided in one place, from a request whose signature has been verified,
+and written with the Supabase secret key because the database refuses that column to everybody else.
+A client that reports its own plan is a client that can report any plan.
 
-Three ways to get it wrong, all of which fail closed and therefore look like Paddle misbehaving:
+**Paddle signs the timestamp with the body.** The header is `Paddle-Signature: ts=...;h1=...` and the
+signed payload is `` `${ts}:${rawBody}` ``, HMAC-SHA256, hex, compared in constant time. Hashing the
+body alone verifies nothing that was actually sent, and it fails closed, so it looks like Paddle
+misbehaving. Raw bytes, not the parsed object: `JSON.parse` then `JSON.stringify` does not reproduce
+the original. `timingSafeEqual` **throws** on a length mismatch, so compare lengths first or a short
+header is a 500 on a route the provider retries.
 
-- **The timestamp is part of what is signed.** Hashing the body alone verifies nothing that was
-  actually sent. This is the one that differs from the previous provider, whose signature was over
-  the body only, and the one a port would carry across unchanged.
-- **Raw bytes, not the parsed object.** `JSON.parse` then `JSON.stringify` does not reproduce the
-  original byte for byte.
-- **`timingSafeEqual` throws** on a length mismatch rather than returning false, so lengths are
-  compared first: a short header is an ordinary refusal, not a 500 on a route the provider retries.
+**`canceled` is NOT entitled.** This is the one that would ship broken. Some providers keep a
+cancelling subscription in a `cancelled` status that still entitles, so it has to count as paid.
+**Paddle does not work that way**: it keeps the subscription `active` with a `scheduled_change` of
+`cancel` until the period ends, and only then marks it `canceled`. Treating `canceled` as entitled
+grants a plan, for ever, to everybody whose subscription has genuinely ended. So the entitled set is
+`{ active, trialing, past_due }`, and "ends at period end" is a pending `scheduled_change`, not a
+status. The date shown is `scheduled_change.effective_at`, falling back to
+`current_billing_period.ends_at`, never `next_billed_at`, which is how somebody is told their
+cancelled plan renews next month.
 
-`SIGNATURE_WINDOW_MS` is **5 minutes**, not the 5 seconds Paddle's own SDKs default to. Five seconds
-is tight enough that a container whose clock has drifted starts refusing real webhooks, and a
-refused webhook means somebody who paid does not get their plan. The HMAC is what stops forgery; the
-window only bounds how long a captured request could be replayed. Unknown parts of the header (`h2`,
-when Paddle versions the scheme) are ignored rather than fatal.
+**`past_due` is entitled.** Retries are still running, and cutting somebody off over a card that
+expired on Tuesday is a support ticket, not a policy. `paused` is not entitled.
 
-### Entitlement
+**An unknown price id becomes `free`**, never a guess. Paddle sells *prices* (`pri_`), not products
+(`pro_`), and the two are easy to confuse; the failure is a charged customer left on Free with one
+line in a log. Whatever replaces `npm run paddle:prices` should check the configured ids against the
+account and say plainly when one is a product id.
 
-`ENTITLED = { active, trialing, past_due }`, and the absence is the interesting part.
+**Sandbox or live comes off the API key prefix** (`pdl_sdbx_` against `pdl_live_`), not a second
+variable. A sandbox key against the live host is a 403 that reads like a permissions problem.
 
-- **`past_due` is in**, so a failed payment does not cut access off mid-retry.
-- **`canceled` is OUT**, and it is the trap when porting an integration from a provider whose
-  cancelled status still entitles. In such a provider `cancelled`
-  meant future payments were stopped while the paid period ran on, so it had to count as entitled.
-  **Paddle does not work that way**: a cancelling subscription stays `active` with a
-  `scheduled_change` of `cancel` until the period ends, and only then becomes `canceled`. Carrying
-  the old set across would have granted a plan, indefinitely, to everybody whose subscription had
-  genuinely ended, and nothing would have looked wrong from the outside.
+**Paddle has no hosted checkout.** The default payment link must be a page you host that includes
+Paddle.js, so there is no URL to send anybody to: the server creates a transaction and the browser
+opens it by id. Load Paddle.js on the click, not at startup, so nobody who never opens the pricing
+screen downloads a payment script. The client-side token is public by design and still belongs in
+`.env` rather than a `VITE_` variable, so billing is configured in one file on one machine.
 
-So `endsAtPeriodEnd` is a pending `scheduled_change`, not a status, and the date shown is
-`scheduled_change.effective_at` (falling back to `current_billing_period.ends_at`) rather than
-`next_billed_at`, which is when somebody is told their cancelled plan renews next month. A scheduled
-`pause` or `resume` is not an ending.
+**`custom_data.user_id` on the transaction is how a payment becomes a user.** Paddle copies it on to
+the subscription it creates and every webhook carries it from then on. Without it the only link is an
+email address, which people change. A lookup by customer id is the fallback.
 
-`paused` is out. An **unrecognised price id becomes `free`** rather than a guess: a rotated price
-should cost a support ticket, not hand out a tier.
+**The browser comes back before the webhook lands.** Poll the profile for about 20 seconds and say
+"turning your plan on" rather than showing Free to somebody who has just paid. The hook that did this
+(`activating` in `useAccount`) went with the integration and has to come back with it.
 
-**Prices, not products.** A Paddle product holds prices (monthly, yearly) and a subscription item
-carries the price id. They are at least told apart by their prefix, `pri_` against `pro_`, which is
-one thing Paddle does better than plain numbers, but `npm run paddle:prices` prints them anyway and
-says plainly when what is configured is a product id, because that failure is a charged customer
-left on Free with one line in a log.
+**A webhook IP allowlist should fail open.** Paddle publishes its addresses at
+`https://api.paddle.com/ips` under `data.ipv4_cidrs`, and a copy in a source file goes stale
+silently. Failing closed when that endpoint is unreachable means an outage there stops plans reaching
+people who have paid; the signature is the real boundary and the allowlist only narrows the blast
+radius. Two traps: `x-forwarded-for` is caller-supplied, so the address must be read from the end of
+the chain inwards by a count of proxies you actually control, and Node hands back `::ffff:1.2.3.4`
+whenever it listens on IPv6, so a mapped address must be unmapped or nothing ever matches.
 
-`custom_data.user_id` on the transaction is how a payment becomes a *user*. Paddle copies it on to
-the subscription it creates and every webhook carries it from then on. Without it the only link
-between the two is an email address, which people change. A lookup by customer id is the fallback.
+### `devPro`, the testing switch
 
-### Checkout runs in the page
+`DEV_PRO=1` treats any signed-in caller as Pro. It refuses to engage when `NODE_ENV` is production,
+warns on every request that uses it, and appears on `/api/health`, because a paywall that is off
+should be impossible to miss. It lifts the plan check, never the identity check.
 
-The one real shape change from the previous provider. Paddle has **no hosted checkout**: the default
-payment link must be a page you host that includes Paddle.js, so there is no URL to send anybody to.
-
-```
-browser  POST /api/billing/checkout      (who they are: a bearer token)
-server   POST /transactions              (what it is: a price id and a user id)
-browser  ← { transactionId, clientToken, environment, successUrl }
-browser  load Paddle.js on the click, Initialize, Checkout.open({ transactionId })
-```
-
-The transaction is created **on the server**, so what is being bought and who is buying it are both
-decided somewhere the browser cannot edit. All that travels back is an id to open.
-
-**Paddle.js is fetched on the click, never at startup.** Somebody who never opens the pricing screen
-never downloads a payment script, and the bundle does not carry one. The promise is the cache, so a
-second click during a slow load waits for that load rather than adding a second `<script>`.
-
-The **client-side token is public by design** and still lives in `.env` rather than a `VITE_`
-variable, so every piece of billing configuration is in one file on one machine. It is handed out by
-`/api/billing/checkout`, to signed-in callers only, which costs nothing and keeps the surfaces
-together.
-
-`successUrl` is a full page load back into the app, which is deliberate: it re-reads the session and
-picks up the plan the webhook has just written. Since the webhook may still be in flight, the app
-polls the profile for about 20 seconds and says "turning your plan on" rather than showing Free to
-somebody who has just paid. The `busy` state on the pricing screen is now **cleared** after the
-overlay opens, because unlike a navigation, somebody who closes it without paying comes back to that
-screen and a button still spinning is a screen they cannot use.
-
-The portal is a **customer** session (`POST /customers/{id}/portal-sessions`), not a subscription
-one, so a lapsed subscriber can still reach their invoices. Its URLs are signed and short-lived, so
-they are fetched per request and never stored.
-
-The three decisions that fail silently, is the request genuine, what did they buy, do they have it
-now, are pure functions in `server/paddle.ts` and tested in `paddle.test.ts`.
+It is **not set** in `.env`. With no payment integration and no `SUPABASE_SECRET_KEY`, every Pro
+route answers 503 from `readBilling`, which is the honest state: the paywall is real and nothing is
+setting the plan behind it. The two ways to work are to set the switch, or to add the secret key and
+set your own profile to `pro`.
 
 ### What is gated, and where
 
@@ -2145,20 +2121,17 @@ studio or a dialog above it, and `App` swaps screens rather than nesting them.
 
 ### Honest billing, said out loud
 
-FlashCC already behaved correctly: a subscription cancelling at the end of its period keeps
-everything until that date. What was missing was the app being able to SAY so, `plan_renews_at`
-alone cannot distinguish "renews on the 3rd" from "ends on the 3rd", and the account card showed a
-renewal date either way.
+`plan_ends_at_period_end` exists so the account card can distinguish **"Renews 3 Oct"** from
+**"Ends 3 Oct, everything stays unlocked until then"**. `plan_renews_at` alone cannot, and showing a
+renewal date for something about to stop is precisely the surprise the feature prevents. The column
+is there and `AccountCard` reads it; nothing writes it until a webhook does again.
 
-`plan_ends_at_period_end` is written by the webhook through the service role and read by
-`AccountCard`, which now shows **"Renews 3 Oct"** or **"Ends 3 Oct, everything stays unlocked
-until then"**. The four promises are on the pricing screen as `BILLING_TERMS`, each one a verbatim
-failure from the research: Loomly's 996% yearly increase, Taplio charging after a trial with "no
-emails, no reminders", Contentdrips revoking access on cancel, Later charging $180 four months
-post-cancellation.
-
-`UNMETERED_PROMISE` sits beside `REVIEWER_PROMISE`. Neither is a footnote, and both are invariants
-(6 and 7) so a future paywall cannot quietly contradict them.
+The five promises are on the pricing screen as `BILLING_TERMS`, each one a verbatim failure from the
+research: a 996% yearly increase, a charge after a trial with "no emails, no reminders", access
+revoked on cancel, a charge four months post-cancellation, and the thirty days that answers all four.
+`UNMETERED_PROMISE` sits beside `REVIEWER_PROMISE`; both are invariants (6 and 7) so a future paywall
+cannot quietly contradict them. The refund policy at `/refunds` is the long form, and
+`REFUND_DAYS` is the number a provider's verification checks for.
 
 ---
 

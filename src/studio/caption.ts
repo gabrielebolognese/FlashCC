@@ -14,7 +14,7 @@
  * quietly replacing the cheap one with the expensive one.
  */
 
-import { authHeader } from "./billing.js";
+import { authHeader } from "./bearer.js";
 import { hasVoice, type Voice } from "./brand.js";
 import { readRefusal } from "./gate.js";
 

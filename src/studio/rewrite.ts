@@ -16,7 +16,7 @@
  * the product cannot actually justify.
  */
 
-import { authHeader } from "./billing.js";
+import { authHeader } from "./bearer.js";
 import { hasVoice, type Voice } from "./brand.js";
 import { readRefusal } from "./gate.js";
 import type { Layer } from "./model.js";

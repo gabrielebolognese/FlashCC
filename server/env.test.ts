@@ -12,7 +12,7 @@ import { describe, expect, it } from "vitest";
  *
  * What went wrong: `process.loadEnvFile()` sat below the imports in `index.ts`.
  * Every import is evaluated before the importing module's body, so `supabase.ts`
- * read `SUPABASE_URL` and `paddle.ts` read `PADDLE_API_KEY` into module-level
+ * read `SUPABASE_URL` and `supabase.ts` reads `SUPABASE_SECRET_KEY` into module-level
  * constants while the environment was still empty, and those constants stayed
  * `undefined` for the life of the process.
  *
@@ -71,16 +71,12 @@ describe("loading the environment", () => {
 
     // `index.ts` is on this list and is safe: it is the file whose first import
     // is `env.js`, so by the time its own body reads PORT the file is loaded.
-    // The other four are safe only because nothing imports them before it.
-    expect(eager).toEqual([
-      "billing.ts",
-      "index.ts",
-      "paddle.ts",
-      // TRUST_PROXY_HOPS, which decides how far into x-forwarded-for the
-      // webhook allowlist looks. Reading it late would be safer still, but it
-      // cannot change while the process runs and a module constant says so.
-      "paddleips.ts",
-      "supabase.ts",
-    ]);
+    // `supabase.ts` is safe only because nothing imports it before that.
+    //
+    // It was five entries until the payment integration was removed. The three
+    // that went, billing.ts, paddle.ts and paddleips.ts, all read keys at import
+    // time, so whatever replaces them will land back on this list and should
+    // arrive with a line in this diff rather than silently.
+    expect(eager).toEqual(["index.ts", "supabase.ts"]);
   });
 });

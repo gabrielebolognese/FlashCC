@@ -19,7 +19,7 @@
  * thing being asked for. See 04-storage.sql.
  */
 
-import { authHeader } from "./billing.js";
+import { authHeader } from "./bearer.js";
 import { publicUrl, SLIDES_BUCKET, storageReady, uploadObject } from "./cloud.js";
 import { readRefusal } from "./gate.js";
 import { renderPayload } from "./exporter.js";

@@ -16,7 +16,6 @@ import {
   KanbanSquare,
   LayoutGrid,
   Palette,
-  RefreshCw,
   Send,
   Upload,
 } from "lucide-react";
@@ -317,15 +316,6 @@ export function Home({
             </span>
           ) : null}
         </header>
-
-        {account.activating ? (
-          <div className="flex shrink-0 items-center gap-2 border-b border-accent-dim bg-accent-wash px-6 py-2.5">
-            <RefreshCw size={13} strokeWidth={2} className="fcc-spin shrink-0 text-accent" />
-            <span className="text-body text-primary">
-              Payment received. Turning your plan on, this takes a second.
-            </span>
-          </div>
-        ) : null}
 
         <main
           className={

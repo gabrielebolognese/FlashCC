@@ -19,7 +19,7 @@
  */
 import { renderToStaticMarkup } from "react-dom/server";
 
-import { authHeader } from "./billing.js";
+import { authHeader } from "./bearer.js";
 import { readRefusal } from "./gate.js";
 import { listCustomFonts } from "./fonts.js";
 import { inlineDoc, inlineSources } from "./inline.js";

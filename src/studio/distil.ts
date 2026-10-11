@@ -10,7 +10,7 @@
  * several carousels and returning one throws the rest away without saying so.
  */
 
-import { authHeader } from "./billing.js";
+import { authHeader } from "./bearer.js";
 import { hasVoice, type Voice } from "./brand.js";
 import { readRefusal } from "./gate.js";
 import type { Structure } from "./structures.js";

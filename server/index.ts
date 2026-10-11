@@ -1,9 +1,10 @@
 /**
  * The server.
  *
- * It exists for the things a browser must not be trusted with: the Anthropic key,
- * the Paddle key, and the Supabase secret key that can write which plan
- * someone is on. Vite proxies /api here in dev.
+ * It exists for the things a browser must not be trusted with: the Anthropic key
+ * and the Supabase secret key that can write which plan someone is on. A payment
+ * provider's key will belong on this list too, once one is wired again. Vite
+ * proxies /api here in dev.
  *
  * No framework. A handful of routes do not need one.
  */
@@ -14,7 +15,6 @@ import "./env.js";
 
 import { createServer, type IncomingMessage, type ServerResponse } from "node:http";
 
-import { billingConfigured, checkout, portal, status, webhook } from "./billing.js";
 import { angles } from "./angles.js";
 import { alt, caption } from "./caption.js";
 import { distil } from "./distil.js";
@@ -48,12 +48,17 @@ const ROUTES: Record<string, Record<string, Handler>> = {
     "/api/export": exportDeck,
     "/api/slides": renderImages,
     "/api/document": renderDocument,
-    "/api/billing/checkout": checkout,
-    "/api/billing/portal": portal,
-    "/api/billing/webhook": webhook,
+    /*
+      The four /api/billing routes were here: checkout, portal, webhook and
+      status. They were removed with the payment integration, to be rebuilt.
+
+      The webhook is the one to be careful about when they come back. It is the
+      only thing in this product permitted to change what plan somebody is on,
+      and without a verified signature it is an open endpoint where anyone who
+      guesses the URL can POST themselves a subscription.
+    */
   },
   GET: {
-    "/api/billing/status": status,
     // The one route that answers to somebody with no account. See review.ts.
     "/api/review": readShare,
   },
@@ -68,7 +73,9 @@ const server = createServer((req, res) => {
       ok: true,
       export: true,
       draft: draftConfigured(),
-      billing: billingConfigured(),
+      // No payment integration is wired. Reported rather than omitted, so the
+      // answer to "can this take money" is explicit instead of absent.
+      billing: false,
       secretKey: hasSecretKey(),
       // Counts of which checks fired since this process started. Codes, not
       // customers. See tally.ts for why this is not in the database.
@@ -95,7 +102,7 @@ const server = createServer((req, res) => {
 server.listen(PORT, () => {
   const bits = [
     draftConfigured() ? "drafting" : "NO ANTHROPIC_API_KEY",
-    billingConfigured() ? "billing" : "no billing",
+    "NO BILLING",
     hasSecretKey() ? "secret key" : "NO SUPABASE SECRET KEY",
   ];
   console.log(`server on http://localhost:${PORT} (${bits.join(" · ")})`);
