@@ -33,6 +33,7 @@ import { isUnnamed, nameFromDoc } from "./search.js";
 import { deleteSet, duplicateSet, inDeckOrder, moveSet } from "./slideset.js";
 import { saveDoc } from "./storage.js";
 import { spacingFor } from "./compositions.js";
+import { piecesOf, place, stripX } from "./spans.js";
 import {
   align as alignLayers,
   distribute as distributeLayers,
@@ -51,6 +52,8 @@ import {
 } from "./tidy.js";
 
 const LIMIT = 120;
+
+const spanIds = { span: () => uid("span"), layer: () => uid("l") };
 
 /**
  * What changing a layer's WORDS undoes, applied at the two edit funnels.
@@ -89,6 +92,8 @@ export function useStudio(initial: Doc) {
   // NOT part of Doc, it is a view setting, not something about the artwork, and
   // it must never reach the export path.
   const [safePlatform, setSafePlatform] = useState<PlatformId | null>(null);
+  /** Every slide side by side, the only view a seam can be judged in (23.1). A view setting, not the doc. */
+  const [stripView, setStripView] = useState(false);
   /**
    * Slides picked in the filmstrip (18.5). IDS, not indexes, so a reorder does
    * not change what is selected. Separate from `index`, the slide on the
@@ -194,6 +199,41 @@ export function useStudio(initial: Doc) {
 
   const updateLayers = useCallback(
     (ids: string[], patch: Partial<Layer>, coalesce?: string) => {
+      // In strip view (23.1) a span is one design: a change that is not about
+      // where it sits goes to every piece, so the seam cannot drift in colour
+      // or type. A position or size typed into the inspector moves or resizes
+      // the whole design along the strip, so the seam holds there too.
+      const peers = stripView
+        ? new Set(
+            doc.slides[index]?.layers.flatMap((l) => (ids.includes(l.id) && l.spanId ? [l.spanId] : [])) ?? [],
+          )
+        : new Set<string>();
+      if (peers.size > 0) {
+        const { x, y, w, h, ...style } = patch;
+        const geometry = x !== undefined || y !== undefined || w !== undefined || h !== undefined;
+        const styled: Doc = {
+          ...doc,
+          slides: doc.slides.map((sl, n) => ({
+            ...sl,
+            layers: sl.layers.map((l) => {
+              if (n === index && ids.includes(l.id) && !(geometry && ids.length === 1))
+                return markEdited(retouched(l, { ...l, ...patch }, () => markFor(sl, l)));
+              if ((l.spanId && peers.has(l.spanId)) || (n === index && ids.includes(l.id)))
+                return markEdited(retouched(l, { ...l, ...style }, () => markFor(sl, l)));
+              return l;
+            }),
+          })),
+        };
+        const own = ids.length === 1 ? styled.slides[index]?.layers.find((l) => l.id === ids[0]) : undefined;
+        if (geometry && own?.spanId) {
+          const template = { ...own, ...(w !== undefined ? { w } : {}), ...(h !== undefined ? { h } : {}) };
+          const at = { x: stripX(index, x ?? own.x, doc.width), y: y ?? own.y };
+          commit(place(styled, at, piecesOf(styled, own.spanId), template, spanIds, own.id), coalesce);
+        } else {
+          commit(styled, coalesce);
+        }
+        return;
+      }
       patchSlide(
         index,
         // markEdited here rather than at each call site: this and updateEach are
@@ -208,7 +248,7 @@ export function useStudio(initial: Doc) {
         coalesce,
       );
     },
-    [index, patchSlide, markFor],
+    [index, patchSlide, markFor, stripView, doc, commit],
   );
 
   const updateEach = useCallback(
@@ -601,6 +641,8 @@ export function useStudio(initial: Doc) {
     doc,
     slide,
     index,
+    stripView,
+    setStripView,
     setSlideIndex,
     selection,
     setSelection,

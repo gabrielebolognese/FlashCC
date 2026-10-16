@@ -63,6 +63,16 @@ export type Layer = {
    * nothing reflow, render or export has to know about. One level only.
    */
   groupId?: string | undefined;
+  /**
+   * One piece of a layer that runs across a slide edge (23.2). Every slide the
+   * design touches holds its own plain copy, offset by the slide width, and the
+   * pieces share this id. Each slide clips and renders its piece alone; strip
+   * view selects and moves the pieces together, like `groupId` across slides.
+   * See spans.ts.
+   */
+  spanId?: string | undefined;
+  /** Which bridge preset made this (23.4), so a peek can stand in for the swipe cue. Never read at render. */
+  bridge?: string | undefined;
 
   /** Painted instead of `fill` when set. Works on text as well as shapes. */
   gradient?: Gradient | undefined;

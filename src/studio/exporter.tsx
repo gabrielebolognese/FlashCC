@@ -17,6 +17,7 @@
  * by `inline.ts`, and the server goes on receiving a page that needs nothing
  * from the network. See the note there for why that matters more than it looks.
  */
+import { isSpanning, runs } from "./spans.js";
 import { renderToStaticMarkup } from "react-dom/server";
 
 import { authHeader } from "./bearer.js";
@@ -69,6 +70,8 @@ export type RenderPayload = {
   height: number;
   css: string;
   slides: { html: string }[];
+  /** Slides joined by a design across their edges, rendered as one strip and sliced (23.5). */
+  runs?: number[][] | undefined;
   /**
    * One line per slide, for `alt.txt` in the zip. Omitted when nothing has
    * been written, so a deck with no alt text gets no empty file.
@@ -94,6 +97,7 @@ export async function renderPayload(doc: Doc, platform: Platform): Promise<Rende
     height: doc.height,
     css,
     slides: carried.slides.map((s) => ({ html: slideHtml(s) })),
+    ...(isSpanning(carried) ? { runs: runs(carried) } : {}),
     // Read from `carried`, not `doc`: that is the version the pictures were
     // inlined into, and the two have to describe the same slides.
     ...(carried.slides.some((s) => (s.alt ?? "").trim())

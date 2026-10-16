@@ -414,7 +414,17 @@ function Screens() {
 
   if (screen.view === "studio") {
     // key: a different project gets fresh state and a fresh history stack.
-    return <Studio key={screen.doc.id} initial={screen.doc} onHome={() => setScreen({ view: "start" })} />;
+    return (
+      <Studio
+        key={screen.doc.id}
+        initial={screen.doc}
+        onHome={() => setScreen({ view: "start" })}
+        onOpen={(next) => {
+          saveDoc(next);
+          setScreen({ view: "studio", doc: next });
+        }}
+      />
+    );
   }
 
   return (

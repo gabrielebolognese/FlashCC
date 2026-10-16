@@ -17,7 +17,7 @@ is still current.
 | | |
 | --- | --- |
 | **Orientation** | [1 What it is](#1-what-it-is) · [2 Running it](#2-running-it) · [3 The invariants](#3-the-invariants) |
-| **The canvas** | [4 Data model](#4-the-data-model) · [5 Canvas](#5-the-canvas) · [6 Text](#6-text-measurement-and-fitting) · [6b Type](#6b-type-pairs-ramps-emphasis-effects-scripts) · [7 Colour](#7-colour-and-contrast) · [8 Gradients](#8-gradients) · [9 Format change](#9-changing-format-reflow) |
+| **The canvas** | [4 Data model](#4-the-data-model) · [5 Canvas](#5-the-canvas) · [6 Text](#6-text-measurement-and-fitting) · [6b Type](#6b-type-pairs-ramps-emphasis-effects-scripts) · [7 Colour](#7-colour-and-contrast) · [8 Gradients](#8-gradients) · [9 Format change](#9-changing-format-reflow) · [9b Spans](#9b-designs-across-slides-spans-and-strip-view) |
 | **Making a deck** | [10 Frameworks](#10-the-four-frameworks) · [11 Generation](#11-generation) · [11b Blocks and furniture](#11b-blocks-and-deck-furniture) · [12 Styles](#12-styles-and-themes) · [13 Onboarding](#13-onboarding) · [14 AI drafting](#14-ai-drafting) · [15 Bulk and long form](#15-bulk-create-and-long-form-ingest) · [16 Media, fonts and assets](#16-media-and-fonts) · [16b Imagery](#16b-imagery-icons-and-backgrounds) · [17 Screen flow](#17-screen-flow) |
 | **The product** | [17b Clients and review](#17b-clients-and-review) · [18 Pipeline, calendar and series](#18-the-pipeline) · [19 Analytics](#19-analytics) · [19b History](#19b-version-history) · [20 Library](#20-the-library) · [21 Export](#21-export) |
 | **Infrastructure** | [22 Persistence](#22-persistence) · [23 Sync](#23-sync) · [24 Auth](#24-auth) · [25 Billing](#25-billing) · [26 Database](#26-database) · [27 Design tokens](#27-design-tokens) · [28 Testing](#28-testing) |
@@ -98,6 +98,10 @@ Layer{ id, name, kind, x, y, w, h, rotation, opacity, visible, locked,
 ```
 
 `LayerKind` is `text | rect | ellipse | triangle | line | icon | image | path`.
+
+Batch 23 added, all optional: `Layer.spanId`, shared by the pieces of one design that crosses a
+slide edge, and `Layer.bridge`, a stamp naming the bridge preset that made a layer. Neither is read
+at render. See [9b](#9b-designs-across-slides-spans-and-strip-view).
 
 Batch 22 added, all optional: on a text layer `markColour`, `textEffect` and `effectColour`, and
 `Theme.ramp`; `fontFamily` may now name a bundled face (§6b).
@@ -545,6 +549,96 @@ line pushes the layer out the bottom.
 `safeScope` is honoured, so Instagram's crop only ever moves the cover.
 
 ---
+
+## 9b. Designs across slides: spans and strip view
+
+Batch 23. The seamless carousel, where a line, a photo or a shape runs across the slide edge so
+the swipe reads as one picture, needs pixel-exact offsets on every slide, and one reorder ruins it
+by hand.
+
+### A spanning layer is several ordinary layers (`spans.ts`)
+
+A circle dropped across the edge between slides 2 and 3 is committed as **two plain layers**, one
+on each slide, the right-hand piece at `x - W`, both carrying the same `spanId`. Each slide clips
+and renders its own piece alone. Nothing is computed at render (invariant 1), `LayerView` is
+unchanged (invariant 3), and a slide exported, previewed or shared alone is still exactly what it
+says it is.
+
+**The strip** is every slide side by side with no gap, so slide `i` starts at `i * W`. A piece on
+slide `i` at `x` sits at strip x `i * W + x`, and every piece of one span agrees on that number.
+That agreement is the seam, and it is what `brokenSpans` checks.
+
+| Function | What it does |
+| --- | --- |
+| `touchedSlides` | the slides a layer at a strip x reaches, from its rotated extent plus half its stroke. Only meeting an edge does not count |
+| `place` | puts a layer given in strip coordinates onto every slide it touches. A slide that already held a piece keeps it (its id, z-position and anything restyled on it); a newly reached slide gets a copy of the nearest piece; a slide no longer reached loses its piece. One slide touched means a plain layer again, no `spanId` |
+| `moveAcross` | moves a layer or its whole span along the strip. The dragged id always survives, so the selection follows the drag even when its own slide is left behind |
+| `addAcross` | a new layer in strip coordinates, on top or (for backgrounds) at the back |
+| `unspan` | the pieces become independent layers where they are |
+| `brokenSpans` | every span whose seam is gone, with the reason: `apart` (not on neighbouring slides), `offset` (the pieces disagree about where the layer is), `missing` (it reaches a slide holding no piece) |
+| `links`, `runs` | which edges a span crosses, and the runs of slides they join. What the export renders as one strip |
+| `joinedSpans` | every span as one layer at strip coordinates. What reflow works on |
+
+Pure and DOM-free, like `geometry.ts`, and for the same reason: this is where a seamless deck breaks.
+
+### Strip view (`StripCanvas.tsx`, toolbar toggle)
+
+Every slide side by side at one scale (`(height - 120) / H`, clamped to 0.12 to 0.5), scrolling
+sideways. Each slide is its own clipped box painted with `slidePaint` and `LayerView`, so what the
+strip shows is what each slide is. Dragging a layer over an edge is how a span is made; dragging
+it back onto one slide unmakes it. Pieces select, move and delete together.
+
+In strip view the inspector edits the whole design: a style change goes to every piece in one
+commit (`updateLayers`), and an X, Y, W or H typed in is turned into a move or resize along the
+strip with `place`, so neither can open the seam. In single-slide view each piece is an ordinary
+layer, as `groupId` is (18.6), and editing one alone is allowed; the result is reported, not
+blocked.
+
+The strip toolbar holds the bridges, the strip texture and picture, a new panorama deck, and
+**Unspan** for the selected design.
+
+### Continuous backgrounds (`panorama.ts`, 23.3)
+
+`stripBackground` puts one picture under the whole strip, `N x W` wide, at the back of every slide,
+fit `cover`. The focal point, credit and asset id ride on every piece, so the subject stays where it
+is in the strip, wherever it falls. `stripTexture` draws a generated texture (21.3) once at strip
+size, so a pattern or a mesh runs on across every edge instead of restarting. `panoramaDeck` makes
+a new deck of 2 to 10 slides with one picture split across all of them, and the studio opens it.
+
+### Bridges (`panorama.ts`, 23.4)
+
+Four designs whose point is the seam, placed after the current slide in the theme's colours:
+
+| Bridge | What it is |
+| --- | --- |
+| Peek | an accent circle mostly on the next slide, a quarter of it showing on this one |
+| Lead line | an 8px rule across 0.8 W, centred on the edge |
+| Arrow | a path that starts on this slide and lands on the next |
+| Split number | the next slide's number at half the artboard height, weight 900, cut by the edge, at the back |
+
+They are plain layers carrying a `bridge` stamp. **A peek on the cover replaces the swipe-cue
+furniture** (Batch 20): `wants()` in `furniture.ts` stands the cue down when `hasPeek`, because the
+peek shows the next slide exists rather than telling the reader to swipe. No bridge is ever placed
+by a model: a bridge is a layout choice (invariant 5).
+
+### The four ways a seam breaks (23.5)
+
+| What | What happens |
+| --- | --- |
+| A format switch | `reflowDoc` reflows each span as **one layer on a strip of N x W by H** (`reflowLayer` with the strip as both boards) and splits it again with `place`. Layers that span nothing reflow per slide as before. A 5-slide seamless deck goes 4:5 to 3:4 with every seam intact (tested) |
+| A reorder that separates pieces | `apart`. A banner in the studio and a `span-broken` pre-flight warning, both offering **Unspan**. Never silently stretched across slides that are no longer neighbours |
+| A slide inserted inside a span | the same, broken by construction |
+| Export anti-aliasing | the export renders each run of linked slides as one strip and slices it. See [21, Rendering](#rendering) |
+
+`safearea.ts` leaves span pieces where they are (moving one would open the seam) and the
+safe-zone pre-flight skips them, since running past the edge is the point.
+
+### The cover still has to work alone (23.6)
+
+In a deck with any span, a text layer on slide 1 that is a span piece or runs past either edge
+gets a `cover-cut` warning: the profile grid and most feed impressions show the cover alone, so a
+headline cut by the edge is a hook nobody can read. A shape or picture crossing the cover's edge is
+fine; that is the peek.
 
 ## 10. The four frameworks
 
@@ -2244,8 +2338,9 @@ scheduler that exists.
 Blocking: too many slides, too few (Threads and Pinterest want two), an empty deck, type below the
 platform floor, text that does not fit its box. Warnings: the app-vs-API slide gap, an app-only
 shape, an artboard that is none of the platform's shapes, placeholder copy, hairline strokes,
-anything reaching into a safe zone, a weak hook on slide 1, and, after rendering, a file outside
-the byte band.
+anything reaching into a safe zone (span pieces excepted), a weak hook on slide 1, a broken seam
+(`span-broken`), cover text cut by the edge in a spanning deck (`cover-cut`), and, after rendering,
+a file outside the byte band.
 
 **The safe box is not one thing.** `Platform` carries `safeKind` and `safeScope`, because the
 insets mean different things and apply to different slides:
@@ -2290,6 +2385,16 @@ customer's storage mid-screenshot, with credentials it does not have and no netw
 just before serialising. The server's contract is unchanged: a page that needs nothing from the
 network. Fetched payloads are cached for the session, so exporting for LinkedIn and then for
 Instagram does not download the same photo twice.
+
+**Linked slides render as one strip (23.5).** A deck with a span sends `runs` (from `spans.ts`)
+with the payload. `stripRuns` keeps only well-formed runs (consecutive, in range, each slide once)
+and cuts any run wider than 16,000px (Chromium's screenshot limit) into strips that fit; the seam at
+such a cut renders slide by slide, the old way. Each strip is laid out in one page with every slide
+in its own clipped box exactly as when alone, screenshotted once as PNG, and sliced in the same
+browser through a canvas into JPEG or PNG at the requested quality. Both sides of every seam come
+from the same bitmap. Measured (`server/strip.test.ts`): an unrotated shape crossing the edge,
+rounded and gradient-filled, slices **pixel-identical** to the same shape drawn unbroken. A
+rotated one does not, either way, see D33.
 
 **LinkedIn PDFs are built from JPEG pages**, not PNG: PNG pages have been observed converting into a
 PDF that renders blank, and the failure is silent until the post is live.
@@ -2715,7 +2820,7 @@ all disabled under `prefers-reduced-motion`.
 
 ## 28. Testing
 
-1,473 tests across 71 files (as of Batch 21). They are design guards, not coverage theatre, several encode an argument
+1,589 tests across 80 files (as of Batch 23). They are design guards, not coverage theatre, several encode an argument
 that would otherwise be lost:
 
 - **mean vs median**, five posts and one at 100k, proving a mean baseline would switch outlier
@@ -3016,6 +3121,31 @@ existing deck's look, so it is a decision, not a fix.
 The advance tables (about 30KB), the face manifest (13KB) and the type code. The kerning, the CJK
 manifest and every font file are separate and lazy. If it matters, the face manifest can move
 behind a dynamic import, at the cost of a frame of fallback type on first paint.
+
+### D33, A rotated shape across a seam is not pixel-identical
+
+Measured while building the strip export. A shape rotated across an edge, sliced from one strip,
+differs from the same shape drawn unbroken by up to 14 levels (flat fill) or 26 levels (gradient
+and radius) on the anti-aliased pixels of its edge. Chromium rasterises a rotated element inside a
+clipped box differently from one outside it, whatever does the clipping (`overflow: hidden`,
+`clip-path`, a no-op clip), and rendering slide by slide is equally affected. Unrotated shapes are
+exact. Not visible at phone scale; the test pins it at 32.
+
+### D34, The single-slide canvas does not clip span pieces
+
+`Canvas.tsx` lets layers run past the artboard so they can be dragged back, so a span piece shows
+its whole box there, beyond the slide edge. Strip view, the thumbnails and the export all clip.
+
+### D35, A piece moved alone in single-slide view breaks its seam
+
+Editing one piece's geometry outside strip view is allowed (it is an ordinary layer there), and it
+is reported as `offset` with Unspan offered, rather than prevented or followed. Following would
+make a single-slide edit move things on slides the user cannot see.
+
+### D36, A panorama deck opens in single-slide view
+
+`panoramaDeck` replaces the open deck, and the studio remounts with strip view off. One click on
+the toolbar toggle shows it.
 
 ### D20, Smaller things
 

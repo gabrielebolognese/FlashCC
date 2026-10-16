@@ -31,6 +31,13 @@ export type RenderRequest = {
   format: "png" | "jpg";
   /** 0-1, JPEG only. */
   quality: number;
+  /**
+   * Runs of consecutive slides joined by a design across their edges (23.5),
+   * e.g. [[0], [1, 2, 3], [4]]. A run longer than one is rendered as ONE strip
+   * and sliced, so both sides of every seam come from the same pixels.
+   * Absent, every slide renders alone, as before.
+   */
+  runs?: number[][] | undefined;
 };
 
 export type RenderedSlide = { index: number; bytes: Buffer };
@@ -87,6 +94,86 @@ const page = (req: RenderRequest, body: string): string => `<!doctype html>
 </style>
 </head><body><div id="slide">${body}</div></body></html>`;
 
+/** The widest strip rendered in one screenshot; Chromium's limit is about 16k pixels. */
+const MAX_STRIP_PX = 16_000;
+
+/** Only well-formed runs: consecutive, in range, each slide once. Anything else renders slide by slide. */
+export function stripRuns(req: Pick<RenderRequest, "runs" | "slides" | "width">): number[][] {
+  const n = req.slides.length;
+  const per = Math.max(1, Math.floor(MAX_STRIP_PX / req.width));
+  const out: number[][] = [];
+  const seen = new Set<number>();
+  for (const run of req.runs ?? []) {
+    if (!Array.isArray(run) || run.length < 2) continue;
+    if (!run.every((v, k) => Number.isInteger(v) && v >= 0 && v < n && (k === 0 || v === run[k - 1]! + 1) && !seen.has(v))) continue;
+    // A strip wider than one screenshot is cut into pieces that are; the seam
+    // where it is cut renders slide by slide, the old way.
+    for (let k = 0; k < run.length; k += per) {
+      const part = run.slice(k, k + per);
+      if (part.length > 1) out.push(part);
+      for (const v of part) seen.add(v);
+    }
+  }
+  return out;
+}
+
+/**
+ * One run of slides as one picture, sliced (23.5).
+ *
+ * Screenshotting slides one at a time leaves a faint 1px seam on a shape that
+ * crosses an edge, because each side is rasterised on its own. Here the slides
+ * sit side by side in one page, each clipped exactly as it is alone, one
+ * screenshot is taken, and the slices are cut from that one bitmap.
+ */
+async function renderStrip(req: RenderRequest, run: number[], context: import("playwright").BrowserContext): Promise<RenderedSlide[]> {
+  const W = req.width;
+  const H = req.height;
+  const body = run
+    .map(
+      (i, k) =>
+        `<div style="position:absolute;left:${k * W}px;top:0;width:${W}px;height:${H}px;overflow:hidden">${req.slides[i]!.html}</div>`,
+    )
+    .join("");
+  const sheet = await context.newPage();
+  try {
+    await sheet.setViewportSize({ width: W * run.length, height: H });
+    await sheet.setContent(
+      `<!doctype html><html><head><meta charset="utf-8"><style>
+  *, *::before, *::after { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; background: transparent; }
+  #strip { position: relative; width: ${W * run.length}px; height: ${H}px; overflow: hidden; }
+  ${req.css}
+</style></head><body><div id="strip">${body}</div></body></html>`,
+      { waitUntil: "load" },
+    );
+    await sheet.evaluate("(document.body.offsetHeight, document.fonts.ready)");
+    const element = await sheet.$("#strip");
+    if (!element) throw new HttpError(500, "Strip root went missing during render");
+    const full = (await element.screenshot({ type: "png" })).toString("base64");
+
+    // Sliced in the same browser: it decodes and encodes without a dependency,
+    // and every slice is cut from the one bitmap above.
+    const type = req.format === "jpg" ? "image/jpeg" : "image/png";
+    const slices = (await sheet.evaluate(`(async () => {
+      const img = new Image();
+      img.src = "data:image/png;base64,${full}";
+      await img.decode();
+      const out = [];
+      for (let k = 0; k < ${run.length}; k += 1) {
+        const c = document.createElement("canvas");
+        c.width = ${W};
+        c.height = ${H};
+        c.getContext("2d").drawImage(img, k * ${W}, 0, ${W}, ${H}, 0, 0, ${W}, ${H});
+        out.push(c.toDataURL("${type}", ${Math.max(0, Math.min(1, req.quality))}).split(",")[1]);
+      }
+      return out;
+    })()`)) as string[];
+    return run.map((i, k) => ({ index: i, bytes: Buffer.from(slices[k]!, "base64") }));
+  } finally {
+    await sheet.close();
+  }
+}
+
 export async function renderSlides(req: RenderRequest): Promise<RenderedSlide[]> {
   validate(req);
 
@@ -100,11 +187,15 @@ export async function renderSlides(req: RenderRequest): Promise<RenderedSlide[]>
 
   try {
     const out: RenderedSlide[] = [];
+    const strips = stripRuns(req);
+    const inStrip = new Set(strips.flat());
+    for (const run of strips) out.push(...(await renderStrip(req, run, context)));
+
     const sheet = await context.newPage();
 
     for (let i = 0; i < req.slides.length; i += 1) {
       const slide = req.slides[i];
-      if (!slide) continue;
+      if (!slide || inStrip.has(i)) continue;
 
       await sheet.setContent(page(req, slide.html), { waitUntil: "load" });
       // Uploaded faces arrive as data URLs in the CSS; without this the first
@@ -134,7 +225,7 @@ export async function renderSlides(req: RenderRequest): Promise<RenderedSlide[]>
     }
 
     await sheet.close();
-    return out;
+    return out.sort((a, b) => a.index - b.index);
   } finally {
     await context.close();
   }

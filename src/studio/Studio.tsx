@@ -1,4 +1,7 @@
 import { ChevronLeft, ClipboardPaste, Download, History, Redo2, Send, Shuffle, Sparkles, Undo2, X } from "lucide-react";
+import type { Studio as StudioState } from "./useStudio.js";
+import { brokenSpans, unspan } from "./spans.js";
+import { StripCanvas } from "./StripCanvas.js";
 import { useState } from "react";
 import { createPortal } from "react-dom";
 
@@ -33,7 +36,16 @@ import { THEMES } from "./presets.js";
 import { Toolbar } from "./Toolbar.js";
 import { useStudio } from "./useStudio.js";
 
-export function Studio({ initial, onHome }: { initial: Doc; onHome: () => void }) {
+export function Studio({
+  initial,
+  onHome,
+  onOpen,
+}: {
+  initial: Doc;
+  onHome: () => void;
+  /** Opens another document, saved, in the editor: the panorama deck (23.3) is a new deck. */
+  onOpen?: ((doc: Doc) => void) | undefined;
+}) {
   const studio = useStudio(initial);
   const { doc, slide } = studio;
   const [naming, setNaming] = useState(false);
@@ -184,7 +196,10 @@ export function Studio({ initial, onHome }: { initial: Doc; onHome: () => void }
           <LayersPanel studio={studio} />
           <MediaPool studio={studio} />
         </div>
-        <Canvas studio={studio} />
+        <div className="flex min-w-0 flex-1 flex-col">
+          {!studio.stripView ? <SeamWarnings studio={studio} /> : null}
+          {studio.stripView ? <StripCanvas studio={studio} onOpenDoc={onOpen} /> : <Canvas studio={studio} />}
+        </div>
         <Properties studio={studio} onRewrite={(l) => setRewritingLayer(l)} />
       </div>
 
@@ -382,6 +397,34 @@ export function Studio({ initial, onHome }: { initial: Doc; onHome: () => void }
             printRoot,
           )
         : null}
+    </div>
+  );
+}
+
+/**
+ * A span whose seam a reorder, an insert or a lone move has broken (23.5).
+ * Never repaired silently: said here, with the one fix that cannot make it
+ * worse, Unspan, which frees the pieces where they are.
+ */
+function SeamWarnings({ studio }: { studio: StudioState }) {
+  const broken = brokenSpans(studio.doc);
+  if (broken.length === 0) return null;
+  return (
+    <div className="flex shrink-0 items-center gap-2 border-b border-hairline bg-danger-wash px-3 py-1.5 text-caption text-secondary">
+      <span className="flex-1">
+        {broken.length === 1 ? "A design that ran across slides" : `${broken.length} designs that ran across slides`} no
+        longer meet at the edge.
+      </span>
+      <button type="button" onClick={() => studio.setStripView(true)} className="h-7 rounded-md border border-hairline px-2 text-primary">
+        Show in strip
+      </button>
+      <button
+        type="button"
+        onClick={() => studio.replaceDoc(broken.reduce((d, b) => unspan(d, b.spanId), studio.doc))}
+        className="h-7 rounded-md border border-hairline px-2 text-primary"
+      >
+        Unspan
+      </button>
     </div>
   );
 }

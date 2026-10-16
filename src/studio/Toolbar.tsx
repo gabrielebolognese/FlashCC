@@ -1,4 +1,4 @@
-import { Circle, LayoutGrid, Minus, MousePointer2, ScanLine, Sparkle, Square, Triangle, Type } from "lucide-react";
+import { Circle, GalleryHorizontal, LayoutGrid, Minus, MousePointer2, ScanLine, Sparkle, Square, Triangle, Type } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 
 import type { Tool } from "./model.js";
@@ -109,6 +109,21 @@ export function Toolbar({ studio }: { studio: Studio }) {
         className="grid h-8 w-8 place-items-center rounded-lg text-tertiary hover:bg-white/[0.06] hover:text-primary"
       >
         <LayoutGrid size={15} strokeWidth={2} />
+      </button>
+
+      {/* Every slide side by side (23.1). A view, like the safe areas. */}
+      <button
+        type="button"
+        title="Strip view: every slide side by side"
+        aria-label="Strip view"
+        aria-pressed={studio.stripView}
+        onClick={() => studio.setStripView(!studio.stripView)}
+        className={[
+          "grid h-8 w-8 place-items-center rounded-lg",
+          studio.stripView ? "bg-accent-wash text-accent" : "text-tertiary hover:bg-white/[0.06] hover:text-primary",
+        ].join(" ")}
+      >
+        <GalleryHorizontal size={15} strokeWidth={2} />
       </button>
 
       {/* Show what the platform covers. A view setting, never part of the doc. */}

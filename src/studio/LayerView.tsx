@@ -219,6 +219,10 @@ export function LayerView({
           alt=""
           style={{
             ...box,
+            // Tailwind's preflight caps an <img> at its parent's width, and the
+            // export page has no preflight: a picture wider than the slide (a
+            // strip background, 23.3) was cut to one slide in the editor only.
+            maxWidth: "none",
             objectFit: layer.fit ?? "cover",
             objectPosition: position,
             borderRadius: layer.radius,

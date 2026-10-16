@@ -18,6 +18,7 @@
  * something is actually rendered, so the export path reports it after the fact.
  */
 
+import { brokenSpans, isSpanning } from "./spans.js";
 import { missingFurniture, pieceLabel } from "./furniture.js";
 import type { Doc, Layer } from "./model.js";
 import { safeBox, shapeOf, type Platform } from "./platforms.js";
@@ -164,6 +165,39 @@ export function preflight(doc: Doc, platform: Platform): Finding[] {
     });
   }
 
+  // A design across slides whose seam a reorder, an insert or a lone move
+  // broke (23.5). A warning, with Unspan offered in the editor; never fixed
+  // silently.
+  for (const b of brokenSpans(doc)) {
+    add({
+      severity: "warn",
+      code: "span-broken",
+      slide: (b.slides[0] ?? 0) + 1,
+      message:
+        b.reason === "apart"
+          ? `A design across slides ${b.slides.map((x) => x + 1).join(" and ")} is no longer on neighbouring slides, so it will not meet at the edge.`
+          : `A design across slides ${b.slides.map((x) => x + 1).join(" and ")} no longer lines up at the edge.`,
+    });
+  }
+
+  // The cover still has to work alone (23.6). The profile grid and most feed
+  // impressions show nothing else, so a headline cut by the edge the reader
+  // has not swiped past yet is a hook nobody can read.
+  if (isSpanning(doc)) {
+    for (const l of doc.slides[0]?.layers ?? []) {
+      if (l.kind !== "text" || !l.visible || !stripMarks(l.text ?? "").trim()) continue;
+      if (l.spanId || l.x + l.w > doc.width + 0.5 || l.x < -0.5) {
+        add({
+          severity: "warn",
+          code: "cover-cut",
+          slide: 1,
+          layerId: l.id,
+          message: `"${l.name}" runs past the edge of the cover. The grid and the feed show the cover alone, so this line is cut there.`,
+        });
+      }
+    }
+  }
+
   /* ── per slide ── */
 
   const box = safeBox(platform, doc.width, doc.height);
@@ -228,7 +262,9 @@ export function preflight(doc: Doc, platform: Platform): Finding[] {
       // happen, and drowned the one slide where it can.
       const inScope = platform.safeScope === "all" || i === 0;
 
-      if (inScope && intrudes(l, box, doc.width, doc.height)) {
+      // A span piece (23.2) runs past the edge by design; the cover check
+      // (cover-cut, above) is the one that asks whether that costs the cover its words.
+      if (inScope && !l.spanId && intrudes(l, box, doc.width, doc.height)) {
         add({
           severity: "warn",
           code: "outside-safe-zone",

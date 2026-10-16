@@ -24,7 +24,8 @@
  * than the one it fixes.
  */
 
-import type { Layer, Slide } from "./model.js";
+import type { Doc, Layer, Slide } from "./model.js";
+import { joinedSpans, place } from "./spans.js";
 import { layerLines } from "./text.js";
 
 export type Size = { w: number; h: number };
@@ -100,12 +101,30 @@ export function reflowDoc<T extends Doclike>(doc: T, w: number, h: number): T {
   if (doc.width === w && doc.height === h) return doc;
   const from = { w: doc.width, h: doc.height };
   const to = { w, h };
-  return {
+  const spans = joinedSpans(doc);
+  if (spans.length === 0) {
+    return { ...doc, width: w, height: h, slides: doc.slides.map((s) => reflowSlide(s, from, to)) };
+  }
+
+  // Span pieces (23.5) are NOT reflowed one by one: each piece would move by
+  // its own slide's rules and every seam would open. Each span is rebuilt as
+  // one layer on the strip, reflowed there, and split again at the new width.
+  const n = doc.slides.length;
+  let out = {
     ...doc,
     width: w,
     height: h,
-    slides: doc.slides.map((s) => reflowSlide(s, from, to)),
-  };
+    slides: doc.slides.map((s) => ({ ...s, layers: s.layers.map((l) => (l.spanId ? l : reflowLayer(l, from, to))) })),
+  } as T & { width: number };
+  for (const span of spans) {
+    const next = reflowLayer(span.layer, { w: n * from.w, h: from.h }, { w: n * to.w, h: to.h });
+    let k = 0;
+    out = place(out as unknown as Doc, { x: next.x, y: next.y }, span.pieces, next, {
+      span: () => span.spanId,
+      layer: () => `${span.spanId}_r${(k += 1)}`,
+    }) as unknown as T & { width: number };
+  }
+  return out;
 }
 
 /**

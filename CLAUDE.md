@@ -72,9 +72,10 @@ select and move together (a tag, not a container, one level only), and `Slide.co
 at generation so Tidy can use the spacing steps the slide was built from. The layout tools in
 `tidy.ts` and `slideset.ts` compute coordinates once and forget they ran.
 
-Three more stamps, all read only by the tools that wrote them: `Layer.block` (which block,
+Four more stamps, all read only by the tools that wrote them: `Layer.block` (which block,
 instance and part made it, `blocks.ts`), `Layer.furniture` (a deck furniture piece, `furniture.ts`),
-and `Layer.verbatim` (a quote still word for word). Furniture follows **stamp and reseal**: it is
+`Layer.verbatim` (a quote still word for word), and `Layer.bridge` (a bridge preset, `panorama.ts`).
+`Layer.spanId` is a tag like `groupId`, across slides (see below). Furniture follows **stamp and reseal**: it is
 rewritten at the structural funnels in `useStudio.ts` and at export, never on an ordinary edit,
 and typing into a piece hands it over to the user. There is one more layer kind, `path`, for the
 shapes the others cannot draw (donut segments, arrows, QR codes).
@@ -157,6 +158,23 @@ Invariants worth keeping:
 - The export carries the bundled faces a deck uses (`bundledFaceCss`): emoji (Twemoji, COLR, which
   every engine draws) and CJK/Arabic/Hebrew render on a server that has none installed. Do not
   swap in an OpenType-SVG emoji font; Chrome draws those blank.
+
+## Designs across slides (Batch 23)
+
+- **A spanning layer is several ordinary layers**, one per slide it touches, sharing a `spanId`,
+  the right-hand piece at `x - W` (`spans.ts`, pure and tested). Each slide clips its own piece.
+  Never compute a piece at render, never add a "span" container: a slide exported alone must be
+  exactly what it holds.
+- **Anything that moves layers between boards treats a span as one layer on the strip** (N x W by
+  H) and splits it again with `place`. `reflow.ts` does; a new layout tool that moves pieces one
+  by one opens every seam.
+- **A broken seam is reported, never repaired silently** (`brokenSpans`, the studio banner, the
+  `span-broken` pre-flight). The remedy offered is Unspan.
+- Strip view is `StripCanvas.tsx`; its inspector edits go to every piece. The export renders each
+  run of linked slides as ONE strip and slices it (`server/render.ts`, `stripRuns`), so both sides
+  of a seam come from the same pixels.
+- `<img>` in `LayerView` carries `maxWidth: none`: Tailwind's preflight caps images at the parent's
+  width in the editor only, which cut a strip background to one slide.
 
 ## Pictures
 

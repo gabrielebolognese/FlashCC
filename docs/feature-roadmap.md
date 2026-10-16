@@ -3713,7 +3713,7 @@ text during the face's block period; fixed.
 
 ## Batch 23, Panoramic carousels
 
-**Status:** next
+**Status:** done
 **Size:** medium to large
 **Why here:** the seamless carousel, where a line, a photo or a shape runs across
 the slide edge so the swipe feels like one continuous image, is one of the most
@@ -3797,11 +3797,55 @@ cover whose headline is cut by the right edge is flagged.
 - **No automatic seam design.** The model writes words; a bridge is a layout choice
   the user makes (invariant 5).
 
+### Built as
+
+All six. Both unknowns are answered. The canvas showed one slide and did not clip at the
+artboard, so strip view is a second canvas (`StripCanvas.tsx`) rather than a mode of the first,
+painting each slide in its own clipped box through `LayerView`. The export screenshotted slide by
+slide and built the PDF from those pages; it now renders each run of linked slides as one strip
+and slices it.
+
+**23.1** as specified, toggled from the toolbar. Selecting, dragging, deleting and restyling act on
+the whole design; X, Y, W and H typed into the inspector move or resize it along the strip, so no
+edit made there can open a seam.
+
+**23.2** as specified, in `spans.ts`, pure and DOM-free. The done-when is a test: a circle dropped
+across slides 2 and 3 becomes two layers whose strip positions agree to the pixel, and a strip
+move moves both. A drag keeps the dragged id alive whatever the span becomes, so the selection
+follows it off its own slide.
+
+**23.3** as specified. `stripBackground`, `stripTexture` (the 21.3 textures drawn once at strip size)
+and `panoramaDeck` (2 to 10 slides from one picture). The focal point belongs to the strip and
+rides on every piece. Found on the way: Tailwind's preflight caps an `<img>` at its parent's width,
+so a picture wider than the slide was cut to one slide in the editor and drawn whole in the export.
+`LayerView` sets `maxWidth: none`.
+
+**23.4.** Peek, Lead line, Arrow and Split number, plain layers in the theme's colours carrying a
+`bridge` stamp. A peek on the cover stands the swipe-cue furniture down.
+
+**23.5.** Reflow treats each span as one layer on the strip and splits it again; the done-when
+holds as a test (a 5-slide seamless deck, 4:5 to 3:4, every seam intact, and square and back).
+Reorders and inserts are reported as `apart`, lone moves as `offset`, with Unspan offered in a
+banner and a `span-broken` pre-flight warning; nothing is repaired silently. The landmine got its
+pixel test, and an honest result: an unrotated shape across a seam, rounded and gradient-filled,
+slices pixel-identical to the same shape drawn unbroken. A rotated one differs by up to 26 levels
+on its anti-aliased edge, and so does rendering slide by slide: Chromium rasterises rotated
+content inside a clipped box differently whatever does the clipping. Not visible at phone scale;
+recorded as D33 and pinned at 32 in the test. Strips wider than 16,000px are cut into strips that
+fit.
+
+**23.6.** `cover-cut`: in a spanning deck, cover text that is a span piece or runs past either edge
+is flagged. Shapes are not, because a shape across the cover's edge is the peek.
+
+Verified in the browser: bridges and a mesh texture across a 4-slide deck, a dragged arrow, a 3:4
+switch with no broken seam, a panorama deck from an uploaded picture, the banner after a lone
+move, and LinkedIn PDFs whose pages join without a visible seam.
+
 ---
 
 ## Batch 24, Outline mode and keyboard speed
 
-**Status:** queued
+**Status:** next
 **Size:** medium
 **Why here:** the first half's central finding was that **writing the slides is the
 biggest time sink**, 30 to 60 minutes of a 45 to 120 minute carousel. Every writing

@@ -71,13 +71,15 @@ const isLast = (i: number, n: number) => i === n - 1 && n > 1;
  * be a lie; the footer is body slides only; the author chip is everywhere
  * except a closing slide that already shows who you are.
  */
-export function wants(kind: PieceKind, i: number, n: number, slide: Slide): boolean {
+export function wants(kind: PieceKind, i: number, n: number, slide: Slide, peek = false): boolean {
   switch (kind) {
     case "counter":
     case "progress":
       return i > 0;
     case "swipe":
-      return !isLast(i, n);
+      // A peek on the cover (23.4) shows the next slide exists; a cue that
+      // also says so is the same message twice.
+      return !isLast(i, n) && !peek;
     case "footer":
       return i > 0 && !isLast(i, n);
     case "logo":
@@ -86,6 +88,10 @@ export function wants(kind: PieceKind, i: number, n: number, slide: Slide): bool
       return !(isLast(i, n) && slide.layers.some((l) => l.block?.block === "post-card"));
   }
 }
+
+/** The cover carries a peek bridge (23.4). Here rather than imported from panorama.ts, which sits above this module. */
+const coverPeeks = (doc: Pick<Doc, "slides">): boolean =>
+  doc.slides[0]?.layers.some((l) => l.bridge === "peek" && l.visible) ?? false;
 
 /** "3 / 9": the cover is not counted, so a ten-slide deck reads 1 to 9 after it. */
 export const counterText = (i: number, n: number): string => `${i} / ${Math.max(1, n - 1)}`;
@@ -349,6 +355,7 @@ export function resealWith(doc: Doc, opts: SealOptions = {}): SealResult {
   const logoTemplate = doc.slides.flatMap((s) => s.layers).find((l) => l.furniture === "logo" && l.src);
   const logo = opts.logo ?? (logoTemplate?.src ? { src: logoTemplate.src, assetId: logoTemplate.assetId, w: logoTemplate.w, h: logoTemplate.h } : undefined);
 
+  const peek = coverPeeks(doc);
   const slides = doc.slides.map((slide, i) => {
     let layers = slide.layers;
     const c: PieceCtx = { slide, index: i, total: n, identity: state.identity, platform, look: lookOf(slide, doc.palette), bold: Boolean(set.bold), logo };
@@ -357,7 +364,7 @@ export function resealWith(doc: Doc, opts: SealOptions = {}): SealResult {
     for (const kind of set.pieces) {
       if (optedOut(slide, kind)) continue;
       const existing = pieceOn({ ...slide, layers }, kind);
-      const want = wants(kind, i, n, slide);
+      const want = wants(kind, i, n, slide, peek);
 
       if (!want) {
         if (existing.length > 0) {
@@ -456,7 +463,7 @@ export function missingFurniture(doc: Doc): { slide: number; kind: PieceKind }[]
     for (const kind of set.pieces) {
       if (kind === "logo" && !doc.slides.some((s) => pieceOn(s, "logo").length > 0)) continue;
       if (kind === "footer" && !(doc.furniture?.identity.site || doc.furniture?.identity.name)) continue;
-      if (wants(kind, i, doc.slides.length, slide) && pieceOn(slide, kind).length === 0 && !optedOut(slide, kind)) {
+      if (wants(kind, i, doc.slides.length, slide, coverPeeks(doc)) && pieceOn(slide, kind).length === 0 && !optedOut(slide, kind)) {
         out.push({ slide: i + 1, kind });
       }
     }

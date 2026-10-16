@@ -65,7 +65,7 @@ export function movableBounds(slide: Slide, w: number, h: number): Box | null {
   let y1 = -Infinity;
 
   for (const l of slide.layers) {
-    if (!l.visible || isFullBleed(l, w, h)) continue;
+    if (!l.visible || isFullBleed(l, w, h) || l.spanId) continue;
 
     if (!bleedsX(l, w)) {
       x0 = Math.min(x0, l.x);
@@ -138,6 +138,8 @@ export const isIdentity = (t: Transform): boolean =>
  * after the platform recompresses it, and that floor is absolute.
  */
 export function applyTransform(l: Layer, t: Transform, w: number, h: number): Layer {
+  // A span piece (23.2) moves only with its span; moving it alone opens the seam.
+  if (l.spanId) return l;
   const fixedX = bleedsX(l, w);
   const fixedY = bleedsY(l, h);
   if (fixedX && fixedY) return l;
