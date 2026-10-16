@@ -4,6 +4,7 @@ import { useRef, useState } from "react";
 import { slidePaint } from "./paint.js";
 import { rangeSelect, toggleSelect } from "./slideset.js";
 import { LayerView } from "./LayerView.js";
+import type { ActionId } from "./actions.js";
 import type { Studio } from "./useStudio.js";
 
 const THUMB_H = 96;
@@ -16,8 +17,19 @@ export function Filmstrip({
   studio,
   onRewrite,
   onRelay,
+  onTypeSlide,
+  typing = false,
+  setTyping,
 }: {
   studio: Studio;
+  /**
+   * A slide typed into existence (24.5): the line becomes its headline. Absent
+   * keeps the plain "+", which adds a blank slide.
+   */
+  onTypeSlide?: ((line: string) => void) | undefined;
+  /** The "+" is showing its line, from a click or from the palette. */
+  typing?: boolean | undefined;
+  setTyping?: ((on: boolean) => void) | undefined;
   /** Absent when there is nothing to open, which keeps the button out of the DOM. */
   onRewrite?: ((index: number) => void) | undefined;
   /** Lays the picked slides out again. Absent hides the action. */
@@ -64,14 +76,14 @@ export function Filmstrip({
         {picked.length > 0 ? (
           <div className="flex items-center gap-1">
             <span className="mr-1 text-caption text-accent">{picked.length} picked</span>
-            <SetButton icon={Copy} label="Duplicate" onClick={() => studio.duplicateSlides(picked)} />
+            <SetButton icon={Copy} label="Duplicate" action="duplicate-picked" onClick={() => studio.duplicateSlides(picked)} />
             {onRelay ? (
-              <SetButton icon={LayoutTemplate} label="Re-lay" onClick={() => onRelay(picked)} />
+              <SetButton icon={LayoutTemplate} label="Re-lay" action="relay-picked" onClick={() => onRelay(picked)} />
             ) : null}
             {picked.length < doc.slides.length ? (
-              <SetButton icon={Trash2} label="Delete" danger onClick={() => studio.deleteSlides(picked)} />
+              <SetButton icon={Trash2} label="Delete" danger action="delete-picked" onClick={() => studio.deleteSlides(picked)} />
             ) : null}
-            <SetButton icon={X} label="Clear" onClick={() => setSlideSelection([])} />
+            <SetButton icon={X} label="Clear" action="clear-picked" onClick={() => setSlideSelection([])} />
           </div>
         ) : (
           <span className="text-caption text-muted">
@@ -118,6 +130,7 @@ export function Filmstrip({
             >
               <button
                 type="button"
+                data-control
                 onClick={(e) => click(i, e)}
                 aria-label={`Slide ${i + 1}`}
                 aria-pressed={picked.includes(s.id)}
@@ -163,45 +176,90 @@ export function Filmstrip({
                     The hover cluster is the gesture people already use on these
                     thumbnails, so it goes in the cluster. */}
                 {onRewrite ? (
-                  <MiniButton icon={Wand2} label="Rewrite" onClick={() => onRewrite(i)} />
+                  <MiniButton icon={Wand2} label="Rewrite" action="rewrite-slide" onClick={() => onRewrite(i)} />
                 ) : null}
-                <MiniButton icon={Copy} label="Duplicate" onClick={() => studio.duplicateSlide(i)} />
+                <MiniButton icon={Copy} label="Duplicate" action="duplicate-slide" onClick={() => studio.duplicateSlide(i)} />
                 {doc.slides.length > 1 ? (
-                  <MiniButton icon={Trash2} label="Delete" danger onClick={() => studio.deleteSlide(i)} />
+                  <MiniButton icon={Trash2} label="Delete" danger action="delete-slide" onClick={() => studio.deleteSlide(i)} />
                 ) : null}
               </div>
             </div>
           </div>
         ))}
 
-        <button
-          type="button"
-          onClick={() => studio.addSlide()}
-          aria-label="Add slide"
-          className="ml-1.5 grid shrink-0 place-items-center self-start rounded-xl border-2 border-dashed border-hairline text-tertiary hover:border-edge hover:text-primary"
-          style={{ width: thumbW, height: THUMB_H }}
-        >
-          <Plus size={16} strokeWidth={2} />
-        </button>
+        {typing && onTypeSlide ? (
+          <TypedSlide
+            height={THUMB_H}
+            onDone={(line) => {
+              setTyping?.(false);
+              if (line === null) return;
+              if (line.trim()) onTypeSlide(line.trim());
+              else studio.addSlide();
+            }}
+          />
+        ) : (
+          <button
+            type="button"
+            data-action={onTypeSlide ? "type-slide" : "new-slide"}
+            onClick={() => (onTypeSlide && setTyping ? setTyping(true) : studio.addSlide())}
+            aria-label="Add slide"
+            title={onTypeSlide ? "Type a headline for a new slide. Enter on an empty line adds a blank one." : "Add slide"}
+            className="ml-1.5 grid shrink-0 place-items-center self-start rounded-xl border-2 border-dashed border-hairline text-tertiary hover:border-edge hover:text-primary"
+            style={{ width: thumbW, height: THUMB_H }}
+          >
+            <Plus size={16} strokeWidth={2} />
+          </button>
+        )}
       </div>
     </footer>
+  );
+}
+
+/**
+ * The "+" as a line to type into (24.5). Enter makes the slide (an empty line
+ * makes a blank one, which is what "+" always did); Escape or leaving it
+ * empty changes nothing.
+ */
+function TypedSlide({ height, onDone }: { height: number; onDone: (line: string | null) => void }) {
+  const [line, setLine] = useState("");
+  return (
+    <div className="ml-1.5 flex shrink-0 flex-col justify-center gap-1 self-start rounded-xl border-2 border-dashed border-accent-dim px-2" style={{ width: 240, height }}>
+      <input
+        autoFocus
+        aria-label="Headline for a new slide"
+        value={line}
+        onChange={(e) => setLine(e.target.value)}
+        onKeyDown={(e) => {
+          e.stopPropagation();
+          if (e.key === "Enter") onDone(line);
+          if (e.key === "Escape") onDone(null);
+        }}
+        onBlur={() => onDone(line.trim() ? line : null)}
+        placeholder="Type a headline, Enter"
+        className="h-7 w-full rounded-md border border-hairline bg-surface-1 px-2 text-caption text-primary outline-none placeholder:text-muted focus:border-accent-dim"
+      />
+      <span className="text-[10px] leading-3 text-muted">Laid out by the next layout in the deck&rsquo;s cycle.</span>
+    </div>
   );
 }
 
 function MiniButton({
   icon: Icon,
   label,
+  action,
   onClick,
   danger = false,
 }: {
   icon: typeof Copy;
   label: string;
+  action: ActionId;
   onClick: () => void;
   danger?: boolean;
 }) {
   return (
     <button
       type="button"
+      data-action={action}
       aria-label={label}
       title={label}
       onClick={(e) => {
@@ -222,17 +280,20 @@ function MiniButton({
 function SetButton({
   icon: Icon,
   label,
+  action,
   onClick,
   danger = false,
 }: {
   icon: typeof Copy;
   label: string;
+  action: ActionId;
   onClick: () => void;
   danger?: boolean;
 }) {
   return (
     <button
       type="button"
+      data-action={action}
       title={label}
       onClick={onClick}
       className={[

@@ -23,7 +23,7 @@ import { missingFurniture, pieceLabel } from "./furniture.js";
 import type { Doc, Layer } from "./model.js";
 import { safeBox, shapeOf, type Platform } from "./platforms.js";
 import { stripMarks } from "./marks.js";
-import { layerLines } from "./text.js";
+import { layerLines, overflowsBox } from "./text.js";
 
 export type Severity = "block" | "warn";
 
@@ -224,9 +224,8 @@ export function preflight(doc: Doc, platform: Platform): Finding[] {
 
         // Does the copy actually fit the box it was given? The generator
         // guarantees this; a person typing into an existing layer does not.
-        const lines = layerLines(l, size, l.w);
-        const needed = lines * size * (l.lineHeight ?? 1.2);
-        if (needed > l.h + 1) {
+        if (overflowsBox(l)) {
+          const lines = layerLines(l, size, l.w);
           add({
             severity: "block",
             code: "text-overflows",

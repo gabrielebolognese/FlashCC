@@ -382,6 +382,28 @@ export function marginLines(w: number, h: number): { x: number[]; y: number[] } 
 const CYCLE: Composition[] = [HEADING_BODY, STATEMENT, NUMBERED, QUOTE, UNDERLINE, CAPS];
 
 /**
+ * Every composition, in the fixed order `L` steps through (24.3): pressing it
+ * as many times as there are entries comes back to where it started, and
+ * `Shift+L` walks the same ring backwards.
+ */
+const RING: Composition[] = [TITLE, ...CYCLE, BLOCK];
+
+/** The composition after (or before) `id` in the ring. An unknown id starts at the top. */
+export function stepComposition(id: string | undefined, dir: 1 | -1 = 1): string {
+  const at = RING.findIndex((c) => c.id === id);
+  const next = at < 0 ? (dir === 1 ? 0 : RING.length - 1) : (at + dir + RING.length) % RING.length;
+  return RING[next]!.id;
+}
+
+/**
+ * The composition the deck's cycle gives a body slide at `index`, from the
+ * deck's own seed: what a slide typed into existence (24.5) is laid out with.
+ * Never the title or the colour block, which belong to the first and the last.
+ */
+export const cycleCompositionAt = (index: number, texts: readonly string[]): string =>
+  CYCLE[(Math.max(1, index) - 1 + seedOf(texts.filter((t) => t.trim()))) % CYCLE.length]!.id;
+
+/**
  * Roles that always get the same treatment, whatever their position. The hook is the
  * title because it is the hook; the CTA is the one loud slide because it is the ask.
  */
@@ -507,6 +529,12 @@ export type BuildOptions = {
    * back, since a document has no roles to key them by.
    */
   fillsAt?: (SlotFillSpec | undefined)[] | undefined;
+  /**
+   * A composition chosen for a slide, by position (24.3's `L`, 24.5's typed
+   * slide): the slide is laid out with that one rather than the cycle's. A
+   * user's choice, so it is honoured over the role and the position.
+   */
+  compositions?: (string | undefined)[] | undefined;
 };
 
 export type SlotFillSpec = { id: string; fields: Record<string, string> };
@@ -624,9 +652,9 @@ function layout(entries: Entry[], theme: Theme, options: BuildOptions): Slide[] 
   const images = options.images ?? true;
   const decor = options.decor ?? 1;
 
-  const kept: Entry[] = [];
-  entries.forEach((e) => {
-    if (e.text.trim()) kept.push({ ...e, text: e.text.trim() });
+  const kept: (Entry & { at: number })[] = [];
+  entries.forEach((e, at) => {
+    if (e.text.trim()) kept.push({ ...e, text: e.text.trim(), at });
   });
   if (kept.length === 0) return [makeSlide(theme.bg, "Slide 1")];
 
@@ -637,7 +665,8 @@ function layout(entries: Entry[], theme: Theme, options: BuildOptions): Slide[] 
       const slide = blockSlide(k.text, k.fill, theme, i, images);
       if (slide) return slide;
     }
-    const comp = compositionFor(i, kept.length, k.role, seed);
+    const pinned = options.compositions?.[k.at];
+    const comp = (pinned ? RING.find((c) => c.id === pinned) : undefined) ?? compositionFor(i, kept.length, k.role, seed);
     const { image, textRegion } = bandsFor(comp.image, images);
     const rtl = isRtl(k.text);
     const built = comp

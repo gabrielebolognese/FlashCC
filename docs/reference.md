@@ -17,7 +17,7 @@ is still current.
 | | |
 | --- | --- |
 | **Orientation** | [1 What it is](#1-what-it-is) · [2 Running it](#2-running-it) · [3 The invariants](#3-the-invariants) |
-| **The canvas** | [4 Data model](#4-the-data-model) · [5 Canvas](#5-the-canvas) · [6 Text](#6-text-measurement-and-fitting) · [6b Type](#6b-type-pairs-ramps-emphasis-effects-scripts) · [7 Colour](#7-colour-and-contrast) · [8 Gradients](#8-gradients) · [9 Format change](#9-changing-format-reflow) · [9b Spans](#9b-designs-across-slides-spans-and-strip-view) |
+| **The canvas** | [4 Data model](#4-the-data-model) · [5 Canvas](#5-the-canvas) · [6 Text](#6-text-measurement-and-fitting) · [6b Type](#6b-type-pairs-ramps-emphasis-effects-scripts) · [7 Colour](#7-colour-and-contrast) · [8 Gradients](#8-gradients) · [9 Format change](#9-changing-format-reflow) · [9b Spans](#9b-designs-across-slides-spans-and-strip-view) · [9c Writing](#9c-writing-outline-mode-typed-slides-find-and-replace-batch-24) |
 | **Making a deck** | [10 Frameworks](#10-the-four-frameworks) · [11 Generation](#11-generation) · [11b Blocks and furniture](#11b-blocks-and-deck-furniture) · [12 Styles](#12-styles-and-themes) · [13 Onboarding](#13-onboarding) · [14 AI drafting](#14-ai-drafting) · [15 Bulk and long form](#15-bulk-create-and-long-form-ingest) · [16 Media, fonts and assets](#16-media-and-fonts) · [16b Imagery](#16b-imagery-icons-and-backgrounds) · [17 Screen flow](#17-screen-flow) |
 | **The product** | [17b Clients and review](#17b-clients-and-review) · [18 Pipeline, calendar and series](#18-the-pipeline) · [19 Analytics](#19-analytics) · [19b History](#19b-version-history) · [20 Library](#20-the-library) · [21 Export](#21-export) |
 | **Infrastructure** | [22 Persistence](#22-persistence) · [23 Sync](#23-sync) · [24 Auth](#24-auth) · [25 Billing](#25-billing) · [26 Database](#26-database) · [27 Design tokens](#27-design-tokens) · [28 Testing](#28-testing) |
@@ -253,22 +253,72 @@ keeps it, because it holds ids. Rewrite stays single-slide, as Batch 11 decided.
 
 ### Keyboard
 
-Window-level, skipped while typing (`INPUT`, `TEXTAREA`, `contentEditable`).
+Two handlers since Batch 24, both window-level.
+
+**The keyboard map** (`actions.ts`, `actionForKey`, run by `Studio.tsx` in every view: canvas,
+strip and outline). One map, printed on `?`, with no custom bindings. **A single-letter key never
+fires while a text field has focus** (`INPUT`, `TEXTAREA`, `SELECT`, `contentEditable`): `typing`
+is a parameter of the match itself, not a check each caller remembers. ⌘K and ⌘E work while
+typing; ⌘Z and ⌘⇧↑/↓ leave a field its own. Nothing fires while a dialog is open.
+
+| Key | |
+| --- | --- |
+| `N` | New slide after this one |
+| `D` | Duplicate slide |
+| `Shift+Cmd+Up` / `Down` | Move slide earlier / later |
+| `/` | Insert a block |
+| `L` / `Shift+L` | Next / previous layout for this slide (see below) |
+| `R` | Rewrite the selected text |
+| `T` | Tidy |
+| `M` | Match on every slide |
+| `O` | Outline mode |
+| `G` / `Shift+G` | Group / ungroup |
+| `Cmd+E` | Export with the last-used destination |
+| `Cmd+K` | Command palette |
+| `Cmd+Z` / `Shift+Cmd+Z` | Undo / redo |
+| `V`, `I` | Move tool, icon |
+| `Shift+T`, `Shift+R`, `Shift+O` | Text, rectangle, ellipse tools |
+| `?` | The table |
+
+**The drawing tools moved to Shift.** T, R, O and L were the text, rectangle, ellipse and line
+tools; the roadmap's map gives those letters to Tidy, Rewrite, Outline and Layout, which are done
+far more often than drawing a rectangle. The line and triangle tools have no key.
+
+**The canvas's own** (`Canvas.tsx`), only where a canvas is showing:
 
 | Key | |
 | --- | --- |
 | `Space` | Pan (checked before the typing guard) |
-| `Cmd+Z` / `Shift+Cmd+Z` | Undo / redo |
-| `Cmd+D` / `Cmd+A` | Duplicate / select all on slide (locked layers excluded) |
-| `Cmd+G` / `Shift+Cmd+G` | Group / ungroup |
+| `Cmd+D` / `Cmd+A` | Duplicate layer / select all on slide (locked layers excluded) |
+| `Cmd+G` / `Shift+Cmd+G` | Group / ungroup (as `G`) |
 | `Cmd+]` / `Cmd+[` | Forward / backward |
+| `Cmd+=` / `Cmd+-` / `Cmd+0` | Zoom in / out / fit |
 | `Delete` / `Backspace` | Remove selection |
 | `Escape` | Clear editing, clear selection, tool → select |
 | `Enter` | Edit text (exactly one text layer selected) |
-| `v t r o l i` | select, text, rect, ellipse, line, icon |
 | Arrows | Nudge 1px, **10px with Shift** |
 
-There is **no shortcut for the triangle tool**.
+`L` steps through a fixed ring of every composition (`stepComposition`: title, the six of the
+cycle, colour block), so pressing it eight times comes back to the start and `Shift+L` walks it
+backwards. The words, the slide's id and every layer of the user's that is not its words stay; the
+slide's own copy layers are laid out afresh even if moved (keeping a moved headline beside the
+re-laid one would print it twice). A slide with no composition recorded steps from the one the
+deck's cycle gives its position. This is the minimum of 25.2, which owns the catalogue.
+
+### The command palette and the action registry (24.2, `actions.ts`, `CommandPalette.tsx`)
+
+`ACTIONS` names every action in the editor once: its label, its group, its key. The palette lists
+every one, plus a **family** per argument built when it opens (`insert-block:<block>`,
+`brand:<id>`, `format:<id>`, `export:<platform>`, `safe:<platform>`, `open:<project>`), so a block,
+a brand, a format, a destination or a project is found by name rather than given a button. Recent
+actions come first (eight, per viewer, in `localStorage`); an action that cannot run right now is
+listed dimmed with the reason rather than hidden.
+
+The studio's runner table is typed `Record<ActionId, ...>`, so a registered action with nothing to
+run does not compile. Every button in `Studio.tsx`, `Toolbar.tsx`, `Filmstrip.tsx` and
+`Properties.tsx` carries `data-action` (or `data-control` for a control that sets a value, a
+swatch or a tab), and `actions.test.ts` walks those files' source: a button with neither, or naming
+an action the registry does not know, fails the build. That is the 24.2 done-when, enforced.
 
 ### History
 
@@ -278,6 +328,10 @@ no command class per action.
 
 Coalescing suppresses a push when the tag matches the previous one, so a drag is one undo step
 rather than sixty. It has **no time or gesture boundary**, see §29.
+
+Since Batch 24 a commit can carry a **label**, kept in a `WeakMap` keyed by the resulting document
+(so it needs no upkeep), and the Undo button names what it would undo: "Undo Outline", "Undo
+Layout", "Undo Replace".
 
 `commit` is also where auto-naming happens: a document whose name is one the app supplied takes its
 name from the first text layer on slide 1. A name you chose is never overwritten.
@@ -639,6 +693,74 @@ In a deck with any span, a text layer on slide 1 that is a span piece or runs pa
 gets a `cover-cut` warning: the profile grid and most feed impressions show the cover alone, so a
 headline cut by the edge is a hook nobody can read. A shape or picture crossing the cover's edge is
 fine; that is the peek.
+
+## 9c. Writing: outline mode, typed slides, find and replace (Batch 24)
+
+### Outline mode (`outline.ts`, `OutlineView.tsx`, 24.1)
+
+The whole deck as one plain text document, in place of the canvas (toolbar toggle, or `O`).
+
+```
+# Your edits feel mechanical. Here is why.
+# You cut on the beat
+The beat is the most predictable moment in the track.
+[Big number] number: 73% | what it means: of buyers decide on the cover
+```
+
+A line starting with `#` is a slide's headline and starts a slide; the lines under it are its body;
+a blank line never splits a slide. Emphasis marks are characters, so they work here. A block is
+one labelled line, `[Label] field: value | field: value`, a list field's items joined by ` / `;
+edited in place it is rebuilt with 19.8's rule, deleted it goes, a new one is inserted where there
+is room (or said that there is none).
+
+**This is not the paste importer.** It never creates a document: it is a second view of the one
+open, and it changes the deck through the same path as a rewrite.
+
+**How edits land.** On a pause of 800ms (`OUTLINE_PAUSE_MS`), on blur and on leaving the view, the
+whole outline is applied to the deck as it was when the view opened (`applyOutline`), and committed
+under one coalescing key per session: the session is **one undo step**, named "Outline". Applying
+from the opening state every time makes the answer the same however many pauses there were.
+
+`planOutline` matches typed slides to the deck's. Same count: slide for slide, by position, as
+Batch 11 applies a rewrite. Different count: the unchanged slides are found by a longest common
+subsequence, and the changed stretches between them pair by position, the surplus being new or
+removed slides. The margin then says the deck is free-form for slot purposes (`slotAt` already
+refuses a count that does not match the structure).
+
+`restateMany` (`regenerate.ts`) does the work, and is what `L` and typed slides use too:
+
+- An unchanged slide is kept as the same object, every layer where it was.
+- A changed slide whose copy layers are all generated is laid out again (the whole deck rebuilt
+  for its composition, the slide taken), and its hand-edited layers ride on top.
+- A changed slide where the user edited a copy layer has its words **written onto its layers**,
+  line for line (`writeCopy`), and nothing moves: the rewrite picker's "who owns the box" rule.
+- Never split. A `#` line is somebody's decision about where slides break, so copy too long for
+  its slide is named in the margin (`overflow`) rather than moved onto a slide nobody asked for.
+- An outline with no `#` line changes nothing: clearing the box is not how a deck is deleted.
+
+### A slide typed into existence (`typeSlide`, `Filmstrip.tsx`, 24.5)
+
+The filmstrip's `+` is a line to type into: Enter makes a slide with that line as its headline,
+laid out with the composition the deck's cycle gives that position (`cycleCompositionAt`), never
+the colour block a generated last slide gets. Enter on an empty line adds a blank slide, which is
+what `+` always did. Every other slide is untouched.
+
+### Find and replace (`findreplace.ts`, `ReplaceDialog.tsx`, 24.4)
+
+In this deck (toolbar, palette) or across every project the filters show ("Replace in the N shown"
+on Projects). Nothing changes before Replace: the list is every match with its slide and some
+context, each with a tick.
+
+- A match in a **verbatim** quote, or in **furniture**, starts unticked. Ticking a quote's match
+  removes its verbatim mark; ticking furniture hands that piece to the user (`retouched`, the same
+  rule as typing into it).
+- A match in a block goes into that block's fields too, or the next edit of the block would
+  rebuild the old words.
+- Replaced text goes through the pre-flight's overflow check (`overflowsBox`, shared now), and a
+  layer that fitted before and does not now is named.
+- Across projects, every changed document is **snapshotted first** (reason `replace`) and then
+  saved, and the dialog keeps an Undo per project and an Undo all. On Free, version history keeps
+  nothing (§19b), so those buttons are the way back and the dialog says so.
 
 ## 10. The four frameworks
 
@@ -2820,7 +2942,7 @@ all disabled under `prefers-reduced-motion`.
 
 ## 28. Testing
 
-1,589 tests across 80 files (as of Batch 23). They are design guards, not coverage theatre, several encode an argument
+1,638 tests across 83 files (as of Batch 24). They are design guards, not coverage theatre, several encode an argument
 that would otherwise be lost:
 
 - **mean vs median**, five posts and one at 100k, proving a mean baseline would switch outlier
@@ -3146,6 +3268,21 @@ make a single-slide edit move things on slides the user cannot see.
 
 `panoramaDeck` replaces the open deck, and the studio remounts with strip view off. One click on
 the toolbar toggle shows it.
+
+### D37, Outline mode cannot write a body line that starts with `#` or a known `[Label]`
+
+`# ` starts a slide and `[Big number]` is read as a block, so a body line beginning either way
+cannot be said in the outline. Rare in carousel copy; type it on the slide.
+
+### D38, A find-and-replace match inside emphasis marks matches the raw text
+
+The search runs over the stored text, marks included: `**fast**` is found by `fast`, and a query
+that spans a mark boundary (`fast** and`) matches the characters as stored.
+
+### D39, Find and replace does not reach captions, alt text or slide names
+
+Only the words on the slides (and a block's fields). A renamed product in a caption or in alt text
+is still a manual edit, in the post sheet and the export dialog.
 
 ### D20, Smaller things
 

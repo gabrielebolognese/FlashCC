@@ -120,11 +120,9 @@ export function Canvas({ studio }: { studio: Studio }) {
       if (isTyping(e.target)) return;
       const mod = e.metaKey || e.ctrlKey;
 
-      if (mod && e.key.toLowerCase() === "z") {
-        e.preventDefault();
-        e.shiftKey ? studio.redo() : studio.undo();
-        return;
-      }
+      // Undo and redo, "/", the letter keys and the slide keys belong to the
+      // studio's keyboard map (24.3, actions.ts), which works in every view.
+      // What stays here is what only means something on this canvas.
       if (mod && e.key.toLowerCase() === "d") {
         e.preventDefault();
         studio.duplicateSelected();
@@ -134,11 +132,6 @@ export function Canvas({ studio }: { studio: Studio }) {
         e.preventDefault();
         // Locked means unselectable on the canvas, select-all included.
         setSelection(layers.filter((l) => !l.locked).map((l) => l.id));
-        return;
-      }
-      if (e.key === "/" && !mod) {
-        e.preventDefault();
-        studio.setPicker({ mode: "insert" });
         return;
       }
       if (mod && e.key.toLowerCase() === "g") {
@@ -189,14 +182,6 @@ export function Canvas({ studio }: { studio: Studio }) {
           e.preventDefault();
           setEditingId(l.id);
         }
-        return;
-      }
-
-      // single-letter tools, Photoshop style
-      const keys: Record<string, Tool> = { v: "select", t: "text", r: "rect", o: "ellipse", l: "line", i: "icon" };
-      const t = keys[e.key.toLowerCase()];
-      if (t && !mod) {
-        setTool(t);
         return;
       }
 

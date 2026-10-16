@@ -384,6 +384,19 @@ export const textInset = (l: TextLike, fontSize = l.fontSize ?? 64): number =>
 export const layerLines = (l: TextLike & { text?: string | undefined }, fontSize: number, width: number): number =>
   lineCount(l.text ?? "", fontSize, width - textInset(l, fontSize), layerMeasure(l));
 
+/**
+ * Does a text layer's copy need more height than its box gives it? The
+ * pre-flight's `text-overflows`, shared so outline mode (24.1) and find and
+ * replace (24.4) can say which slides their new words no longer fit.
+ */
+export const overflowsBox = (
+  l: TextLike & { text?: string | undefined; w: number; h: number; lineHeight?: number | undefined },
+): boolean => {
+  if (!(l.text ?? "").trim()) return false;
+  const size = l.fontSize ?? 0;
+  return layerLines(l, size, l.w) * size * (l.lineHeight ?? 1.2) > l.h + 1;
+};
+
 /* ── fitting ──────────────────────────────────────────────────────────────── */
 
 export type Fitted = {

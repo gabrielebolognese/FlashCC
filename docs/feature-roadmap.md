@@ -3845,7 +3845,7 @@ move, and LinkedIn PDFs whose pages join without a visible seam.
 
 ## Batch 24, Outline mode and keyboard speed
 
-**Status:** next
+**Status:** done
 **Size:** medium
 **Why here:** the first half's central finding was that **writing the slides is the
 biggest time sink**, 30 to 60 minutes of a 45 to 120 minute carousel. Every writing
@@ -3961,11 +3961,57 @@ cycle.
 - **No markdown import as a document.** See 24.1.
 - **No vim mode.** Somebody will ask; the answer is outline mode.
 
+### Built as
+
+All five. Both unknowns are answered. The shortcuts that existed were the canvas's own (undo,
+duplicate, group, arrange, zoom, nudge, `/`, and Photoshop-style tool letters V T R O L I), in one
+window listener per canvas, plus a few per dialog; there was no global handler. There is one now,
+in the studio, so the map works in every view (canvas, strip, outline), and the canvas keeps only
+what means something on a canvas.
+
+**24.1** as specified, in `outline.ts` and `OutlineView.tsx`. Edits land on an 800ms pause, on blur
+and on leaving; each time the whole outline is applied to the deck as it was when the view opened,
+under one coalescing key, so the session is one undo step and the Undo button says "Undo
+Outline". The work goes through a new `restateMany`, the multi-slide form of `restateSlide`:
+unchanged slides are kept as the same objects, changed generated slides are laid out again with
+the user's layers on top, and a slide whose copy layer the user moved or typed into has its words
+written onto its own layers, because rebuilding it printed the line twice (the rewrite picker had
+found the same thing). Outline never splits: a `#` line is somebody's decision, so copy too long
+for its slide is named in the margin. The landmine is handled as written: a changed count is
+matched by a longest common subsequence on whole slides, and the margin says the deck is now
+free-form for slot purposes. Blocks are one labelled line each and editable in place. The
+done-when holds as a test and in the browser: three slides rewritten and a fourth added, the
+hand-moved headline still at x=138, one Undo back to the original deck.
+
+**24.2** as specified. `actions.ts` registers every action, with families for blocks, brands,
+formats, destinations, safe areas and projects. The done-when is a test that walks the editor's
+source: every button in the studio, the toolbar, the filmstrip and the properties panel names a
+registry action or says it is a value control, and every action named is one the palette lists;
+the runner table is typed against the registry, so an action with nothing to run does not
+compile. Mutation-checked: removing one `data-action`, or misspelling one, fails it.
+
+**24.3** as specified, with one decision the table forced. T, R, O and L were the text, rectangle,
+ellipse and line tools; the map gives them to Tidy, Rewrite, Outline and Layout, so the drawing
+tools moved to Shift (the line and triangle tools have no key). `L` needed 25.2's cycling, so the
+minimum of it is here: a fixed ring of all eight compositions, `Shift+L` backwards, the words and
+the user's other layers kept. The catalogue of six per content shape stays 25.2's. `⌘E` opens the
+export on the last destination and exports at once unless pre-flight blocks it. The typing rule is
+a parameter of the key match itself, and tested.
+
+**24.4** as specified. Verbatim quotes and furniture start unticked; a block's fields are replaced
+with its layers; newly overflowing layers are named. Across projects every touched document is
+snapshotted first, and the dialog keeps an Undo per project and an Undo all, because Free keeps no
+version history and that would otherwise leave no way back. The done-when (twelve projects, every
+match changed, the rest untouched) is a test; three projects in the browser, undone with Undo all.
+
+**24.5** as specified: the filmstrip's `+` takes a line, laid out with the cycle's composition for
+its position, never the colour block a generated last slide gets.
+
 ---
 
 ## Batch 25, The preset system
 
-**Status:** queued
+**Status:** next
 **Size:** large, mostly content and tests rather than new machinery.
 **Why here:** this is where "many presets" is delivered, and it comes after Batches
 19 to 24 on purpose. A preset is only as good as the pieces it can assemble: a

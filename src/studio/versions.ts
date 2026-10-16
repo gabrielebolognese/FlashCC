@@ -42,13 +42,14 @@ import type { Doc, Slide } from "./model.js";
 import { docVersion } from "./review.js";
 
 /** What caused a snapshot. Never "you typed something". */
-export type Reason = "approve" | "export" | "brand" | "manual";
+export type Reason = "approve" | "export" | "brand" | "manual" | "replace";
 
 export const REASON_LABEL: Record<Reason, string> = {
   approve: "Sent for approval",
   export: "Exported",
   brand: "Brand applied",
   manual: "Saved by hand",
+  replace: "Before find and replace",
 };
 
 export type Version = {

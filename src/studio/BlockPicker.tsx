@@ -26,7 +26,14 @@ export function BlockPicker({ studio }: { studio: Studio }) {
   const record = editing ? slide?.blocks?.find((b) => b.instance === editing) : undefined;
 
   const [query, setQuery] = useState("");
-  const [chosen, setChosen] = useState<Block | null>(() => (record ? (blockById(record.block) ?? null) : null));
+  // Opened from the palette on a named block (24.2), it starts at that block's form.
+  const [chosen, setChosen] = useState<Block | null>(() =>
+    record
+      ? (blockById(record.block) ?? null)
+      : picker?.mode === "insert" && picker.block
+        ? (blockById(picker.block) ?? null)
+        : null,
+  );
   const [fields, setFields] = useState<Fields>(() => record?.fields ?? {});
 
   const brands = useMemo(() => listBrands(), []);

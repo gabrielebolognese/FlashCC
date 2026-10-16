@@ -2,8 +2,28 @@ import { ChevronLeft, ClipboardPaste, Download, History, Redo2, Send, Shuffle, S
 import type { Studio as StudioState } from "./useStudio.js";
 import { brokenSpans, unspan } from "./spans.js";
 import { StripCanvas } from "./StripCanvas.js";
-import { useState } from "react";
+import { OutlineView } from "./OutlineView.js";
+import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
+
+import {
+  ACTIONS,
+  actionForKey,
+  FAMILIES,
+  lastDestination,
+  rememberAction,
+  type ActionId,
+  type FamilyId,
+} from "./actions.js";
+import { BLOCKS } from "./blocks.js";
+import { CommandPalette, type PaletteEntry } from "./CommandPalette.js";
+import { ReplaceDialog } from "./ReplaceDialog.js";
+import { FORMATS } from "./model.js";
+import { hasSafeZone, PLATFORMS, platformForSize, type PlatformId } from "./platforms.js";
+import { Shortcuts } from "./Shortcuts.js";
+import { listDocs, loadDoc } from "./storage.js";
+import { stepLayout, typeSlide } from "./regenerate.js";
+import type { Brand } from "./brand.js";
 
 import { Button } from "../ui/Button.js";
 import { IconButton } from "../ui/IconButton.js";
@@ -50,7 +70,13 @@ export function Studio({
   const { doc, slide } = studio;
   const [naming, setNaming] = useState(false);
   const [pasteOpen, setPasteOpen] = useState(false);
-  const [exporting, setExporting] = useState(false);
+  /** The export dialog, and what it opens on: a destination, and whether to start at once (⌘E). */
+  const [exporting, setExporting] = useState<{ initial?: string | null | undefined; auto?: boolean | undefined } | null>(null);
+  const [palette, setPalette] = useState(false);
+  const [shortcuts, setShortcuts] = useState(false);
+  const [finding, setFinding] = useState(false);
+  /** The filmstrip's "+" showing its line (24.5). */
+  const [typingSlide, setTypingSlide] = useState(false);
   const [relaid, setRelaid] = useState<number | null>(null);
   const [hooking, setHooking] = useState(false);
   /**
@@ -64,12 +90,241 @@ export function Studio({
   const [history, setHistory] = useState(false);
   const [pasted, setPasted] = useState("");
 
+  /* ── actions: one registry for the buttons, the palette and the keys (24.2, 24.3) ── */
+
+  const theme = () => themeOf(doc, listBrands());
+
+  function relayDeck() {
+    const result = regenerate(doc, theme());
+    studio.replaceDoc(result.doc);
+    setRelaid(result.kept);
+  }
+
+  function relayPicked(ids: string[]) {
+    // Only the picked slides change; the deck is rebuilt to get their
+    // compositions right and the rest is left exactly as it was.
+    const result = relaySlides(doc, ids, theme());
+    if (result.replaced > 0) studio.replaceDoc(result.doc);
+    setRelaid(result.replaced > 0 ? result.kept : -1);
+  }
+
+  function applyBrandNow(brand: Brand) {
+    const result = applyBrand(doc, brand, undefined);
+    // The logo goes on in the same commit, so applying a brand is one
+    // undo rather than two, and so "it used my brand assets
+    // automatically" is true without a second button to find.
+    // Snapshot BEFORE the brand lands, not after: the version worth
+    // keeping is the one that is about to stop existing.
+    snapshot(doc, "brand", sessionPlan(), `Before ${brand.name}`);
+    const stamped = stampLogo(result.doc, brand, logoResolver());
+    // And the brand's furniture, from its identity, in the same commit.
+    const furnished = furnishWith(stamped.doc, brand, logoResolver());
+    studio.replaceDoc(furnished);
+    return { ...result, doc: furnished };
+  }
+
+  const one = studio.selected.length === 1 ? studio.selected[0] : undefined;
+  const picked = studio.slideSelection.length > 1 ? studio.slideSelection : [];
+  const needs = {
+    one: one ? null : "Select one layer first.",
+    some: studio.selected.length > 0 ? null : "Select a layer first.",
+    two: studio.selected.length > 1 ? null : "Select two or more layers.",
+    picked: picked.length > 0 ? null : "Pick several slides in the filmstrip first (Shift-click).",
+  };
+  const stampedBlock = studio.selected.find((l) => l.block && slide?.blocks?.some((b) => b.instance === l.block!.instance));
+
+  /**
+   * What each action does, and why it cannot right now. Typed against the
+   * registry: an action listed in actions.ts with no entry here does not compile.
+   */
+  const runners: Record<ActionId, { run: () => void; unavailable?: string | null }> = {
+    palette: { run: () => setPalette(true) },
+    shortcuts: { run: () => setShortcuts(true) },
+    outline: {
+      run: () => {
+        studio.setStripView(false);
+        studio.setOutline(!studio.outline);
+      },
+    },
+    "strip-view": {
+      run: () => {
+        studio.setOutline(false);
+        studio.setStripView(!studio.stripView);
+      },
+    },
+    "unspan-broken": {
+      run: () => studio.replaceDoc(brokenSpans(doc).reduce((d, b) => unspan(d, b.spanId), doc)),
+      unavailable: brokenSpans(doc).length > 0 ? null : "Every seam in this deck is intact.",
+    },
+    "safe-areas": {
+      run: () =>
+        studio.setSafePlatform(studio.safePlatform ? null : ((platformForSize(doc.width, doc.height)?.id as PlatformId | undefined) ?? "instagram")),
+    },
+    "find-replace": { run: () => setFinding(true) },
+    undo: { run: studio.undo },
+    redo: { run: studio.redo },
+    rename: { run: () => setNaming(true) },
+    "relay-deck": { run: relayDeck },
+    hooks: { run: () => setHooking(true) },
+    "paste-post": { run: () => setPasteOpen(true) },
+    history: { run: () => setHistory(true) },
+    review: { run: () => setSharing(true) },
+    export: { run: () => setExporting({}) },
+    "export-last": { run: () => setExporting({ initial: lastDestination(), auto: true }) },
+    "new-slide": { run: () => studio.addSlide(studio.index + 1) },
+    "type-slide": { run: () => setTypingSlide(true) },
+    "duplicate-slide": { run: () => studio.duplicateSlide(studio.index) },
+    "delete-slide": {
+      run: () => studio.deleteSlide(studio.index),
+      unavailable: doc.slides.length > 1 ? null : "A deck keeps at least one slide.",
+    },
+    "move-slide-earlier": {
+      run: () => studio.moveSlide(studio.index, studio.index - 1),
+      unavailable: studio.index > 0 ? null : "This is already the first slide.",
+    },
+    "move-slide-later": {
+      run: () => studio.moveSlide(studio.index, studio.index + 1),
+      unavailable: studio.index < doc.slides.length - 1 ? null : "This is already the last slide.",
+    },
+    "next-layout": {
+      run: () => studio.replaceDoc(stepLayout(doc, studio.index, 1, theme()).doc, undefined, "Layout"),
+      unavailable: slide && textsOfSlide(slide) ? null : "This slide has no words to lay out.",
+    },
+    "previous-layout": {
+      run: () => studio.replaceDoc(stepLayout(doc, studio.index, -1, theme()).doc, undefined, "Layout"),
+      unavailable: slide && textsOfSlide(slide) ? null : "This slide has no words to lay out.",
+    },
+    "rewrite-slide": { run: () => setRewriting(studio.index) },
+    tidy: { run: () => void studio.tidy() },
+    "relay-picked": { run: () => relayPicked(picked), unavailable: needs.picked },
+    "duplicate-picked": { run: () => studio.duplicateSlides(picked), unavailable: needs.picked },
+    "delete-picked": {
+      run: () => studio.deleteSlides(picked),
+      unavailable: needs.picked ?? (picked.length < doc.slides.length ? null : "A deck keeps at least one slide."),
+    },
+    "clear-picked": { run: () => studio.setSlideSelection([]), unavailable: needs.picked },
+    "rewrite-text": {
+      run: () => one && setRewritingLayer(one),
+      unavailable: one?.kind === "text" && (one.text ?? "").trim() ? null : "Select one text layer first.",
+    },
+    match: {
+      run: () => one && studio.matchOnSlides(one.id),
+      unavailable: needs.one ?? (doc.slides.length > 1 ? null : "There is only one slide."),
+    },
+    group: { run: studio.groupSelected, unavailable: needs.two },
+    ungroup: {
+      run: studio.ungroupSelected,
+      unavailable: studio.selected.some((l) => l.groupId) ? null : "Select a group first.",
+    },
+    "delete-layer": { run: studio.removeSelected, unavailable: needs.some },
+    "bring-front": { run: () => studio.reorder("front"), unavailable: needs.some },
+    forward: { run: () => studio.reorder("forward"), unavailable: needs.some },
+    backward: { run: () => studio.reorder("backward"), unavailable: needs.some },
+    "send-back": { run: () => studio.reorder("back"), unavailable: needs.some },
+    "align-left": { run: () => studio.alignSelected("left"), unavailable: needs.some },
+    "align-hcenter": { run: () => studio.alignSelected("hcenter"), unavailable: needs.some },
+    "align-right": { run: () => studio.alignSelected("right"), unavailable: needs.some },
+    "align-top": { run: () => studio.alignSelected("top"), unavailable: needs.some },
+    "align-vcenter": { run: () => studio.alignSelected("vcenter"), unavailable: needs.some },
+    "align-bottom": { run: () => studio.alignSelected("bottom"), unavailable: needs.some },
+    "distribute-h": { run: () => studio.distributeSelected("x"), unavailable: needs.two },
+    "distribute-v": { run: () => studio.distributeSelected("y"), unavailable: needs.two },
+    "equal-gap": { run: () => void studio.equalGapSelected("y"), unavailable: needs.two },
+    "match-width": { run: () => studio.matchWidthSelected(), unavailable: needs.two },
+    "edit-block": {
+      run: () => stampedBlock && studio.setPicker({ mode: "edit", instance: stampedBlock.block!.instance }),
+      unavailable: stampedBlock ? null : "Select a block first.",
+    },
+    "tool-select": { run: () => studio.setTool("select") },
+    "tool-text": { run: () => studio.setTool("text") },
+    "tool-rect": { run: () => studio.setTool("rect") },
+    "tool-ellipse": { run: () => studio.setTool("ellipse") },
+    "tool-triangle": { run: () => studio.setTool("triangle") },
+    "tool-line": { run: () => studio.setTool("line") },
+    "tool-icon": { run: () => studio.setTool("icon") },
+    "insert-block": { run: () => studio.setPicker({ mode: "insert" }) },
+    projects: { run: onHome },
+  };
+
+  /** One entry per argument of each family, built when the palette opens. */
+  function familyEntries(): PaletteEntry[] {
+    const entry = (family: FamilyId, arg: string, label: string, run: () => void, also = ""): PaletteEntry => ({
+      id: `${family}:${arg}`,
+      label: `${FAMILIES[family]} ${label}`,
+      group: family === "open" ? "Projects" : family === "export" ? "Export" : family === "insert-block" ? "Insert" : "Deck",
+      also,
+      run,
+    });
+    return [
+      ...BLOCKS.map((b) => entry("insert-block", b.id, b.label, () => studio.setPicker({ mode: "insert", block: b.id }), b.hint)),
+      ...listBrands().map((b) => entry("brand", b.id, b.name, () => void applyBrandNow(b), "style restyle")),
+      ...FORMATS.map((f) => entry("format", f.id, `${f.label} (${f.w}×${f.h})`, () => studio.setFormat(f.w, f.h), "canvas size resize")),
+      ...PLATFORMS.map((p) => entry("export", p.id, p.label, () => setExporting({ initial: p.id }), "download")),
+      ...PLATFORMS.filter(hasSafeZone).map((p) =>
+        entry("safe", p.id, p.label, () => studio.setSafePlatform(p.id as PlatformId), "overlay interface"),
+      ),
+      ...listDocs()
+        .filter((d) => d.id !== doc.id && !d.archived)
+        .map((d) =>
+          entry("open", d.id, d.name, () => {
+            const full = loadDoc(d.id);
+            if (full && onOpen) onOpen(full);
+          }, "jump switch"),
+        ),
+    ];
+  }
+
+  function paletteItems(): PaletteEntry[] {
+    const statics = (Object.keys(ACTIONS) as ActionId[])
+      .filter((id) => id !== "palette")
+      .map((id) => {
+        const def = ACTIONS[id];
+        return {
+          id,
+          label: def.label,
+          group: def.group,
+          keys: "keys" in def ? def.keys : undefined,
+          also: "also" in def ? def.also : undefined,
+          unavailable: runners[id].unavailable ?? null,
+          run: runners[id].run,
+        };
+      });
+    return [...statics, ...familyEntries()];
+  }
+
+  // The keyboard map, window-wide. Subscribed once and read through a ref:
+  // a listener re-subscribed during the key event that changed state is
+  // skipped for that event (the BlockPicker bug, Batch 19).
+  const runnersRef = useRef(runners);
+  runnersRef.current = runners;
+  const modal =
+    palette || shortcuts || finding || pasteOpen || exporting !== null || sharing || history || hooking ||
+    rewriting !== null || rewritingLayer !== null || studio.picker !== null || naming;
+  const modalRef = useRef(modal);
+  modalRef.current = modal;
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.defaultPrevented || modalRef.current) return;
+      const t = e.target as HTMLElement | null;
+      const typing = t?.tagName === "INPUT" || t?.tagName === "TEXTAREA" || t?.tagName === "SELECT" || t?.isContentEditable === true;
+      const id = actionForKey(e, typing);
+      if (!id) return;
+      const r = runnersRef.current[id];
+      e.preventDefault();
+      if (r.unavailable) return;
+      rememberAction(id);
+      r.run();
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, []);
+
   const printRoot = document.getElementById("print-root");
 
   return (
     <div className="flex h-full flex-col overflow-hidden bg-base">
       <header className="flex h-11 shrink-0 items-center gap-2 border-b border-hairline bg-surface-1 px-3">
-        <IconButton icon={ChevronLeft} label="Projects" onClick={onHome} />
+        <IconButton icon={ChevronLeft} label="Projects" action="projects" onClick={onHome} />
 
         {naming ? (
           <input
@@ -86,6 +341,7 @@ export function Studio({
         ) : (
           <button
             type="button"
+            data-action="rename"
             onClick={() => setNaming(true)}
             className="h-7 rounded-sm border border-transparent px-2 text-body text-secondary hover:border-hairline hover:text-primary"
           >
@@ -94,8 +350,8 @@ export function Studio({
         )}
 
         <div className="mx-1 h-4 w-px bg-hairline" />
-        <IconButton icon={Undo2} label="Undo" onClick={studio.undo} />
-        <IconButton icon={Redo2} label="Redo" onClick={studio.redo} />
+        <IconButton icon={Undo2} label={studio.undoLabel ? `Undo ${studio.undoLabel}` : "Undo"} action="undo" onClick={studio.undo} />
+        <IconButton icon={Redo2} label="Redo" action="redo" onClick={studio.redo} />
 
         <div className="flex-1" />
 
@@ -104,12 +360,9 @@ export function Studio({
         </span>
         <button
           type="button"
+          data-action="relay-deck"
           title="Lay the same words out again. Anything you changed by hand is kept."
-          onClick={() => {
-            const result = regenerate(doc, themeOf(doc, listBrands()));
-            studio.replaceDoc(result.doc);
-            setRelaid(result.kept);
-          }}
+          onClick={relayDeck}
           className="flex h-7 items-center gap-1.5 rounded-md border border-hairline bg-surface-1 px-2.5 text-body text-secondary hover:bg-surface-3 hover:text-primary"
         >
           <Shuffle size={14} strokeWidth={2} />
@@ -133,6 +386,7 @@ export function Studio({
         */}
         <button
           type="button"
+          data-action="hooks"
           title="Several ways to open the same carousel. Nothing else in the deck moves."
           onClick={() => setHooking(true)}
           className="flex h-7 items-center gap-1.5 rounded-md border border-hairline bg-surface-1 px-2.5 text-body text-secondary hover:bg-surface-3 hover:text-primary"
@@ -141,25 +395,10 @@ export function Studio({
           Hooks
         </button>
 
-        <BrandMenu
-          brands={listBrands()}
-          onApply={(brand) => {
-            const result = applyBrand(doc, brand, undefined);
-            // The logo goes on in the same commit, so applying a brand is one
-            // undo rather than two, and so "it used my brand assets
-            // automatically" is true without a second button to find.
-            // Snapshot BEFORE the brand lands, not after: the version worth
-            // keeping is the one that is about to stop existing.
-            snapshot(doc, "brand", sessionPlan(), `Before ${brand.name}`);
-            const stamped = stampLogo(result.doc, brand, logoResolver());
-            // And the brand's furniture, from its identity, in the same commit.
-            const furnished = furnishWith(stamped.doc, brand, logoResolver());
-            studio.replaceDoc(furnished);
-            return { ...result, doc: furnished };
-          }}
-        />
+        <BrandMenu brands={listBrands()} onApply={applyBrandNow} />
         <button
           type="button"
+          data-action="paste-post"
           onClick={() => setPasteOpen(true)}
           className="flex h-7 items-center gap-1.5 rounded-md border border-hairline bg-surface-1 px-2.5 text-body text-secondary hover:bg-surface-3 hover:text-primary"
         >
@@ -168,6 +407,7 @@ export function Studio({
         </button>
         <button
           type="button"
+          data-action="history"
           title="What this looked like when you exported it, sent it, or rebranded it."
           onClick={() => setHistory(true)}
           className="flex h-7 items-center gap-1.5 rounded-md border border-hairline bg-surface-1 px-2.5 text-body text-secondary hover:bg-surface-3 hover:text-primary"
@@ -177,6 +417,7 @@ export function Studio({
         </button>
         <button
           type="button"
+          data-action="review"
           title="Send a link your client can open without an account."
           onClick={() => setSharing(true)}
           className="flex h-7 items-center gap-1.5 rounded-md border border-hairline bg-surface-1 px-2.5 text-body text-secondary hover:bg-surface-3 hover:text-primary"
@@ -184,12 +425,12 @@ export function Studio({
           <Send size={14} strokeWidth={2} />
           Review
         </button>
-        <Button hero icon={Download} onClick={() => setExporting(true)}>
+        <Button hero icon={Download} action="export" onClick={() => setExporting({})}>
           Export
         </Button>
       </header>
 
-      <Toolbar studio={studio} />
+      <Toolbar studio={studio} onFind={() => setFinding(true)} />
 
       <div className="flex min-h-0 flex-1">
         <div className="flex w-[212px] shrink-0 flex-col border-r border-hairline bg-surface-1">
@@ -197,8 +438,14 @@ export function Studio({
           <MediaPool studio={studio} />
         </div>
         <div className="flex min-w-0 flex-1 flex-col">
-          {!studio.stripView ? <SeamWarnings studio={studio} /> : null}
-          {studio.stripView ? <StripCanvas studio={studio} onOpenDoc={onOpen} /> : <Canvas studio={studio} />}
+          {!studio.stripView && !studio.outline ? <SeamWarnings studio={studio} /> : null}
+          {studio.outline ? (
+            <OutlineView studio={studio} />
+          ) : studio.stripView ? (
+            <StripCanvas studio={studio} onOpenDoc={onOpen} />
+          ) : (
+            <Canvas studio={studio} />
+          )}
         </div>
         <Properties studio={studio} onRewrite={(l) => setRewritingLayer(l)} />
       </div>
@@ -206,13 +453,15 @@ export function Studio({
       <Filmstrip
         studio={studio}
         onRewrite={(i) => setRewriting(i)}
-        onRelay={(ids) => {
-          // Only the picked slides change; the deck is rebuilt to get their
-          // compositions right and the rest is left exactly as it was.
-          const result = relaySlides(doc, ids, themeOf(doc, listBrands()));
-          if (result.replaced > 0) studio.replaceDoc(result.doc);
-          setRelaid(result.replaced > 0 ? result.kept : -1);
+        onRelay={relayPicked}
+        onTypeSlide={(line) => {
+          const r = typeSlide(doc, doc.slides.length, line, themeOf(doc, listBrands()));
+          studio.replaceDoc(r.doc, undefined, "New slide");
+          studio.setSlideIndex(doc.slides.length);
+          studio.setSelection([]);
         }}
+        typing={typingSlide}
+        setTyping={setTypingSlide}
       />
 
       {pasteOpen ? (
@@ -221,7 +470,7 @@ export function Studio({
             <header className="flex h-11 items-center gap-2 border-b border-hairline px-3">
               <span className="text-title text-primary">Paste a post</span>
               <div className="flex-1" />
-              <IconButton icon={X} label="Close" onClick={() => setPasteOpen(false)} />
+              <IconButton icon={X} label="Close" control onClick={() => setPasteOpen(false)} />
             </header>
             <div className="p-4">
               <p className="mb-2 text-caption text-tertiary">
@@ -238,6 +487,7 @@ export function Studio({
             <div className="flex justify-end gap-2 border-t border-hairline bg-surface-1 p-3">
               <button
                 type="button"
+                data-control
                 onClick={() => setPasteOpen(false)}
                 className="h-7 rounded-md px-2.5 text-body text-tertiary hover:text-primary"
               >
@@ -245,6 +495,7 @@ export function Studio({
               </button>
               <Button
                 hero
+                control
                 onClick={() => {
                   if (pasted.trim()) {
                     const slides = buildSlides(
@@ -269,7 +520,33 @@ export function Studio({
       ) : null}
 
       {exporting ? (
-        <ExportDialog doc={doc} onAlt={studio.setSlideAlt} onClose={() => setExporting(false)} />
+        <ExportDialog
+          doc={doc}
+          onAlt={studio.setSlideAlt}
+          onClose={() => setExporting(null)}
+          initial={exporting.initial}
+          autoStart={exporting.auto}
+        />
+      ) : null}
+
+      {palette ? <CommandPalette items={paletteItems()} onClose={() => setPalette(false)} /> : null}
+      {shortcuts ? <Shortcuts onClose={() => setShortcuts(false)} /> : null}
+      {finding ? (
+        <ReplaceDialog
+          docs={[doc]}
+          scope="deck"
+          undoNote="One Undo takes it back."
+          onReplace={([c]) => {
+            if (!c) return;
+            snapshot(c.before, "replace", sessionPlan(), "Before find and replace");
+            studio.replaceDoc(c.after, undefined, "Replace");
+          }}
+          onOpenSlide={(_, i) => {
+            studio.setSlideIndex(i);
+            setFinding(false);
+          }}
+          onClose={() => setFinding(false)}
+        />
       ) : null}
 
       {sharing ? <ShareDialog doc={doc} onClose={() => setSharing(false)} /> : null}
@@ -415,11 +692,17 @@ function SeamWarnings({ studio }: { studio: StudioState }) {
         {broken.length === 1 ? "A design that ran across slides" : `${broken.length} designs that ran across slides`} no
         longer meet at the edge.
       </span>
-      <button type="button" onClick={() => studio.setStripView(true)} className="h-7 rounded-md border border-hairline px-2 text-primary">
+      <button
+        type="button"
+        data-action="strip-view"
+        onClick={() => studio.setStripView(true)}
+        className="h-7 rounded-md border border-hairline px-2 text-primary"
+      >
         Show in strip
       </button>
       <button
         type="button"
+        data-action="unspan-broken"
         onClick={() => studio.replaceDoc(broken.reduce((d, b) => unspan(d, b.spanId), studio.doc))}
         className="h-7 rounded-md border border-hairline px-2 text-primary"
       >
@@ -427,4 +710,9 @@ function SeamWarnings({ studio }: { studio: StudioState }) {
       </button>
     </div>
   );
+}
+
+/** Whether a slide has words of its own to lay out. */
+function textsOfSlide(s: { layers: Layer[] }): boolean {
+  return s.layers.some((l) => l.kind === "text" && (l.text ?? "").trim() !== "" && !l.block && !l.furniture);
 }

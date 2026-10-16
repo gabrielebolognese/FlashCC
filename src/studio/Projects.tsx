@@ -5,7 +5,7 @@
  * the pipeline bridge on each card, "Add to pipeline" is where a document stops
  * being a file and becomes something with a date and, eventually, numbers.
  */
-import { Archive, ArchiveRestore, CalendarPlus, Copy, FileText, Folder, Layers, Link2, PenLine, Plus, Send, Table, Trash2 } from "lucide-react";
+import { Archive, ArchiveRestore, CalendarPlus, Copy, FileText, Folder, Layers, Link2, PenLine, Plus, Replace, Send, Table, Trash2 } from "lucide-react";
 import { useMemo, useState } from "react";
 
 import { LayerView } from "./LayerView.js";
@@ -16,6 +16,9 @@ import { furnishWith } from "./furniture.js";
 import { ALL_CLIENTS, belongsTo, listClients, UNASSIGNED, type Client } from "./clients.js";
 import { logoResolver } from "./library.js";
 import { PublishBatch } from "./PublishBatch.js";
+import { ReplaceDialog } from "./ReplaceDialog.js";
+import { sessionPlan } from "./session.js";
+import { retentionDays, snapshot } from "./versions.js";
 import { seriesTitle } from "./series.js";
 import { BrandMenu } from "./BrandMenu.js";
 import { detachDoc, listPosts, postFromDoc, type Post } from "./pipeline.js";
@@ -65,6 +68,8 @@ export function Projects({
   const [filters, setFilters] = useState<Filters>(NO_FILTERS);
   const [renaming, setRenaming] = useState<string | null>(null);
   const [publishing, setPublishing] = useState(false);
+  /** Find and replace across the projects in view (24.4), with their full documents loaded. */
+  const [replacing, setReplacing] = useState<Doc[] | null>(null);
 
   const refresh = () => setDocs(listDocs());
 
@@ -293,6 +298,18 @@ export function Projects({
               {/* The other half of the same idea: the filtered set is already
                   "this week's batch", so publishing it is one press rather than
                   a selection mode nobody asked for. */}
+              {/* A product renamed, a price or a handle changed: across the
+                  filtered set, which is already "this client's carousels". */}
+              <button
+                type="button"
+                onClick={() =>
+                  setReplacing(visible.map((d) => loadDoc(d.id)).filter((d): d is Doc => d !== null))
+                }
+                className="flex h-8 items-center gap-1.5 rounded-xl border border-hairline px-3 text-caption text-tertiary hover:border-accent-dim hover:text-accent"
+              >
+                <Replace size={13} strokeWidth={2} />
+                Replace in the {visible.length} shown
+              </button>
               <button
                 type="button"
                 onClick={() => setPublishing(true)}
@@ -515,6 +532,36 @@ export function Projects({
 
       {publishing ? (
         <PublishBatch ids={visible.map((d) => d.id)} onClose={() => setPublishing(false)} />
+      ) : null}
+
+      {replacing ? (
+        <ReplaceDialog
+          docs={replacing}
+          scope="projects"
+          undoNote={
+            retentionDays(sessionPlan()) > 0
+              ? "Each project was saved in its version history first, and each can be put back below."
+              : "Version history is not kept on Free, so the way back is the Undo buttons below, until you close this."
+          }
+          onReplace={(changed) => {
+            // Every touched document is snapshotted BEFORE it changes (8.3),
+            // so the replace can be undone document by document from History.
+            for (const c of changed) {
+              snapshot(c.before, "replace", sessionPlan(), "Before find and replace");
+              saveDoc(c.after);
+            }
+            refresh();
+          }}
+          onUndo={(docs) => {
+            for (const d of docs) saveDoc(d);
+            refresh();
+          }}
+          onOpenSlide={(docId) => {
+            const full = loadDoc(docId);
+            if (full) onOpen(full);
+          }}
+          onClose={() => setReplacing(null)}
+        />
       ) : null}
     </>
   );

@@ -41,6 +41,7 @@ import { TextureField } from "./TextureField.js";
 import { PictureTools, TextScrimField } from "./PictureTools.js";
 import { focalFromClick } from "./imagetools.js";
 import { unitsOf } from "./tidy.js";
+import type { ActionId } from "./actions.js";
 import type { Studio } from "./useStudio.js";
 
 /** Properties for the current selection. Nothing selected → the slide itself. */
@@ -80,6 +81,7 @@ export function Properties({
               <button
                 key={f.id}
                 type="button"
+                data-action={`format:${f.id}`}
                 onClick={() => studio.setFormat(f.w, f.h)}
                 className={[
                   "h-7 flex-1 rounded-md border text-caption",
@@ -112,7 +114,7 @@ export function Properties({
           {selected.length > 1 ? `${selected.length} layers` : (one?.name ?? "Layer")}
         </span>
         <div className="flex-1" />
-        <IconButton icon={Trash2} label="Delete" danger onClick={studio.removeSelected} />
+        <IconButton icon={Trash2} label="Delete" danger action="delete-layer" onClick={studio.removeSelected} />
       </div>
 
       {one ? (
@@ -128,10 +130,10 @@ export function Properties({
 
       <Field label="Arrange">
         <div className="flex gap-1">
-          <Arrange icon={ArrowUpToLine} label="Bring to front" onClick={() => studio.reorder("front")} />
-          <Arrange icon={ArrowUp} label="Forward" onClick={() => studio.reorder("forward")} />
-          <Arrange icon={ArrowDown} label="Backward" onClick={() => studio.reorder("backward")} />
-          <Arrange icon={ArrowDownToLine} label="Send to back" onClick={() => studio.reorder("back")} />
+          <Arrange icon={ArrowUpToLine} label="Bring to front" action="bring-front" onClick={() => studio.reorder("front")} />
+          <Arrange icon={ArrowUp} label="Forward" action="forward" onClick={() => studio.reorder("forward")} />
+          <Arrange icon={ArrowDown} label="Backward" action="backward" onClick={() => studio.reorder("backward")} />
+          <Arrange icon={ArrowDownToLine} label="Send to back" action="send-back" onClick={() => studio.reorder("back")} />
         </div>
       </Field>
 
@@ -142,6 +144,7 @@ export function Properties({
           <Field label="Block">
             <button
               type="button"
+              data-action="edit-block"
               onClick={() => studio.setPicker({ mode: "edit", instance: stamped.block!.instance })}
               className="flex h-7 w-full items-center justify-center gap-1.5 rounded-md border border-hairline text-caption text-secondary hover:border-accent-dim hover:text-accent"
             >
@@ -171,6 +174,7 @@ export function Properties({
         <Field label="Rewrite">
           <button
             type="button"
+            data-action="rewrite-text"
             onClick={() => onRewrite(one)}
             disabled={!(one.text ?? "").trim()}
             className="flex h-7 w-full items-center justify-center gap-1.5 rounded-md border border-hairline text-caption text-secondary hover:border-accent-dim hover:text-accent disabled:pointer-events-none disabled:opacity-40"
@@ -230,6 +234,7 @@ export function Properties({
             />
             <button
               type="button"
+              data-control
               onClick={() => set({ uppercase: !one?.uppercase })}
               className={[
                 "h-7 rounded-md border text-caption",
@@ -365,6 +370,7 @@ function Toggle({ icon: Icon, active, onClick }: { icon: typeof Bold; active: bo
   return (
     <button
       type="button"
+      data-control
       onClick={onClick}
       className={[
         "grid h-7 w-7 place-items-center rounded-md border",
@@ -376,10 +382,22 @@ function Toggle({ icon: Icon, active, onClick }: { icon: typeof Bold; active: bo
   );
 }
 
-function Arrange({ icon: Icon, label, onClick }: { icon: typeof ArrowUp; label: string; onClick: () => void }) {
+function Arrange({
+  icon: Icon,
+  label,
+  action,
+  onClick,
+}: {
+  icon: typeof ArrowUp;
+  label: string;
+  /** The registry action (24.2); typed, so a button cannot name one that does not exist. */
+  action: ActionId;
+  onClick: () => void;
+}) {
   return (
     <button
       type="button"
+      data-action={action}
       title={label}
       aria-label={label}
       onClick={onClick}
@@ -405,6 +423,7 @@ function Colour({
         <button
           key={hex}
           type="button"
+          data-control
           onClick={() => onChange(hex)}
           className={[
             "h-6 w-6 rounded-md border",
@@ -468,6 +487,7 @@ function PaintPicker({
   const tab = (id: typeof mode, label: string, onPick: () => void) => (
     <button
       type="button"
+      data-control
       onClick={onPick}
       className={[
         "h-6 flex-1 rounded-sm text-caption",
@@ -564,6 +584,7 @@ function BackgroundImage({
           <button
             key={m.id}
             type="button"
+            data-control
             title={m.name}
             onClick={() =>
               // Both replaced, never kept: the previous picture's asset id or
@@ -586,6 +607,7 @@ function BackgroundImage({
           <button
             key={f}
             type="button"
+            data-control
             onClick={() => onChange({ ...image, fit: f })}
             className={[
               "h-6 flex-1 rounded-sm text-caption capitalize",
@@ -616,6 +638,7 @@ function BackgroundImage({
 
       <button
         type="button"
+        data-control
         onClick={() => onChange(undefined)}
         className="mt-2 h-7 w-full rounded-md border border-hairline text-caption text-tertiary hover:border-accent-dim hover:text-accent"
       >
@@ -652,12 +675,12 @@ function LayoutTools({ studio }: { studio: Studio }) {
     <>
       <Field label={units === 1 ? "Align to the slide" : "Align"}>
         <div className="flex gap-1">
-          <Arrange icon={AlignStartVertical} label="Align left" onClick={() => studio.alignSelected("left")} />
-          <Arrange icon={AlignCenterVertical} label="Align centres" onClick={() => studio.alignSelected("hcenter")} />
-          <Arrange icon={AlignEndVertical} label="Align right" onClick={() => studio.alignSelected("right")} />
-          <Arrange icon={AlignStartHorizontal} label="Align top" onClick={() => studio.alignSelected("top")} />
-          <Arrange icon={AlignCenterHorizontal} label="Align middles" onClick={() => studio.alignSelected("vcenter")} />
-          <Arrange icon={AlignEndHorizontal} label="Align bottom" onClick={() => studio.alignSelected("bottom")} />
+          <Arrange icon={AlignStartVertical} label="Align left" action="align-left" onClick={() => studio.alignSelected("left")} />
+          <Arrange icon={AlignCenterVertical} label="Align centres" action="align-hcenter" onClick={() => studio.alignSelected("hcenter")} />
+          <Arrange icon={AlignEndVertical} label="Align right" action="align-right" onClick={() => studio.alignSelected("right")} />
+          <Arrange icon={AlignStartHorizontal} label="Align top" action="align-top" onClick={() => studio.alignSelected("top")} />
+          <Arrange icon={AlignCenterHorizontal} label="Align middles" action="align-vcenter" onClick={() => studio.alignSelected("vcenter")} />
+          <Arrange icon={AlignEndHorizontal} label="Align bottom" action="align-bottom" onClick={() => studio.alignSelected("bottom")} />
         </div>
       </Field>
 
@@ -669,11 +692,13 @@ function LayoutTools({ studio }: { studio: Studio }) {
                 <Arrange
                   icon={AlignHorizontalSpaceAround}
                   label="Distribute horizontally"
+                  action="distribute-h"
                   onClick={() => studio.distributeSelected("x")}
                 />
                 <Arrange
                   icon={AlignVerticalSpaceAround}
                   label="Distribute vertically"
+                  action="distribute-v"
                   onClick={() => studio.distributeSelected("y")}
                 />
               </>
@@ -681,11 +706,13 @@ function LayoutTools({ studio }: { studio: Studio }) {
             <Arrange
               icon={Rows3}
               label="Equal gap, top to bottom, from the spacing scale"
+              action="equal-gap"
               onClick={() => setNote(`Gaps set to ${studio.equalGapSelected("y")}px.`)}
             />
             <Arrange
               icon={StretchHorizontal}
               label="Match width to the widest"
+              action="match-width"
               onClick={() => studio.matchWidthSelected()}
             />
           </div>
@@ -697,10 +724,10 @@ function LayoutTools({ studio }: { studio: Studio }) {
         <Field label="Group">
           <div className="flex gap-1">
             {selection.length >= 2 && !(grouped && units === 1) ? (
-              <Arrange icon={Group} label="Group (Cmd+G)" onClick={studio.groupSelected} />
+              <Arrange icon={Group} label="Group (G)" action="group" onClick={studio.groupSelected} />
             ) : null}
             {grouped ? (
-              <Arrange icon={Ungroup} label="Ungroup (Cmd+Shift+G)" onClick={studio.ungroupSelected} />
+              <Arrange icon={Ungroup} label="Ungroup (Shift+G)" action="ungroup" onClick={studio.ungroupSelected} />
             ) : null}
           </div>
         </Field>
@@ -723,6 +750,7 @@ function TidyField({ studio }: { studio: Studio }) {
     <Field label="Tidy">
       <button
         type="button"
+        data-action="tidy"
         onClick={() => {
           const r = studio.tidy();
           const parts = [
@@ -760,6 +788,7 @@ function MatchField({ studio, layer }: { studio: Studio; layer: Layer }) {
     <Field label="Match">
       <button
         type="button"
+        data-action="match"
         onClick={() => setResult(studio.matchOnSlides(layer.id))}
         className="flex h-7 w-full items-center justify-center gap-1.5 rounded-md border border-hairline text-caption text-secondary hover:border-accent-dim hover:text-accent"
       >
@@ -777,6 +806,7 @@ function MatchField({ studio, layer }: { studio: Studio; layer: Layer }) {
                 <button
                   key={n}
                   type="button"
+                  data-control
                   onClick={() => studio.setSlideIndex(n - 1)}
                   className="mr-1 underline"
                 >

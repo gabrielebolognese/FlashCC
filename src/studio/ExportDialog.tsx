@@ -28,8 +28,9 @@ import {
   Table,
   X,
 } from "lucide-react";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 
+import { rememberDestination } from "./actions.js";
 import { altFile, writeAlt, writeCaption } from "./caption.js";
 import { ContactSheet, type SheetColumn } from "./ContactSheet.js";
 import { Chip } from "./Dash.js";
@@ -86,14 +87,23 @@ export function ExportDialog({
   doc,
   onAlt,
   onClose,
+  initial,
+  autoStart = false,
 }: {
   doc: Doc;
   onAlt: (index: number, text: string) => void;
   onClose: () => void;
+  /** A destination to open on: the palette's "Export for…", or ⌘E's last one (24.2, 24.3). */
+  initial?: string | null | undefined;
+  /** ⌘E: export straight away when nothing blocks it. Pre-flight still decides. */
+  autoStart?: boolean | undefined;
 }) {
   // Default to whatever matches the artboard, so the common case needs no choice.
   const [dests, setDests] = useState<Destination[]>(() => [
-    destinationFor(platformForSize(doc.width, doc.height) ?? PLATFORMS[0]!, doc),
+    destinationFor(
+      PLATFORMS.find((p) => p.id === initial) ?? platformForSize(doc.width, doc.height) ?? PLATFORMS[0]!,
+      doc,
+    ),
   ]);
   /**
    * Several at once (17.5). A mode rather than a second dialog, because the
@@ -194,6 +204,7 @@ export function ExportDialog({
     // a render anyway, so the earlier call is the one that cannot be missed by
     // a failure halfway through.
     snapshot(doc, "export", sessionPlan(), `Exported for ${destinationLabel(current)}`);
+    rememberDestination(platform.id);
     setPhase({ at: "working" });
 
     const perPost = platform.perPost;
@@ -266,6 +277,16 @@ export function ExportDialog({
     ].filter(Boolean);
     setPhase({ at: "done", filename, size: null, note: notes.join(" ") || undefined });
   };
+
+  // ⌘E (24.3): the last destination, straight away, unless pre-flight blocks
+  // it, in which case the dialog is simply open on what is wrong. Once.
+  const started = useRef(false);
+  useEffect(() => {
+    if (!autoStart || started.current) return;
+    started.current = true;
+    if (ready && !multi) void run();
+    // Decided once, on opening.
+  }, []);
 
   const instagram = columns.find((c) => c.destination.platform.id === "instagram");
   const neighbours = useMemo(

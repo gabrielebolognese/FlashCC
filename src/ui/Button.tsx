@@ -9,16 +9,22 @@ type Props = {
   /** The one hero control per screen. Brand gold gradient. */
   hero?: boolean;
   disabled?: boolean;
+  /** The registry action this runs (24.2), rendered as `data-action`. */
+  action?: string | undefined;
+  /** A control that sets a value or closes a dialog rather than running an action. */
+  control?: boolean | undefined;
 };
 
 /**
  * R6: the hero variant is the only filled, accent-coloured control in the app.
  * Everything else is ghost or text.
  */
-export function Button({ children, onClick, icon: Icon, hero = false, disabled = false }: Props) {
+export function Button({ children, onClick, icon: Icon, hero = false, disabled = false, action, control }: Props) {
   return (
     <button
       type="button"
+      data-action={action}
+      data-control={control ? "" : undefined}
       onClick={onClick}
       disabled={disabled}
       style={hero ? { background: "var(--brand-gold)", color: "var(--on-brand-gold)" } : undefined}

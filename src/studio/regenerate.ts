@@ -12,7 +12,8 @@
  * original colour silently loses its protection.
  */
 
-import { buildSlides, type BuildOptions } from "./compositions.js";
+import { buildSlides, cycleCompositionAt, stepComposition, type BuildOptions } from "./compositions.js";
+import { hasMarks } from "./marks.js";
 import type { Doc, Layer, Slide } from "./model.js";
 import type { Theme } from "./presets.js";
 
@@ -44,20 +45,28 @@ const withFills = (doc: Doc, options: BuildOptions): BuildOptions => {
   return fillsAt ? { ...options, fillsAt } : options;
 };
 
+/**
+ * The layers that carry a slide's own copy, biggest first. A block's words and
+ * a counter's "3 / 10" are not what the slide says, and feeding them back into
+ * generation would lay them out a second time as body text.
+ */
+export function copyLayers(slide: Slide): Layer[] {
+  const texts = slide.layers.filter(
+    (l) => l.kind === "text" && (l.text ?? "").trim() !== "" && !l.block && !l.furniture && !l.furnitureOptOut,
+  );
+  // Biggest first, then the rest, which reassembles "heading. body" the way
+  // the splitter produced it. Stable, so equal sizes keep their order.
+  return [...texts].sort((a, b) => (b.fontSize ?? 0) - (a.fontSize ?? 0));
+}
+
+/** One slide's copy, as generation reads it back. */
+export const slideCopy = (slide: Slide): string =>
+  copyLayers(slide)
+    .map((l) => (l.text ?? "").trim())
+    .join("\n");
+
 export function textsOf(doc: Doc): string[] {
-  return doc.slides.map((slide) => {
-    // The slide's own copy only. A block's words and a counter's "3 / 10" are
-    // not what the slide says, and feeding them back into generation would lay
-    // them out a second time as body text.
-    const texts = slide.layers.filter(
-      (l) => l.kind === "text" && (l.text ?? "").trim() !== "" && !l.block && !l.furniture && !l.furnitureOptOut,
-    );
-    if (texts.length === 0) return "";
-    // Biggest first, then the rest, which reassembles "heading. body" the way
-    // the splitter produced it.
-    const sorted = [...texts].sort((a, b) => (b.fontSize ?? 0) - (a.fontSize ?? 0));
-    return sorted.map((l) => (l.text ?? "").trim()).join("\n");
-  });
+  return doc.slides.map(slideCopy);
 }
 
 export type MergeResult = { doc: Doc; replaced: number; kept: number };
@@ -168,6 +177,29 @@ export function restateSlide(
 export const handEditedCount = (doc: Doc): number =>
   doc.slides.reduce((n, s) => n + s.layers.filter((l) => l.handEdited).length, 0);
 
+/**
+ * What changing a layer's WORDS undoes, applied wherever words change: the two
+ * edit funnels, outline mode and find and replace.
+ *
+ * A verified quote (Batch 13, 19.2) whose words change is no longer verbatim.
+ * A furniture piece somebody typed into (Batch 20.4) stops being furniture:
+ * its stamp goes, and the opt-out stays so reseal neither rewrites it nor puts
+ * a fresh one beside it. Somebody who typed "Swipe for the secret" into the
+ * swipe cue has said what they want.
+ */
+export function retouched(before: Layer, after: Layer, marks?: () => string): Layer {
+  if (after.text === undefined || after.text === before.text) return after;
+  let next = after;
+  if (next.verbatim) next = { ...next, verbatim: undefined };
+  if (next.furniture) next = { ...next, furnitureOptOut: next.furniture, furniture: undefined };
+  // The first mark typed into a layer that never had one (22.3): it takes the
+  // deck's accent, chosen once and stored, like every colour on a layer.
+  if (marks && !next.markColour && next.kind === "text" && hasMarks(next.text ?? "")) {
+    next = { ...next, markColour: marks() };
+  }
+  return next;
+}
+
 /** Marks a layer as the user's. Called from every editor mutation. */
 export const markEdited = (l: Layer): Layer => (l.handEdited ? l : { ...l, handEdited: true });
 
@@ -208,4 +240,185 @@ export function relaySlides(doc: Doc, ids: readonly string[], theme: Theme): Mer
   });
 
   return { doc: replaced > 0 ? { ...doc, slides } : doc, replaced, kept };
+}
+
+/* ── several slides at once (24.1, 24.5) ─────────────────────────────────── */
+
+/**
+ * One slide of the deck to be: where it comes from, and what it says.
+ *
+ * `from` is the index of the slide it continues (null for a new one), `text`
+ * its copy, and `changed` whether that copy differs from what `from` says.
+ * A slide that continues one and is unchanged is kept exactly as it is.
+ */
+export type Restatement = { from: number | null; text: string; changed: boolean; composition?: string | undefined };
+
+export type RestateResult = {
+  doc: Doc;
+  /** Indexes (in the new deck) of slides laid out again or written to. */
+  rebuilt: number[];
+  /** Of those, the ones written straight onto their layers because a copy layer was the user's. */
+  written: number[];
+};
+
+/**
+ * Lays out the slides whose words changed, keeps every other slide exactly as
+ * it is, and adds or drops slides as the plan says.
+ *
+ * The deck is rebuilt from all the new copy and the changed slides taken from
+ * it, for the reason `restateSlide` gives (a composition depends on the index,
+ * the total and the deck's seed). Never split: the plan's slide count is
+ * somebody's decision (a `#` line in the outline), so copy too long for its
+ * slide is reported by the caller rather than moved onto a slide nobody asked
+ * for.
+ *
+ * Who owns the box decides how a changed slide changes, the same rule the
+ * rewrite picker follows. A slide whose copy layers are all generated is laid
+ * out again, and its hand-edited layers ride on top where they were. A slide
+ * where the user has edited a copy layer (moved it, restyled it, typed into
+ * it) has its words written straight onto its layers, line for line, and
+ * nothing moves: rebuilding would print the new words as a generated layer
+ * beside the kept one, the same line twice.
+ */
+export function restateMany(doc: Doc, plan: readonly Restatement[], theme: Theme, options: BuildOptions = {}): RestateResult {
+  const bands = deckHasBands(doc);
+  const fillsAt = plan.map((p) => {
+    const rec = p.from === null ? undefined : doc.slides[p.from]?.blocks?.find((b) => b.slot);
+    return rec ? { id: rec.block, fields: rec.fields } : undefined;
+  });
+  const compositions = plan.map((p) => p.composition);
+  const fresh = buildSlides(
+    plan.map((p) => p.text),
+    theme,
+    undefined,
+    {
+      images: bands,
+      ...options,
+      split: false,
+      ...(fillsAt.some(Boolean) ? { fillsAt } : {}),
+      ...(compositions.some(Boolean) ? { compositions } : {}),
+    },
+  );
+  // buildSlides drops empty entries, so map plan rows to fresh slides by the
+  // non-empty ones; an empty new slide is a plain blank slide.
+  let k = 0;
+  const freshFor = plan.map((p) => (p.text.trim() ? fresh[k++] : undefined));
+
+  const rebuilt: number[] = [];
+  const written: number[] = [];
+  const slides = plan.map((p, i): Slide => {
+    const old = p.from === null ? undefined : doc.slides[p.from];
+    if (old && !p.changed && !p.composition) return old;
+    const built = freshFor[i];
+    if (!old) {
+      rebuilt.push(i);
+      return built ?? { ...blank(doc), name: `Slide ${i + 1}` };
+    }
+    const copy = copyLayers(old);
+    if (!p.composition && copy.some((l) => l.handEdited)) {
+      written.push(i);
+      rebuilt.push(i);
+      return writeCopy(old, p.text);
+    }
+    rebuilt.push(i);
+    if (!built) {
+      // Emptied: the generated copy goes, the user's layers stay.
+      return { ...old, layers: old.layers.filter((l) => !copy.includes(l) || survivesRegeneration(l)) };
+    }
+    // A new layout asked for by name (`L`) lays the words out afresh, the
+    // user's own copy layers included: keeping a moved headline beside the
+    // re-laid one would print it twice. Everything else of theirs stays.
+    const mine = old.layers.filter((l) => survivesRegeneration(l) && !(p.composition && copy.includes(l)));
+    // A picture the user placed replaces the fresh empty band rather than sitting beside it.
+    const ownPicture = mine.some((l) => l.kind === "image" && !l.block);
+    const layers = ownPicture ? built.layers.filter((l) => !(l.kind === "image" && !l.src)) : built.layers;
+    const blocks = [...(built.blocks ?? []), ...(old.blocks ?? []).filter((b) => !b.slot)];
+    return {
+      ...built,
+      id: old.id,
+      name: old.name,
+      ...(old.alt ? { alt: old.alt } : {}),
+      ...(old.image ? { image: old.image } : {}),
+      ...(old.texture ? { texture: old.texture } : {}),
+      background: old.background,
+      ...(old.gradient ? { gradient: old.gradient } : { gradient: undefined }),
+      ...(blocks.length > 0 ? { blocks } : { blocks: undefined }),
+      layers: [...layers, ...mine],
+    };
+  });
+
+  return { doc: { ...doc, slides }, rebuilt, written };
+}
+
+/** A deck laid out with picture bands keeps them on the slides it lays out again. */
+function deckHasBands(doc: Doc): boolean {
+  return doc.slides.some((s) => s.layers.some((l) => l.kind === "image" && !l.block && !l.furniture && !l.spanId));
+}
+
+const blank = (doc: Doc): Slide => ({
+  id: `s${Date.now().toString(36)}${Math.floor(Math.random() * 1e6).toString(36)}`,
+  name: "Slide",
+  background: doc.slides[0]?.background ?? "#12161c",
+  layers: [],
+});
+
+/**
+ * New copy written onto a slide's own copy layers, line for line: each layer
+ * takes as many lines as it held before, and the last takes whatever is left.
+ * Layers with no words left are emptied rather than deleted, so a box somebody
+ * placed is still there to type into.
+ */
+export function writeCopy(slide: Slide, text: string): Slide {
+  const copy = copyLayers(slide);
+  const lines = text.split("\n");
+  const next = new Map<string, string>();
+  let at = 0;
+  copy.forEach((l, k) => {
+    const want = k === copy.length - 1 ? Math.max(0, lines.length - at) : (l.text ?? "").trim().split("\n").length;
+    next.set(l.id, lines.slice(at, at + want).join("\n"));
+    at += want;
+  });
+  return {
+    ...slide,
+    layers: slide.layers.map((l) => {
+      const t = next.get(l.id);
+      if (t === undefined || t === (l.text ?? "").trim()) return l;
+      return markEdited(retouched(l, { ...l, text: t }));
+    }),
+  };
+}
+
+/**
+ * The next (or previous) layout for one slide (24.3's `L`): the same words in
+ * the composition after this one in the fixed ring, so `L` pressed as many
+ * times as there are compositions comes back to the start. Hand-edited layers
+ * that are not the slide's words stay where they are.
+ */
+export function stepLayout(doc: Doc, index: number, dir: 1 | -1, theme: Theme): RestateResult {
+  const slide = doc.slides[index];
+  if (!slide || !slideCopy(slide)) return { doc, rebuilt: [], written: [] };
+  // A slide no generator laid out (a template's, a typed one before Batch 24)
+  // has no composition recorded: it steps from the one the deck's cycle gives
+  // its position, not from the top of the ring.
+  const current = slide.composition ?? (index === 0 ? "title" : cycleCompositionAt(index, textsOf(doc)));
+  const composition = stepComposition(current, dir);
+  return restateMany(
+    doc,
+    doc.slides.map((s, i) => ({ from: i, text: slideCopy(s), changed: i === index, composition: i === index ? composition : undefined })),
+    theme,
+  );
+}
+
+/**
+ * A slide typed into existence (24.5): `line` as its headline, inserted at
+ * `at`, laid out with the composition the deck's cycle gives that position.
+ * Every other slide is kept exactly as it is.
+ */
+export function typeSlide(doc: Doc, at: number, line: string, theme: Theme): RestateResult {
+  const texts = textsOf(doc);
+  const where = Math.max(0, Math.min(at, doc.slides.length));
+  const plan: Restatement[] = doc.slides.map((s, i) => ({ from: i, text: texts[i] ?? "", changed: false }));
+  const next = [...texts.slice(0, where), line, ...texts.slice(where)];
+  plan.splice(where, 0, { from: null, text: line.trim(), changed: true, composition: cycleCompositionAt(where, next) });
+  return restateMany(doc, plan, theme);
 }

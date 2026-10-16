@@ -28,7 +28,7 @@ import { hasMarks } from "./marks.js";
 import { markColourFor } from "./texteffects.js";
 import { bundledIdsIn, ensureFacesFor } from "./typefaces.js";
 import { loadKerning } from "./typemetrics.js";
-import { markEdited } from "./regenerate.js";
+import { markEdited, retouched } from "./regenerate.js";
 import { isUnnamed, nameFromDoc } from "./search.js";
 import { deleteSet, duplicateSet, inDeckOrder, moveSet } from "./slideset.js";
 import { saveDoc } from "./storage.js";
@@ -56,28 +56,6 @@ const LIMIT = 120;
 const spanIds = { span: () => uid("span"), layer: () => uid("l") };
 
 /**
- * What changing a layer's WORDS undoes, applied at the two edit funnels.
- *
- * A verified quote (Batch 13, 19.2) whose words change is no longer verbatim.
- * A furniture piece somebody typed into (Batch 20.4) stops being furniture:
- * its stamp goes, and the opt-out stays so reseal neither rewrites it nor puts
- * a fresh one beside it. Somebody who typed "Swipe for the secret" into the
- * swipe cue has said what they want.
- */
-function retouched(before: Layer, after: Layer, marks?: () => string): Layer {
-  if (after.text === undefined || after.text === before.text) return after;
-  let next = after;
-  if (next.verbatim) next = { ...next, verbatim: undefined };
-  if (next.furniture) next = { ...next, furnitureOptOut: next.furniture, furniture: undefined };
-  // The first mark typed into a layer that never had one (22.3): it takes the
-  // deck's accent, chosen once and stored, like every colour on a layer.
-  if (marks && !next.markColour && next.kind === "text" && hasMarks(next.text ?? "")) {
-    next = { ...next, markColour: marks() };
-  }
-  return next;
-}
-
-/**
  * All editor state. Snapshot history, so undo covers everything, every layer edit,
  * every reorder, every slide operation, without a command class per action.
  */
@@ -94,6 +72,8 @@ export function useStudio(initial: Doc) {
   const [safePlatform, setSafePlatform] = useState<PlatformId | null>(null);
   /** Every slide side by side, the only view a seam can be judged in (23.1). A view setting, not the doc. */
   const [stripView, setStripView] = useState(false);
+  /** The deck as one text document (24.1). A view, like strip view. */
+  const [outline, setOutline] = useState(false);
   /**
    * Slides picked in the filmstrip (18.5). IDS, not indexes, so a reorder does
    * not change what is selected. Separate from `index`, the slide on the
@@ -104,23 +84,32 @@ export function useStudio(initial: Doc) {
    * The block picker (19.6, 19.8): inserting a new block, or editing the fields
    * of one already placed. A view state, like the safe-zone overlay.
    */
-  const [picker, setPicker] = useState<{ mode: "insert" } | { mode: "edit"; instance: string } | null>(null);
+  const [picker, setPicker] = useState<
+    { mode: "insert"; block?: string | undefined } | { mode: "edit"; instance: string } | null
+  >(null);
 
   const past = useRef<Doc[]>([]);
   const future = useRef<Doc[]>([]);
   const tag = useRef<string | null>(null);
+  /**
+   * What produced each state, for the undo button's name ("Undo Outline").
+   * Keyed by the document object itself, so it needs no upkeep: a state that
+   * leaves the history is forgotten with it.
+   */
+  const labels = useRef(new WeakMap<Doc, string>());
   const saveTimer = useRef<number | undefined>(undefined);
 
   const index = Math.min(slideIndex, Math.max(0, doc.slides.length - 1));
   const slide = doc.slides[index];
 
-  const commit = useCallback((raw: Doc, coalesce?: string) => {
+  const commit = useCallback((raw: Doc, coalesce?: string, label?: string) => {
     // A blank canvas has no hook to be named after yet. Rather than leaving it
     // "Untitled" forever, it takes a name the moment there is one to take,
     // which is also the only point at which the name would be right. A name the
     // user chose is never overwritten, because isUnnamed only matches the ones
     // the app supplied.
     const next = isUnnamed(raw.name) ? { ...raw, name: nameFromDoc(raw) } : raw;
+    if (label) labels.current.set(next, label);
 
     setDoc((cur) => {
       if (!(coalesce !== undefined && tag.current === coalesce)) {
@@ -503,7 +492,10 @@ export function useStudio(initial: Doc) {
   );
 
   // `coalesce` folds a run of edits from one control (a slider) into one undo step.
-  const replaceDoc = useCallback((next: Doc, coalesce?: string) => commit(reseal(next), coalesce), [commit]);
+  const replaceDoc = useCallback(
+    (next: Doc, coalesce?: string, label?: string) => commit(reseal(next), coalesce, label),
+    [commit],
+  );
 
   /* ── layout tools that act once (Batch 18) ─────────────────────────── */
 
@@ -673,6 +665,11 @@ export function useStudio(initial: Doc) {
     undo,
     redo,
     canUndo: past.current.length > 0,
+    /** The name of what Undo would undo, when it has one. */
+    undoLabel: labels.current.get(doc),
+    commit,
+    outline,
+    setOutline,
     addLayer,
     updateLayers,
     updateEach,

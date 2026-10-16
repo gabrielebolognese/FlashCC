@@ -124,7 +124,7 @@ Invariants worth keeping:
   `LongForm`/`longform`, `Review`/`review`, so the component takes the compound name:
   `insights.ts` + `Analytics.tsx`, `library.ts` + `AssetLibrary.tsx`, `longform.ts` +
   `Repurpose.tsx`, `review.ts` + `ReviewLink.tsx`, `imagetools.ts` + `PictureTools.tsx`,
-  `texteffects.ts` + `TextEffectField.tsx`.
+  `texteffects.ts` + `TextEffectField.tsx`, `findreplace.ts` + `ReplaceDialog.tsx`.
 - Source in `src/`, tests colocated as `*.test.ts`.
 - Strict flags in force: `verbatimModuleSyntax` (use `import type`),
   `noUncheckedIndexedAccess` (indexed access is `T | undefined`),
@@ -175,6 +175,22 @@ Invariants worth keeping:
   of a seam come from the same pixels.
 - `<img>` in `LayerView` carries `maxWidth: none`: Tailwind's preflight caps images at the parent's
   width in the editor only, which cut a strip background to one slide.
+
+## Writing and the keyboard (Batch 24)
+
+- **Outline mode is a view, not an importer** (`outline.ts`, `OutlineView.tsx`). It never creates a
+  document; it changes the open one through `restateMany` (`regenerate.ts`), the same path as a
+  rewrite: unchanged slides kept as they are, generated layout re-run, a slide whose copy layer
+  the user edited written onto its layers, never split. A session is one undo step.
+- **Every action is in `actions.ts`.** A new button gets `data-action` with a registry id (or
+  `data-control` if it only sets a value), and its runner goes in the `runners` table in
+  `Studio.tsx`, which is typed against the registry. `actions.test.ts` walks the editor's source
+  and fails on a button the palette cannot reach.
+- **Letter keys never fire while a field has focus**: `actionForKey(e, typing)` takes it as a
+  parameter. A new single-letter key goes in that function, never in a component's own listener.
+  T, R, O and L are Tidy, Rewrite, Outline and Layout; the drawing tools are on Shift.
+- Words changed outside the two edit funnels go through `retouched` + `markEdited`
+  (`regenerate.ts`), so a quote stops being verbatim and furniture is handed over, as typing does.
 
 ## Pictures
 

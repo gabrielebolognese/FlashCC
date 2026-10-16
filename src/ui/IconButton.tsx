@@ -9,17 +9,23 @@ type Props = {
   onClick?: () => void;
   active?: boolean;
   danger?: boolean;
+  /** The registry action this runs (24.2), rendered as `data-action`. */
+  action?: string | undefined;
+  /** A control that sets a value or closes a dialog rather than running an action. */
+  control?: boolean | undefined;
 };
 
 /**
  * 28px hit box, 14px glyph (R5). Hover is a single background change with no
  * transition (R3/R4). Danger colour appears only on the control's own hover (R10).
  */
-export function IconButton({ icon: Icon, label, onClick, active = false, danger = false }: Props) {
+export function IconButton({ icon: Icon, label, onClick, active = false, danger = false, action, control }: Props) {
   return (
     <button
       type="button"
       aria-label={label}
+      data-action={action}
+      data-control={control ? "" : undefined}
       onClick={onClick}
       className={[
         "grid h-7 w-7 place-items-center rounded-lg",
