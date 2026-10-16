@@ -305,3 +305,11 @@ describe("the retry, and its cap", () => {
     expect(flagged(out.findings)).toHaveLength(1);
   });
 });
+
+describe("block fields answer to the brief (19.7)", () => {
+  it("flags a big number the brief never gave", () => {
+    const slots = [{ id: "result", label: "Result", note: "", placeholder: "" }];
+    const findings = checkDraft([{ role: "result", text: "It worked.", fields: ["4x", "watch time"] }], slots, "We tripled watch time, 3x.");
+    expect(findings.map((f) => f.code)).toContain("measure-not-in-brief");
+  });
+});

@@ -27,6 +27,7 @@ import {
   plainText,
   type Structure,
   type Voice,
+  type SlotSpec,
 } from "./prompts.js";
 import { requirePro } from "./supabase.js";
 
@@ -60,6 +61,11 @@ const DraftSchema = z.object({
       z.object({
         role: z.string().describe("The slot id this text is for"),
         text: z.string().describe("The finished slide copy, ready to publish"),
+        // Required and usually empty, rather than optional: a model handed an
+        // optional array fills it about half the time.
+        fields: z
+          .array(z.string())
+          .describe("Only for a slot that asks for fields: the values in the order it asks. Otherwise empty."),
       }),
     )
     .describe("One entry per slot, in the same order as the framework"),
@@ -100,7 +106,7 @@ export async function draft(req: IncomingMessage, res: ServerResponse): Promise<
 
   // Named explicitly: the generic cannot be inferred through a `run` that
   // throws on two of its paths.
-  type Drafted = { slides: { role: string; text: string }[] };
+  type Drafted = { slides: { role: string; text: string; fields?: string[] }[] };
 
   const { out, findings, retried } = await withContentRetry<Drafted>(
     async (retry) => {
@@ -139,7 +145,13 @@ export async function draft(req: IncomingMessage, res: ServerResponse): Promise<
       // Repaired BEFORE checking, so the ceiling is measured on the text that
       // will actually ship rather than on one still carrying punctuation this
       // product removes.
-      return { slides: parsed.slides.map((s) => ({ ...s, text: repair(s.text) })) };
+      return {
+        slides: parsed.slides.map((s) => ({
+          ...s,
+          text: repair(s.text),
+          fields: fieldsFor(s.role, s.fields, slots),
+        })),
+      };
     },
     (draft) => checkDraft(draft.slides, slots, body.brief),
   );
@@ -156,6 +168,20 @@ export async function draft(req: IncomingMessage, res: ServerResponse): Promise<
    * and the person reading it knows things the brief does not contain.
    */
   json(res, 200, { slides: out.slides, findings: flagged(findings) });
+}
+
+/** The longest a block field may be. A big number's label is a few words. */
+const MAX_FIELD = 80;
+
+/**
+ * A slide's block fields, kept only where its slot asked for them, at the
+ * count it asked for, repaired and clipped. Anything else is dropped: a slot
+ * with no block gets no fields however the model answers.
+ */
+export function fieldsFor(role: string, raw: readonly string[] | undefined, slots: readonly SlotSpec[]): string[] {
+  const spec = slots.find((s) => s.id === role)?.block;
+  if (!spec || !Array.isArray(raw)) return [];
+  return spec.fields.map((_, i) => repair(String(raw[i] ?? "")).slice(0, MAX_FIELD));
 }
 
 /* ── hook variants ────────────────────────────────────────────────────────── */

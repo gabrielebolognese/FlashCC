@@ -10,7 +10,8 @@
  * placeholder until something is dropped on it, and it is an ordinary image layer the
  * whole time, movable, resizable, deletable like anything else.
  */
-import { makeLayer, makeSlide, type Layer, type Slide } from "./model.js";
+import { blockById, withDefaults } from "./blocks.js";
+import { makeLayer, makeSlide, uid, type Layer, type Slide } from "./model.js";
 import type { Theme } from "./presets.js";
 import { clampY, fitToBox, ladder, lineCount, type Measure } from "./text.js";
 
@@ -476,7 +477,20 @@ export type BuildOptions = {
    * Only the tests that assert on overflow want this.
    */
   split?: boolean | undefined;
+  /**
+   * Blocks framework slots asked for (19.7), by slot id: the model's words for
+   * the block's fields. The structure chose the block; this file places it.
+   */
+  fills?: Record<string, SlotFillSpec> | undefined;
+  /**
+   * The same, by slide position: how Re-lay hands a document's own slot blocks
+   * back, since a document has no roles to key them by.
+   */
+  fillsAt?: (SlotFillSpec | undefined)[] | undefined;
 };
+
+export type SlotFillSpec = { id: string; fields: Record<string, string> };
+type Entry = { text: string; role: string | undefined; fill?: SlotFillSpec | undefined };
 
 /**
  * Copy that does not fit gets ANOTHER SLIDE rather than a smaller font.
@@ -520,7 +534,16 @@ export function buildSlides(
   roles?: string[],
   options: BuildOptions = {},
 ): Slide[] {
-  let entries = texts.map((t, i) => ({ text: t, role: roles?.[i] }));
+  // A slot's block rides on the first slide carrying its role, and on the first
+  // piece if that slide is split.
+  const used = new Set<string>();
+  let entries: Entry[] = texts.map((t, i) => {
+    const role = roles?.[i];
+    let fill = options.fillsAt?.[i];
+    if (!fill && role && !used.has(role) && options.fills?.[role]) fill = options.fills[role];
+    if (fill && role) used.add(role);
+    return { text: t, role, ...(fill ? { fill } : {}) };
+  });
 
   let slides = layout(entries, theme, options);
   if (options.split === false) return slides;
@@ -541,7 +564,7 @@ export function buildSlides(
     const at = entries.indexOf(target);
     entries = [
       ...entries.slice(0, at),
-      { text: pieces[0] ?? "", role: target.role },
+      { text: pieces[0] ?? "", role: target.role, ...(target.fill ? { fill: target.fill } : {}) },
       ...pieces.slice(1).map((text) => ({ text, role: undefined })),
       ...entries.slice(at + 1),
     ];
@@ -573,23 +596,23 @@ function splitAtMiddle(text: string): string[] {
   return head && tail ? [head, tail] : [t];
 }
 
-function layout(
-  entries: { text: string; role: string | undefined }[],
-  theme: Theme,
-  options: BuildOptions,
-): Slide[] {
+function layout(entries: Entry[], theme: Theme, options: BuildOptions): Slide[] {
   const images = options.images ?? true;
   const decor = options.decor ?? 1;
 
-  const kept: { text: string; role: string | undefined }[] = [];
+  const kept: Entry[] = [];
   entries.forEach((e) => {
-    if (e.text.trim()) kept.push({ text: e.text.trim(), role: e.role });
+    if (e.text.trim()) kept.push({ ...e, text: e.text.trim() });
   });
   if (kept.length === 0) return [makeSlide(theme.bg, "Slide 1")];
 
   const seed = seedOf(kept.map((k) => k.text));
 
   return kept.map((k, i) => {
+    if (k.fill) {
+      const slide = blockSlide(k.text, k.fill, theme, i, images);
+      if (slide) return slide;
+    }
     const comp = compositionFor(i, kept.length, k.role, seed);
     const { image, textRegion } = bandsFor(comp.image, images);
     const built = comp
@@ -605,6 +628,51 @@ function layout(
       layers: images ? [imagePlaceholder(image, theme), ...built] : built,
     };
   });
+}
+
+/**
+ * A slide a framework slot asked to show as a block (19.7): the block in the
+ * upper part of the text region, and the slot's own sentence under it, so the
+ * slide still says in words what the number means and the copy is still there
+ * for regeneration to read.
+ *
+ * The block is recorded on the slide with `slot: true`: generation owns it, so
+ * Re-lay rebuilds it from the record rather than keeping a stale copy beside a
+ * fresh one.
+ */
+function blockSlide(
+  text: string,
+  fill: SlotFillSpec,
+  theme: Theme,
+  index: number,
+  images: boolean,
+): Slide | null {
+  const block = blockById(fill.id);
+  if (!block) return null;
+  const { textRegion: r } = bandsFor("below", images);
+  const instance = uid("blk");
+  const box = { x: r.x, y: r.y, w: r.w, h: Math.round(r.h * 0.6) };
+  const fields = withDefaults(block, fill.fields);
+  const built = block.build(fields, box, { theme, board: { w: W, h: H }, instance });
+  const layers = built.layers.map((l) => applyFonts({ ...l, block: { ...l.block!, slot: true } }, theme));
+
+  const bodyY = box.y + box.h + 40;
+  const f = fit(text, { w: r.w, h: r.y + r.h - bodyY }, [40, 24], 1.4, body(theme));
+  layers.push(
+    applyFonts(
+      { ...makeLayer("text", { x: r.x, y: bodyY, w: r.w, h: f.height }, theme.muted), text, fontSize: f.fontSize, fontWeight: 400, lineHeight: 1.4, name: "Body" },
+      theme,
+    ),
+  );
+
+  const parts: Record<string, { x: number; y: number; w: number; h: number; look: string }> = {};
+  return {
+    ...makeSlide(theme.bg, `Slide ${index + 1}`),
+    composition: "block",
+    ...(theme.bgGradient ? { gradient: theme.bgGradient } : {}),
+    blocks: [{ instance, block: fill.id, fields, box, parts, slot: true }],
+    layers: images ? [imagePlaceholder(bandsFor("below", true).image, theme), ...layers] : layers,
+  };
 }
 
 export const MAX_SLIDES = 35;

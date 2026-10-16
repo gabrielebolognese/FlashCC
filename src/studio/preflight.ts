@@ -18,6 +18,7 @@
  * something is actually rendered, so the export path reports it after the fact.
  */
 
+import { missingFurniture, pieceLabel } from "./furniture.js";
 import type { Doc, Layer } from "./model.js";
 import { safeBox, shapeOf, type Platform } from "./platforms.js";
 import { lineCount, type Measure } from "./text.js";
@@ -34,7 +35,17 @@ export type Finding = {
 };
 
 /** Placeholder copy the generator leaves behind; shipping it is always a mistake. */
-const PLACEHOLDERS = ["type something", "your hook goes here", "the point", "say the thing."];
+const PLACEHOLDERS = [
+  "type something",
+  "your hook goes here",
+  "the point",
+  "say the thing.",
+  // An empty testimonial block (19.5). It is never filled by a model, so an
+  // empty one is caught here rather than shipping blank.
+  "their words go here",
+  // An author chip stamped before anybody added their name to the brand.
+  "your name",
+];
 
 const measureOf = (l: Layer): Measure => ({
   // The id, not the stack, see the note on Measure.family.
@@ -144,6 +155,17 @@ export function preflight(doc: Doc, platform: Platform): Finding[] {
       code: "app-only-shape",
       slide: null,
       message: `${shape.label} posts from the ${platform.label} app, but its publishing API still refuses anything taller than 4:5, so a scheduler may reject it. Post this one by hand.`,
+    });
+  }
+
+  // Furniture that had no free corner (20.3). It never pushes content, so the
+  // honest place to say "slide 4 has no counter" is here.
+  for (const m of missingFurniture(doc)) {
+    add({
+      severity: "warn",
+      code: "furniture-skipped",
+      slide: m.slide,
+      message: `No free corner for the ${pieceLabel(m.kind).toLowerCase()} on this slide, so it was left off rather than covering your content.`,
     });
   }
 

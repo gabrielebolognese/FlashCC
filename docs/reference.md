@@ -18,7 +18,7 @@ is still current.
 | --- | --- |
 | **Orientation** | [1 What it is](#1-what-it-is) · [2 Running it](#2-running-it) · [3 The invariants](#3-the-invariants) |
 | **The canvas** | [4 Data model](#4-the-data-model) · [5 Canvas](#5-the-canvas) · [6 Text](#6-text-measurement-and-fitting) · [7 Colour](#7-colour-and-contrast) · [8 Gradients](#8-gradients) · [9 Format change](#9-changing-format-reflow) |
-| **Making a deck** | [10 Frameworks](#10-the-four-frameworks) · [11 Generation](#11-generation) · [12 Styles](#12-styles-and-themes) · [13 Onboarding](#13-onboarding) · [14 AI drafting](#14-ai-drafting) · [15 Bulk and long form](#15-bulk-create-and-long-form-ingest) · [16 Media, fonts and assets](#16-media-and-fonts) · [17 Screen flow](#17-screen-flow) |
+| **Making a deck** | [10 Frameworks](#10-the-four-frameworks) · [11 Generation](#11-generation) · [11b Blocks and furniture](#11b-blocks-and-deck-furniture) · [12 Styles](#12-styles-and-themes) · [13 Onboarding](#13-onboarding) · [14 AI drafting](#14-ai-drafting) · [15 Bulk and long form](#15-bulk-create-and-long-form-ingest) · [16 Media, fonts and assets](#16-media-and-fonts) · [17 Screen flow](#17-screen-flow) |
 | **The product** | [17b Clients and review](#17b-clients-and-review) · [18 Pipeline, calendar and series](#18-the-pipeline) · [19 Analytics](#19-analytics) · [19b History](#19b-version-history) · [20 Library](#20-the-library) · [21 Export](#21-export) |
 | **Infrastructure** | [22 Persistence](#22-persistence) · [23 Sync](#23-sync) · [24 Auth](#24-auth) · [25 Billing](#25-billing) · [26 Database](#26-database) · [27 Design tokens](#27-design-tokens) · [28 Testing](#28-testing) |
 | **Reality check** | [29 Known defects](#29-known-defects) |
@@ -556,6 +556,89 @@ width). `block` ignores it entirely. `title` and `underline` also reserve vertic
 rule, so turning decor off changes the type fit, not just the graphics.
 
 ---
+
+## 11b. Blocks and deck furniture
+
+### Blocks (`blocks.ts`, `blockplace.ts`, `BlockPicker.tsx`, Batch 19)
+
+A block is a pure function, **fields in, plain layers out**, sized to a box. Nineteen of them:
+checklist, steps, big number, quote, two columns, before and after, timeline, table, chart (bar,
+horizontal bar, line, donut, progress), code, post card, testimonial, annotation, screen frame,
+screenshot polish, QR code, icon grid, question, section title. The list stops there until
+somebody asks for a twentieth.
+
+- **Fields are words and numbers.** No field is a size, a colour or a position (a test asserts
+  it), which is what lets a framework slot ask the model to fill one without breaking invariant 5.
+- **Every layer is stamped** `Layer.block = { block, instance, part }` and grouped by instance
+  (18.6), so a block moves as one thing and the layers list reaches a single part.
+  `Slide.blocks` records each instance's fields, box, and each part as built
+  (`parts`: box and a signature of its look). Nothing reads any of it at render.
+- **Text runs the compositions' ladder** with its 60% floor, and never below `MIN_PT = 20`, the
+  strictest platform floor (TikTok). Words that still do not fit are reported in `overflow`, by
+  part, and the pre-flight catches the layer like any other overflow.
+- **Charts** are drawn from shapes, text and the `path` layer kind: bars start at zero, a negative
+  value draws below a visible zero line, marks are labelled directly, the accent is reserved for
+  the one value marked as the point, and over `CHART_LIMITS` the block says so instead of drawing.
+- **Code** is tokenized locally into five roles and drawn as **one text layer per role**, each
+  holding the whole snippet with the other roles blanked to spaces (`plane`). Monospace keeps the
+  layers on one character grid whatever the real font's advance, so nothing is positioned token by
+  token. It is never soft-wrapped: over the width it reports overflow and offers a split by lines.
+- **QR codes** are encoded on the device (`qrcode-generator`) into one path, at least `QR_MIN`
+  (300px), dark on light.
+- **Post card** reads only the deck's own identity (`identityOf`); it has no field for a name or a
+  handle. **Testimonial** is never filled by a model, and an empty one says "Their words go here",
+  which the pre-flight lists as a placeholder.
+- **Quote** is marked `verbatim` only when its words are exactly one of `Doc.quotes`, the verified
+  quotes carried from Compose (Batch 13). Editing the words on the canvas clears the mark
+  (`retouched` in `useStudio.ts`).
+
+**Placing** (`/` on the canvas, or the toolbar's grid button): the block lands in the largest free
+rectangle inside the composition margins and the platform's safe box, preferring the space under
+the slide's headline, found by trying every rectangle whose edges sit on an existing edge
+(`freeRect`). No room changes nothing and offers a new slide instead. A list block that overflows
+offers a split across two slides, on whole items, numbering carried on.
+
+**Editing** ("Edit as block" in Properties): `rebuildBlock` re-runs the block with new fields and
+replaces only untouched parts. Moving the whole group is a move of the block, found as the offset
+most parts share; a part moved on its own keeps its place, and a restyled or retyped part keeps its
+look. One commit, so one undo step.
+
+**In frameworks** (19.7): a slot can carry `block` (today the Showcase and Story `result` slots, a
+big number). The draft schema's `fields` array comes back with the slide's words, `fieldsFor` keeps
+it only for those slots, `checkDraft` runs the invented-measure check over it, and
+`buildSlides(..., { fills })` lays that slide out as the block plus the slot's sentence. The record
+carries `slot: true`, so Re-lay rebuilds it from the record (`fillsAt`) rather than keeping a stale
+copy. A block the user inserted is theirs and survives regeneration (`survivesRegeneration`).
+
+### Deck furniture (`furniture.ts`, Batch 20)
+
+Six sets (`FURNITURE_SETS`): Minimal (counter), Creator (author chip, swipe cue), Editorial
+(footer, counter), Corporate (logo, footer, counter), Bold (heavy progress bar, author chip), None.
+A brand stores its set (`Brand.furniture`) and its `identity` (name, role, avatar asset, site, and a
+**handle per platform**). New carousels in a brand arrive furnished (`furnishWith`), as does a deck
+the brand is applied to; Properties has a Furniture select for the current deck.
+
+- **Stamp** (`stampFurniture`) snapshots the identity onto `Doc.furniture` and writes each piece as
+  ordinary **locked** layers tagged `Layer.furniture`. A logo the brand already stamped is adopted
+  as the logo piece, not doubled.
+- **Reseal** (`reseal`) runs at the studio's structural funnels (slide insert, duplicate, delete,
+  reorder, format change, any replaced document) and at export, never on an ordinary layer edit.
+  It renumbers counters, resizes progress fills, adds and removes swipe cues, and swaps the chip's
+  handle for the platform, from the deck as it stands. It returns the same document when nothing
+  changed, and running it twice changes nothing.
+- **Rules:** the counter and progress bar skip the cover (a ten-slide deck reads 1 to 9 after it),
+  the swipe cue is on every slide but the last, the footer is body slides only, the logo is first
+  and last, and the author chip is everywhere except a closing slide that already has a post card.
+- **Placement:** each piece has corners in order of preference inside the platform's safe box,
+  inset 28px. A corner with content in it is skipped; with no free corner the piece is left off and
+  the pre-flight says so (`furniture-skipped`). Furniture never pushes content.
+- **A moved piece keeps its place**; reseal changes only its words. **Typing into a piece** swaps
+  `furniture` for `furnitureOptOut`, and reseal neither touches it nor adds a fresh one beside it.
+- **Per destination** (20.5): `variantFor` reseals each copy for its platform, so the Instagram
+  folder shows the Instagram handle, the LinkedIn PDF the full name, and a reflowed copy's pieces
+  go back to corners inside that platform's safe area.
+- Furniture is not what a slide says: transcripts, captions, alt text and regeneration all skip
+  it.
 
 ## 12. Styles and themes
 

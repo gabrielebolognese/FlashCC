@@ -27,7 +27,20 @@
 
 /* ── shapes ───────────────────────────────────────────────────────────────── */
 
-export type SlotSpec = { id: string; label: string; note: string; placeholder: string };
+/**
+ * A slot can ask for a block (Batch 19.7): the framework chose it, so the model
+ * is told which fields to return and never which block to use. It never sees a
+ * list of blocks.
+ */
+export type SlotBlock = { id: string; label: string; fields: { key: string; note: string }[] };
+
+export type SlotSpec = {
+  id: string;
+  label: string;
+  note: string;
+  placeholder: string;
+  block?: SlotBlock | undefined;
+};
 
 export type Structure = { name: string; shape: string; slots: SlotSpec[] };
 
@@ -197,7 +210,13 @@ export type DraftInput = {
 
 export const slotLines = (slots: readonly SlotSpec[]): string =>
   slots
-    .map((s, i) => `${i + 1}. id="${s.id}", ${s.label}: ${s.note}. e.g. "${s.placeholder}"`)
+    .map((s, i) => {
+      const line = `${i + 1}. id="${s.id}", ${s.label}: ${s.note}. e.g. "${s.placeholder}"`;
+      if (!s.block) return line;
+      // Words only: what each field SAYS, never how it looks.
+      const asks = s.block.fields.map((f, n) => `${n + 1}) ${f.key}: ${f.note}`).join("; ");
+      return `${line}\n   This slot is shown as a ${s.block.label}. Also return "fields" with exactly ${s.block.fields.length} values, in this order: ${asks}. Only use figures the brief gives.`;
+    })
     .join("\n");
 
 export type Assembled = { system: string; user: string };

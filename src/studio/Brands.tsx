@@ -46,6 +46,7 @@ import {
   tidyVoice,
   type Voice,
 } from "./brand.js";
+import { FURNITURE_SETS } from "./furniture.js";
 import { importImages, urlFor } from "./library.js";
 import { ACCEPT } from "./media.js";
 import type { Plan } from "./cloud.js";
@@ -201,6 +202,115 @@ function Logos({ brand, onChange }: { brand: Brand; onChange: (b: Brand) => void
         A mark is used everywhere when there is one. Otherwise the light or dark version is picked
         from the slide it lands on, which is the only thing an automatic placement has to get
         right.
+      </p>
+    </div>
+  );
+}
+
+/* ── identity and furniture (Batch 20) ────────────────────────────────────── */
+
+/** The platforms a handle is asked for, in the order people post to them. */
+const HANDLE_PLATFORMS: { id: string; label: string; hint: string }[] = [
+  { id: "instagram", label: "Instagram", hint: "@handle" },
+  { id: "linkedin", label: "LinkedIn", hint: "Your full name" },
+  { id: "tiktok", label: "TikTok", hint: "@handle" },
+  { id: "x", label: "X", hint: "@handle" },
+  { id: "threads", label: "Threads", hint: "@handle" },
+  { id: "bluesky", label: "Bluesky", hint: "@handle.bsky.social" },
+];
+
+/**
+ * Who the carousels are by, and how much furniture they carry.
+ *
+ * A handle PER PLATFORM, because the same person is @shortname on Instagram and
+ * their full name on LinkedIn, and a single field would be wrong on one of them
+ * in every multi-destination export. Applied once, when a deck is stamped:
+ * changing the avatar here does not reach a deck already made.
+ */
+function IdentityEditor({ brand, onChange }: { brand: Brand; onChange: (patch: Partial<Brand>) => void }) {
+  const input = useRef<HTMLInputElement>(null);
+  const [busy, setBusy] = useState(false);
+  const id = brand.identity ?? { name: "", handles: {} };
+  const setId = (patch: Partial<typeof id>) => onChange({ identity: { ...id, ...patch } });
+  const assets = listAssets();
+  const avatar = assets.find((a) => a.id === id.avatar);
+  const avatarUrl = avatar ? urlFor(avatar) : id.avatarSrc;
+
+  return (
+    <div>
+      <span className="text-overline uppercase text-tertiary">Who it is by</span>
+      <div className="mt-2 flex items-start gap-3">
+        <input
+          ref={input}
+          type="file"
+          accept={ACCEPT}
+          hidden
+          onChange={(e) => {
+            const file = e.target.files?.[0];
+            e.target.value = "";
+            if (!file) return;
+            setBusy(true);
+            void importImages([file], { brandId: brand.id, folder: "Avatars" })
+              .then((result) => {
+                const first = result.assets[0];
+                if (first) setId({ avatar: first.id, avatarSrc: urlFor(first) });
+              })
+              .finally(() => setBusy(false));
+          }}
+        />
+        <button
+          type="button"
+          title="Upload an avatar"
+          onClick={() => input.current?.click()}
+          className="grid h-16 w-16 shrink-0 place-items-center overflow-hidden rounded-full border border-hairline bg-surface-1 hover:border-accent-dim"
+        >
+          {busy ? (
+            <span className="text-caption text-muted">…</span>
+          ) : avatarUrl ? (
+            <img src={avatarUrl} alt="Avatar" className="h-full w-full object-cover" />
+          ) : (
+            <ImagePlus size={16} strokeWidth={2} className="text-muted" />
+          )}
+        </button>
+        <div className="grid flex-1 grid-cols-2 gap-2">
+          <input value={id.name} onChange={(e) => setId({ name: e.target.value })} placeholder="Name" className={field} />
+          <input value={id.role ?? ""} onChange={(e) => setId({ role: e.target.value })} placeholder="Role" className={field} />
+          <input value={id.site ?? ""} onChange={(e) => setId({ site: e.target.value })} placeholder="Website" className={`${field} col-span-2`} />
+        </div>
+      </div>
+
+      <div className="mt-3 grid grid-cols-2 gap-2">
+        {HANDLE_PLATFORMS.map((p) => (
+          <label key={p.id} className="flex items-center gap-2">
+            <span className="w-16 shrink-0 text-caption text-tertiary">{p.label}</span>
+            <input
+              value={id.handles?.[p.id] ?? ""}
+              onChange={(e) => setId({ handles: { ...id.handles, [p.id]: e.target.value } })}
+              placeholder={p.hint}
+              className={field}
+            />
+          </label>
+        ))}
+      </div>
+
+      <label className="mt-4 block">
+        <span className="text-overline uppercase text-tertiary">Furniture on every slide</span>
+        <select
+          value={brand.furniture ?? "none"}
+          onChange={(e) => onChange({ furniture: e.target.value })}
+          className={`${field} mt-1.5`}
+        >
+          {FURNITURE_SETS.map((s) => (
+            <option key={s.id} value={s.id}>
+              {s.label}: {s.hint}
+            </option>
+          ))}
+        </select>
+      </label>
+      <p className="mt-2 text-caption leading-4 text-muted">
+        New carousels in this brand arrive with it. Pieces are locked layers: they keep up with
+        reordering on their own, stay out of each platform&rsquo;s interface, and anything you type
+        into one becomes yours.
       </p>
     </div>
   );
@@ -554,6 +664,8 @@ function Editor({
         </div>
 
         <Logos brand={brand} onChange={onChange} />
+
+        <IdentityEditor brand={brand} onChange={set} />
 
         <VoiceEditor brand={brand} onChange={onChange} />
 

@@ -11,7 +11,7 @@ import {
 } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 
-import { alignToSlots, draftSlides, reviseDraft, type Finding } from "./ai.js";
+import { alignToSlots, draftSlides, fillsFor, reviseDraft, type Finding, type SlotFill } from "./ai.js";
 import { contextVoice, listBrands } from "./brand.js";
 import { ALL_CLIENTS, loadSelectedClient } from "./clients.js";
 import {
@@ -25,7 +25,7 @@ import {
 type Phase =
   | { kind: "idle" }
   | { kind: "drafting" }
-  | { kind: "drafted"; texts: string[]; findings: Finding[] }
+  | { kind: "drafted"; texts: string[]; findings: Finding[]; fills: Record<string, SlotFill> }
   | { kind: "failed"; message: string };
 
 export function AiChat({
@@ -38,7 +38,7 @@ export function AiChat({
   structure: Structure;
   /** A brief carried in from a distilled source. Editable like any other. */
   initialBrief?: string | undefined;
-  onDrafted: (texts: string[], findings: Finding[]) => void;
+  onDrafted: (texts: string[], findings: Finding[], fills: Record<string, SlotFill>) => void;
   onWriteMyself: () => void;
   onCancel: () => void;
 }) {
@@ -100,6 +100,7 @@ export function AiChat({
         kind: "drafted",
         texts: alignToSlots(drafted.slides, asked),
         findings: drafted.findings,
+        fills: fillsFor(drafted.slides, asked),
       });
     } catch (error) {
       if (controller.signal.aborted) return;
@@ -142,7 +143,7 @@ export function AiChat({
             <Drafted
               structure={structure}
               texts={phase.texts}
-              onUse={() => onDrafted(phase.texts, phase.findings)}
+              onUse={() => onDrafted(phase.texts, phase.findings, phase.fills)}
               onRedo={() => setPhase({ kind: "idle" })}
               onRevise={async (instruction) => {
                 const slots = slotsFor(structure, phase.texts.length);
@@ -157,7 +158,7 @@ export function AiChat({
                  * Findings are kept: they are about the brief, and a revision
                  * does not make an invented number any less invented.
                  */
-                setPhase({ kind: "drafted", texts: out.deck, findings: phase.findings });
+                setPhase({ kind: "drafted", texts: out.deck, findings: phase.findings, fills: phase.fills });
                 return { changed: out.changed, summary: out.summary };
               }}
             />

@@ -16,7 +16,9 @@ import { buildSlides } from "./compositions.js";
 import { applyBrand, listBrands, stampLogo, themeOf, voiceOf } from "./brand.js";
 import { logoResolver } from "./library.js";
 import { BrandMenu } from "./BrandMenu.js";
+import { BlockPicker } from "./BlockPicker.js";
 import { ExportDialog } from "./ExportDialog.js";
+import { furnishWith } from "./furniture.js";
 import { HookPicker } from "./HookPicker.js";
 import { HistoryPanel } from "./HistoryPanel.js";
 import { sessionPlan } from "./session.js";
@@ -138,8 +140,10 @@ export function Studio({ initial, onHome }: { initial: Doc; onHome: () => void }
             // keeping is the one that is about to stop existing.
             snapshot(doc, "brand", sessionPlan(), `Before ${brand.name}`);
             const stamped = stampLogo(result.doc, brand, logoResolver());
-            studio.replaceDoc(stamped.doc);
-            return { ...result, doc: stamped.doc };
+            // And the brand's furniture, from its identity, in the same commit.
+            const furnished = furnishWith(stamped.doc, brand, logoResolver());
+            studio.replaceDoc(furnished);
+            return { ...result, doc: furnished };
           }}
         />
         <button
@@ -243,6 +247,10 @@ export function Studio({ initial, onHome }: { initial: Doc; onHome: () => void }
             </div>
           </div>
         </div>
+      ) : null}
+
+      {studio.picker ? (
+        <BlockPicker key={studio.picker.mode === "edit" ? studio.picker.instance : "insert"} studio={studio} />
       ) : null}
 
       {exporting ? (

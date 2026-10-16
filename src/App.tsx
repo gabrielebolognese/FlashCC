@@ -2,15 +2,16 @@ import { useEffect, useMemo, useState } from "react";
 
 import { AiChat } from "./studio/AiChat.js";
 import { BulkRun } from "./studio/BulkRun.js";
-import { brandToStyle, listBrands } from "./studio/brand.js";
+import { brandIdOf, brandToStyle, listBrands } from "./studio/brand.js";
+import { furnishWith } from "./studio/furniture.js";
 import { buildSlides } from "./studio/compositions.js";
-import { resolveDocAssets } from "./studio/library.js";
+import { logoResolver, resolveDocAssets } from "./studio/library.js";
 import { nameFromHook } from "./studio/search.js";
 import { Compose } from "./studio/Compose.js";
 import { FirstRun } from "./studio/FirstRun.js";
 import { Home } from "./studio/Home.js";
 import { Repurpose } from "./studio/Repurpose.js";
-import type { Finding } from "./studio/ai.js";
+import type { Finding, SlotFill } from "./studio/ai.js";
 import { Landing } from "./landing/Landing.js";
 import { LegalPage } from "./legal/LegalPage.js";
 import { PRIVACY } from "./legal/privacy.js";
@@ -41,7 +42,19 @@ import { StylePicker } from "./studio/StylePicker.js";
 import { Welcome } from "./studio/Welcome.js";
 import { withStyleImage, type Style } from "./studio/styles.js";
 
-type Draft = { structure: Structure; texts: string[]; roles: string[] };
+/**
+ * `fills`: block fields a framework slot asked the model for (Batch 19.7), by
+ * slot id. Optional all the way through, because writing it yourself is the
+ * ordinary route and produces none.
+ */
+type Draft = {
+  structure: Structure;
+  texts: string[];
+  roles: string[];
+  fills?: Record<string, SlotFill> | undefined;
+  /** Verified quotes from a distilled source, kept on the document. */
+  quotes?: string[] | undefined;
+};
 
 type Screen =
   | { view: "welcome" }
@@ -78,6 +91,7 @@ type Screen =
       theme: keyof typeof THEMES;
       texts?: string[];
       quotes?: string[];
+      fills?: Record<string, SlotFill> | undefined;
       /**
        * What the server could not settle about the draft.
        *
@@ -315,12 +329,13 @@ function Screens() {
             ...(screen.quotes ? { quotes: screen.quotes } : {}),
           })
         }
-        onDrafted={(texts, findings) =>
+        onDrafted={(texts, findings, fills) =>
           setScreen({
             view: "compose",
             structure: screen.structure,
             theme: screen.theme,
             texts,
+            ...(Object.keys(fills).length > 0 ? { fills } : {}),
             ...(findings.length > 0 ? { findings } : {}),
             ...(screen.quotes ? { quotes: screen.quotes } : {}),
           })
@@ -342,7 +357,7 @@ function Screens() {
           setScreen({
             view: "style",
             theme: themeId,
-            draft: { structure: screen.structure, texts, roles },
+            draft: { structure: screen.structure, texts, roles, fills: screen.fills, quotes: screen.quotes },
           })
         }
       />
@@ -356,13 +371,14 @@ function Screens() {
         texts={draft.texts}
         roles={draft.roles}
         styles={styles}
-        build={build}
+        build={draft.fills ? { ...build, fills: draft.fills } : build}
         onBack={() =>
           setScreen({
             view: "compose",
             structure: draft.structure,
             theme: screen.theme,
             texts: draft.texts,
+            fills: draft.fills,
           })
         }
         onUse={(style: Style) => {
@@ -373,16 +389,24 @@ function Screens() {
             // a framework if something remembered which one produced the slides.
             framework: draft.structure.id,
             styleId: style.id,
+            ...(draft.quotes?.length ? { quotes: draft.quotes } : {}),
             palette: [
               t.bg, t.fg, t.accent, t.muted,
               "#ffffff", "#000000", "#e5545a", "#3dbe7a", "#4c86d6", "#db2777",
             ],
             // Stamped after building, so the picture belongs to each slide and is
             // as editable there as any other background. See withStyleImage.
-            slides: withStyleImage(buildSlides(draft.texts, t, draft.roles, build), style),
+            slides: withStyleImage(
+              buildSlides(draft.texts, t, draft.roles, { ...build, fills: draft.fills }),
+              style,
+            ),
           };
-          saveDoc(doc);
-          setScreen({ view: "studio", doc });
+          // A carousel made in a brand arrives with that brand's furniture
+          // (20.6), stamped once from its identity.
+          const brand = listBrands().find((b) => b.id === brandIdOf(style.id));
+          const furnished = brand ? furnishWith(doc, brand, logoResolver()) : doc;
+          saveDoc(furnished);
+          setScreen({ view: "studio", doc: furnished });
         }}
       />
     );

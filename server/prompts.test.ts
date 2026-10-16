@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  slotLines,
   assembleDraft,
   assembleHooks,
   clip,
@@ -648,5 +649,17 @@ describe("alt text", () => {
   it("uses its own system block, not the caption one", () => {
     expect(assembleAlt(["One"]).system).toBe(ALT_SYSTEM);
     expect(ALT_SYSTEM).not.toBe(CAPTION_SYSTEM);
+  });
+});
+
+describe("slots that ask for a block (19.7)", () => {
+  it("tells the model the fields, never a list of blocks", () => {
+    const lines = slotLines([
+      { id: "result", label: "Result", note: "A number", placeholder: "3x", block: { id: "stat", label: "big number", fields: [{ key: "value", note: "the figure" }, { key: "label", note: "what it measures" }] } },
+      { id: "cta", label: "CTA", note: "Ask", placeholder: "Follow" },
+    ]);
+    expect(lines).toContain('exactly 2 values, in this order: 1) value: the figure; 2) label: what it measures');
+    expect(lines).not.toMatch(/checklist|chart|table/);
+    expect(lines.split("\n").at(-1)).not.toContain("fields");
   });
 });

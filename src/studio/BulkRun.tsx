@@ -36,7 +36,7 @@ import {
 import { useEffect, useRef, useState } from "react";
 
 import { researchAngles, type Source } from "./angles.js";
-import { alignToSlots, draftSlides } from "./ai.js";
+import { alignToSlots, draftSlides, fillsFor } from "./ai.js";
 import { contextVoice, listBrands } from "./brand.js";
 import { buildSlides, type BuildOptions } from "./compositions.js";
 import { Chip } from "./Dash.js";
@@ -340,7 +340,13 @@ export function BulkRun({
             style.theme.bg, style.theme.fg, style.theme.accent, style.theme.muted,
             "#ffffff", "#000000", "#e5545a", "#3dbe7a", "#4c86d6", "#db2777",
           ],
-          slides: withStyleImage(buildSlides(texts, style.theme, drafted.slides.map((d) => d.role), build), style),
+          slides: withStyleImage(
+            buildSlides(texts, style.theme, drafted.slides.map((d) => d.role), {
+              ...build,
+              fills: fillsFor(drafted.slides, asked),
+            }),
+            style,
+          ),
         };
 
         // Saved here, not at the end. A run abandoned at step seven has to leave

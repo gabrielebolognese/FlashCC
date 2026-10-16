@@ -2996,7 +2996,7 @@ locked layer could be moved and deleted. The marquee and `Cmd+A` now skip them, 
 
 ## Batch 19, The block library
 
-**Status:** next
+**Status:** done
 **Size:** large. Many small pieces, each with its own tests.
 **Why here:** this is the batch that makes "create everything" true. Today a slide
 is headline, body, shapes and images. Every carousel that needs a chart, a
@@ -3156,11 +3156,82 @@ user's hand-moved title where they put it, and is one undo step.
 - **No AI choosing blocks.** See 19.7.
 - **No fake screenshots of real platforms or people.** See 19.5.
 
+### Built as
+
+All eight items and all nineteen blocks, in `blocks.ts` (the library), `blockplace.ts` (placing
+and rebuilding) and `BlockPicker.tsx` (the dialog).
+
+**The Unknowns.** `compositions.ts` does not expose a catalogue: its compositions are private
+constants, so the block library is its own module and compositions import from it, not the other
+way round. And there was no role tag beyond `handEdited`, so this batch added the stamp the plan
+asked for, `Layer.block = { block, instance, part }`, plus `Slide.blocks`, the record of each
+instance's fields, box and parts.
+
+**The painter needed one new shape.** Donut segments, arrow heads and a QR code's modules cannot be
+drawn by rectangles, ellipses and text, so `LayerView` gained a `path` kind (an SVG path stretched
+to the layer's box) and an optional soft `shadow`. Still one painter, still one render path to
+export.
+
+**19.1, two decisions the plan did not make.** Every block is **one group** (18.6), so it moves as
+one thing and the layers list reaches a part. And block text never goes below **20pt**, whatever
+the ladder's 60% floor says: TikTok's pre-flight floor is 20, and a block that fails the check the
+product runs on it is not a preset. A test asserts no field of any block is a size, a colour or a
+position.
+
+**19.2.** All nineteen. The big number answers to the brief through `checks.ts`'s invented-measure
+check, the same flag tier as Batch 15. The quote is marked `verbatim` only when its words are
+exactly a verified quote, which needed something the plan did not have: **the verified quotes
+never reached the editor**, they lived in Compose's screen state and died there. They now ride onto
+the document as `Doc.quotes`, the Quote form lists them, and editing the words on the canvas clears
+the mark. The icon grid uses the eighteen icons the app already had; Batch 21 brings the rest.
+
+**19.3** as specified, with every rule tested: bars from zero, a negative value below a visible zero
+line, labels on the marks, the accent only on the value marked as the point, and the limits per
+kind. The done-when passes at 1080x1350 against LinkedIn and at 1080x1920 against TikTok.
+
+**19.4, the code block needed a trick.** Highlighting means different colours inside one line, and
+text layers have one colour (styled runs are 22.3). So the block draws **one text layer per token
+role**, each holding the whole snippet with every other role's characters replaced by spaces.
+Monospace keeps all of them on one character grid whatever the real font's advance is, so nothing
+is positioned token by token and nothing can drift. A test asserts no two planes ever put a
+character in the same place. Never soft-wrapped: the layers are made wider than the longest line,
+and over the box's width the block reports it.
+
+**19.5** as specified. The post card has no name or handle field at all; it reads the deck's own
+identity from Batch 20. An empty testimonial says "Their words go here", which the pre-flight now
+lists as placeholder copy.
+
+**19.6.** `/` on the canvas and a toolbar button (the command palette is Batch 24). One refinement
+found in the browser: on a cover whose headline sits low, the largest free space is ABOVE it, and
+the first version put a checklist there. Space **under the headline** is now preferred whenever a
+block fits there. No room changes nothing and offers a new slide; a list that overflows offers a
+split across two slides, on whole items, numbering carried on.
+
+**19.7, one slot today.** The Showcase and Story `result` slots ask for a big number. The draft
+schema gained a required, usually empty `fields` array (an optional one gets filled about half the
+time), `fieldsFor` keeps it only where the slot asked, and the fields travel **by slot id**
+through Compose, since people add and edit slides there. Two columns waits for a slot that compares
+things, which arrives with 25.1's frameworks. The block a slot asked for is marked `slot: true` and
+Re-lay rebuilds it from its record; a block the user inserted is theirs and survives regeneration.
+Known limit: revising a draft in the chat keeps the first draft's fields.
+
+**19.8** as specified, with one refinement the group made necessary: moving the whole block moves
+every part by the same amount, and that is a move of the BLOCK, so the offset most parts share is
+found first and applied to the rebuild. Only a part that moved on its own, or was restyled or
+retyped, keeps its hand edits.
+
+### Also fixed, not in the plan
+
+**Escape closed the block dialog only some of the time.** Its listener depended on the whole studio
+object, the canvas's own Escape handler re-rendered the editor mid-event, and a listener replaced
+during dispatch is skipped for that event. It now depends on the stable setter, with a comment
+saying why.
+
 ---
 
 ## Batch 20, Deck furniture and author identity
 
-**Status:** queued
+**Status:** done
 **Size:** medium
 **Why here:** almost every LinkedIn and Instagram carousel in the research carries
 the same furniture on every slide: who made it, which slide this is, and a nudge to
@@ -3253,11 +3324,49 @@ per-piece placement controls are for.
 - **No live binding of identity.** Changing your avatar does not reach published
   decks. Re-apply the brand (Batch 3.2) to update a document on purpose.
 
+### Built as
+
+All six, in `furniture.ts`, with the identity on the brand and a Furniture control in Properties.
+
+**20.1.** `Brand.identity`: name, role, avatar (uploaded into the library as an asset), site, and a
+handle for Instagram, LinkedIn, TikTok, X, Threads and Bluesky. On the deck it is a **snapshot**,
+`Doc.furniture.identity`, so changing the brand does not reach a deck already made.
+
+**20.2.** All six pieces. "Absent on the CTA if the CTA block already shows identity" became: absent
+on the last slide when it carries a post card, the one block that shows identity.
+
+**20.3** as specified, with one thing the plan did not mention: furniture text is **measured**, not
+estimated. A box a few pixels short wraps a name onto two lines, which the pre-flight treats as
+overflow and blocks. The chip is sized for the longest thing it may say on any platform, so a
+per-destination reseal can swap the handle without wrapping. A piece with no free corner is left
+off and the pre-flight warns (`furniture-skipped`); a chip stamped before anybody added a name says
+"Your name", which the pre-flight lists as placeholder copy.
+
+**20.4.** Reseal runs at slide insert, duplicate, delete, reorder (single and set), format change,
+and any replaced document (re-lay, a rewrite that splits a slide, a restored version), and at
+export. **Deliberately not on an ordinary layer edit**, so a piece somebody deleted is not put
+straight back. Typing into a piece swaps its stamp for `furnitureOptOut` at the studio's two edit
+funnels. The done-when is a test: after moving slide 7 to position 2, every counter is renumbered,
+the old last slide picks up a swipe cue in its new place, the new last slide loses its cue, and a
+second reseal returns the same document. Known limit: a chip that stays put keeps its size, so a slide
+reordered onto the cover keeps the small chip until the set is stamped again.
+
+**20.5** as specified, inside `variantFor`: the copy is resealed for its platform, and a reflowed
+copy's pieces go back to corners in that platform's safe area. The done-when is a test.
+
+**20.6.** Six sets, stored on the brand. New carousels made in a brand arrive furnished, and applying
+a brand to a deck (from the studio or the projects grid) furnishes it too. A logo the brand had
+already stamped is adopted as the logo piece rather than doubled. Bulk runs use the gallery styles,
+not brands, so they arrive bare.
+
+**Furniture is not what a slide says.** Transcripts, captions, alt text and regeneration all skip
+it, or a caption would read "3 / 9" and the author's handle nine times.
+
 ---
 
 ## Batch 21, Imagery, icons and backgrounds
 
-**Status:** queued
+**Status:** next
 **Size:** large. Stock search and background removal are each real work.
 **Why here:** after blocks, pictures are the second reason somebody leaves for Canva
 mid-session. A carousel that needs one icon per tip, a photo behind the cover, or a
@@ -4812,7 +4921,7 @@ that define the category. And **nothing is ranked, scored or graded**, because
 the ranking complaint in the research corpus is not about cost, it is about a
 machine asserting which of your sentences is better.
 
-**Batches 1 to 18 are done.** Batches 19 to 33 are the rest of the second half
+**Batches 1 to 20 are done.** Batches 21 to 33 are the rest of the second half
 of the plan and are not built yet. The suggested build order is at the end of
 this document.
 
@@ -4825,7 +4934,7 @@ and `09-gates.sql`.
 
 ## Suggested order and where this stands
 
-**Batches 17 and 18 are built. The rest of 17 to 33 is not.** The numbering groups them by theme; the build
+**Batches 17 to 20 are built. The rest of 17 to 33 is not.** The numbering groups them by theme; the build
 order below is by damage-to-effort and dependency, the same logic that put export
 first in the first half.
 

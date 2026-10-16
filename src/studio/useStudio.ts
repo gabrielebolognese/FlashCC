@@ -17,6 +17,12 @@ import type { PlatformId } from "./platforms.js";
 import { platformForSize } from "./platforms.js";
 import { reflowDoc } from "./reflow.js";
 import { fitToSafeArea } from "./safearea.js";
+// Deck furniture (Batch 20) is resealed at every STRUCTURAL funnel below: slide
+// insert, duplicate, delete, reorder, format change, and anything that replaces
+// the document (re-lay, a rewrite that splits a slide, a restored version).
+// Never on an ordinary layer edit, so a piece somebody deleted on purpose is
+// not put straight back.
+import { reseal } from "./furniture.js";
 import { markEdited } from "./regenerate.js";
 import { isUnnamed, nameFromDoc } from "./search.js";
 import { deleteSet, duplicateSet, inDeckOrder, moveSet } from "./slideset.js";
@@ -42,6 +48,23 @@ import {
 const LIMIT = 120;
 
 /**
+ * What changing a layer's WORDS undoes, applied at the two edit funnels.
+ *
+ * A verified quote (Batch 13, 19.2) whose words change is no longer verbatim.
+ * A furniture piece somebody typed into (Batch 20.4) stops being furniture:
+ * its stamp goes, and the opt-out stays so reseal neither rewrites it nor puts
+ * a fresh one beside it. Somebody who typed "Swipe for the secret" into the
+ * swipe cue has said what they want.
+ */
+function retouched(before: Layer, after: Layer): Layer {
+  if (after.text === undefined || after.text === before.text) return after;
+  let next = after;
+  if (next.verbatim) next = { ...next, verbatim: undefined };
+  if (next.furniture) next = { ...next, furnitureOptOut: next.furniture, furniture: undefined };
+  return next;
+}
+
+/**
  * All editor state. Snapshot history, so undo covers everything, every layer edit,
  * every reorder, every slide operation, without a command class per action.
  */
@@ -62,6 +85,11 @@ export function useStudio(initial: Doc) {
    * canvas: the canvas always shows one slide, the filmstrip can hold several.
    */
   const [slideSelection, setSlideSelection] = useState<string[]>([]);
+  /**
+   * The block picker (19.6, 19.8): inserting a new block, or editing the fields
+   * of one already placed. A view state, like the safe-zone overlay.
+   */
+  const [picker, setPicker] = useState<{ mode: "insert" } | { mode: "edit"; instance: string } | null>(null);
 
   const past = useRef<Doc[]>([]);
   const future = useRef<Doc[]>([]);
@@ -149,7 +177,7 @@ export function useStudio(initial: Doc) {
         // them both is the whole of it.
         (s) => ({
           ...s,
-          layers: s.layers.map((l) => (ids.includes(l.id) ? markEdited({ ...l, ...patch }) : l)),
+          layers: s.layers.map((l) => (ids.includes(l.id) ? markEdited(retouched(l, { ...l, ...patch })) : l)),
         }),
         coalesce,
       );
@@ -161,7 +189,7 @@ export function useStudio(initial: Doc) {
     (fn: (l: Layer) => Layer, ids: string[], coalesce?: string) => {
       patchSlide(
         index,
-        (s) => ({ ...s, layers: s.layers.map((l) => (ids.includes(l.id) ? markEdited(fn(l)) : l)) }),
+        (s) => ({ ...s, layers: s.layers.map((l) => (ids.includes(l.id) ? markEdited(retouched(l, fn(l))) : l)) }),
         coalesce,
       );
     },
@@ -230,7 +258,7 @@ export function useStudio(initial: Doc) {
   const addSlide = useCallback(
     (at = doc.slides.length) => {
       const s = makeSlide(slide?.background ?? "#12161c", `Slide ${doc.slides.length + 1}`);
-      commit({ ...doc, slides: [...doc.slides.slice(0, at), s, ...doc.slides.slice(at)] });
+      commit(reseal({ ...doc, slides: [...doc.slides.slice(0, at), s, ...doc.slides.slice(at)] }));
       setSlideIndex(at);
       setSelection([]);
       // The count changed, so the filmstrip's picked set is cleared (18.5).
@@ -252,7 +280,7 @@ export function useStudio(initial: Doc) {
           () => uid("g"),
         ),
       };
-      commit({ ...doc, slides: [...doc.slides.slice(0, i + 1), copy, ...doc.slides.slice(i + 1)] });
+      commit(reseal({ ...doc, slides: [...doc.slides.slice(0, i + 1), copy, ...doc.slides.slice(i + 1)] }));
       setSlideIndex(i + 1);
       setSlideSelection([]);
     },
@@ -262,7 +290,7 @@ export function useStudio(initial: Doc) {
   const deleteSlide = useCallback(
     (i: number) => {
       if (doc.slides.length <= 1) return;
-      commit({ ...doc, slides: doc.slides.filter((_, n) => n !== i) });
+      commit(reseal({ ...doc, slides: doc.slides.filter((_, n) => n !== i) }));
       setSlideIndex(Math.max(0, i - 1));
       setSelection([]);
       setSlideSelection([]);
@@ -276,7 +304,7 @@ export function useStudio(initial: Doc) {
       const [m] = next.splice(from, 1);
       if (!m) return;
       next.splice(to, 0, m);
-      commit({ ...doc, slides: next });
+      commit(reseal({ ...doc, slides: next }));
       setSlideIndex(to);
     },
     [commit, doc],
@@ -326,7 +354,7 @@ export function useStudio(initial: Doc) {
       // put every headline under TikTok's action rail. When the new size belongs
       // to a platform, pull the content clear of its chrome as well.
       const platform = platformForSize(w, h);
-      commit(platform ? fitToSafeArea(reflowed, platform) : reflowed);
+      commit(reseal(platform ? fitToSafeArea(reflowed, platform) : reflowed, { platform, replace: true }));
     },
     [commit, doc],
   );
@@ -397,7 +425,7 @@ export function useStudio(initial: Doc) {
     [doc.width, doc.height, index, patchSlide],
   );
 
-  const replaceDoc = useCallback((next: Doc) => commit(next), [commit]);
+  const replaceDoc = useCallback((next: Doc) => commit(reseal(next)), [commit]);
 
   /* ── layout tools that act once (Batch 18) ─────────────────────────── */
 
@@ -496,7 +524,7 @@ export function useStudio(initial: Doc) {
           () => uid("g"),
         ),
       }));
-      commit({ ...doc, slides });
+      commit(reseal({ ...doc, slides }));
       setSlideSelection([]);
     },
     [commit, doc],
@@ -506,7 +534,7 @@ export function useStudio(initial: Doc) {
     (ids: string[]) => {
       const slides = deleteSet(doc.slides, ids);
       if (slides.length === doc.slides.length) return;
-      commit({ ...doc, slides });
+      commit(reseal({ ...doc, slides }));
       setSlideIndex((i) => Math.min(i, slides.length - 1));
       setSlideSelection([]);
       setSelection([]);
@@ -518,7 +546,7 @@ export function useStudio(initial: Doc) {
   const moveSlides = useCallback(
     (ids: string[], target: string) => {
       const slides = moveSet(doc.slides, ids, target);
-      commit({ ...doc, slides });
+      commit(reseal({ ...doc, slides }));
       const current = doc.slides[index]?.id;
       const at = slides.findIndex((s) => s.id === current);
       if (at >= 0) setSlideIndex(at);
@@ -547,6 +575,8 @@ export function useStudio(initial: Doc) {
     setSafePlatform,
     slideSelection,
     setSlideSelection,
+    picker,
+    setPicker,
     withGroupsOf,
     groupOf,
     alignSelected,

@@ -21,6 +21,7 @@
 import type { Doc } from "./model.js";
 import { published, type Post } from "./pipeline.js";
 import { shapeOf, type Platform, type Shape } from "./platforms.js";
+import { reseal } from "./furniture.js";
 import { fitToSafeArea } from "./safearea.js";
 import { reflowDoc } from "./reflow.js";
 import { clamp, captionLimit, deckTexts } from "./transcript.js";
@@ -173,9 +174,15 @@ export function variantFor(doc: Doc, d: Destination): Doc {
   // out by hand clear of the chrome is what the format SWITCH does, on a
   // change of size; doing it silently at export would move layers nobody
   // asked to move, in a file nobody looks at until it is posted.
-  if (picked.width === d.shape.w && picked.height === d.shape.h) return picked;
+  if (picked.width === d.shape.w && picked.height === d.shape.h) {
+    // Furniture is the exception (20.5): the chip says this platform's
+    // handle, and a piece in this platform's chrome goes back to a corner.
+    return reseal(picked, { platform: d.platform });
+  }
   const reflowed = reflowDoc(picked, d.shape.w, d.shape.h);
-  return fitToSafeArea(reflowed, d.platform);
+  // A reflowed copy's furniture goes back to its corners in THIS platform's
+  // safe area: positions chosen for another board mean nothing here.
+  return reseal(fitToSafeArea(reflowed, d.platform), { platform: d.platform, replace: true });
 }
 
 /**

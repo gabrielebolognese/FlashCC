@@ -14,7 +14,23 @@
 
 import type { Gradient } from "./gradient.js";
 
-export type LayerKind = "text" | "rect" | "ellipse" | "triangle" | "line" | "icon" | "image";
+export type LayerKind = "text" | "rect" | "ellipse" | "triangle" | "line" | "icon" | "image" | "path";
+
+/**
+ * Where a layer came from, when a block made it (Batch 19).
+ *
+ * A stamp, read only by the block tools: "Edit as block" uses it to find the
+ * instance again, and the regenerator uses it to leave the block alone. Nothing
+ * reads it at render. The same shape `stampLogo`'s layers have always had in
+ * spirit, a tag on an ordinary layer.
+ */
+export type BlockStamp = {
+  block: string;
+  instance: string;
+  part: string;
+  /** Placed by a framework slot (19.7): generation owns it and rebuilds it. */
+  slot?: true | undefined;
+};
 
 export type Layer = {
   id: string;
@@ -68,6 +84,37 @@ export type Layer = {
 
   /** icon */
   glyph?: string | undefined;
+
+  /**
+   * path: an SVG path in its own coordinate box, stretched to the layer's.
+   *
+   * The one shape the other kinds cannot draw: a donut segment, an arrow head,
+   * a QR code's modules as one shape rather than six hundred rectangles. Still
+   * one layer, still painted by LayerView, still exported by the same render.
+   */
+  path?: string | undefined;
+  pathW?: number | undefined;
+  pathH?: number | undefined;
+
+  /** A soft drop shadow. Screenshot polish (19.2) is the reason it exists. */
+  shadow?: { y: number; blur: number; colour: string } | undefined;
+
+  /** See `BlockStamp`. */
+  block?: BlockStamp | undefined;
+  /**
+   * The words came from a verified source quote (Batch 13) and have not been
+   * changed since. Editing the words clears it, because an edited quote is no
+   * longer a quote.
+   */
+  verbatim?: boolean | undefined;
+
+  /**
+   * Deck furniture (Batch 20): which piece this is, so reseal can find it.
+   * Typing into a piece removes the stamp and records `furnitureOptOut`, so
+   * reseal neither touches it again nor puts a fresh one beside it.
+   */
+  furniture?: string | undefined;
+  furnitureOptOut?: string | undefined;
 
   /** image */
   src?: string | undefined;
@@ -156,7 +203,23 @@ export type Slide = {
    * get the default scale.
    */
   composition?: string | undefined;
+  /**
+   * The fields each block on this slide was built from (19.8), so "Edit as
+   * block" can reopen the form. A record of input, never read at render.
+   */
+  blocks?: BlockRecord[] | undefined;
   layers: Layer[];
+};
+
+export type BlockRecord = {
+  instance: string;
+  block: string;
+  fields: Record<string, string>;
+  box: { x: number; y: number; w: number; h: number };
+  /** Each part as built: its box and a signature of its look. See blockplace.ts. */
+  parts?: Record<string, { x: number; y: number; w: number; h: number; look: string }> | undefined;
+  /** See `BlockStamp.slot`. */
+  slot?: true | undefined;
 };
 
 export type Doc = {
@@ -209,6 +272,18 @@ export type Doc = {
    * only thing that remembers they were ever the same deck.
    */
   variantOf?: string | undefined;
+  /**
+   * Which furniture set this deck carries, and the identity it was stamped
+   * with (Batch 20). A SNAPSHOT: changing the brand's avatar does not reach a
+   * deck already made, and re-applying the brand is how to update one on
+   * purpose. Reseal reads this, never the brand.
+   */
+  furniture?: FurnitureState | undefined;
+  /**
+   * Quotes verified word for word against a source (Batch 13), carried from
+   * Compose so the Quote block (19.2) can offer them and mark them verbatim.
+   */
+  quotes?: string[] | undefined;
   slides: Slide[];
   createdAt: string;
   updatedAt: string;
@@ -364,3 +439,17 @@ export const cloneLayer = (l: Layer, dx = 24, dy = 24): Layer => ({
   x: l.x + dx,
   y: l.y + dy,
 });
+
+/** Who a deck is by, per platform where it differs. See `Doc.furniture`. */
+export type Identity = {
+  name: string;
+  role?: string | undefined;
+  /** A library asset id (Batch 5), and the URL it resolved to when stamped. */
+  avatar?: string | undefined;
+  avatarSrc?: string | undefined;
+  site?: string | undefined;
+  /** `@shortname` on Instagram, the full name on LinkedIn. Keyed by PlatformId. */
+  handles: Record<string, string>;
+};
+
+export type FurnitureState = { set: string; identity: Identity };

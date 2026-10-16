@@ -136,6 +136,11 @@ export function Canvas({ studio }: { studio: Studio }) {
         setSelection(layers.filter((l) => !l.locked).map((l) => l.id));
         return;
       }
+      if (e.key === "/" && !mod) {
+        e.preventDefault();
+        studio.setPicker({ mode: "insert" });
+        return;
+      }
       if (mod && e.key.toLowerCase() === "g") {
         e.preventDefault();
         e.shiftKey ? studio.ungroupSelected() : studio.groupSelected();

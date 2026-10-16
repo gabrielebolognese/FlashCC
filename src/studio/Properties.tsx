@@ -11,6 +11,7 @@ import {
   AlignStartVertical,
   AlignVerticalSpaceAround,
   Group,
+  LayoutGrid,
   Rows3,
   StretchHorizontal,
   Ungroup,
@@ -29,7 +30,9 @@ import { useState, type ReactNode } from "react";
 import { IconButton } from "../ui/IconButton.js";
 import { GradientEditor } from "./GradientEditor.js";
 import { averageColour, makeGradient, type Gradient } from "./gradient.js";
-import { brandIdOf } from "./brand.js";
+import { brandIdentity, brandIdOf, furnitureLogo, listBrands } from "./brand.js";
+import { clearFurniture, FURNITURE_SETS, stampFurniture } from "./furniture.js";
+import { logoResolver } from "./library.js";
 import { FORMATS, allFonts, type Layer, type MediaItem, type SlideImage } from "./model.js";
 import { DEFAULT_SCRIM } from "./paint.js";
 import { unitsOf } from "./tidy.js";
@@ -85,6 +88,7 @@ export function Properties({
           </div>
         </Field>
         <TidyField key={slide?.id} studio={studio} />
+        <FurnitureField studio={studio} />
         <p className="mt-4 border-t border-hairline pt-3 text-caption leading-[16px] text-muted">
           Pick a tool on the left, then drag on the canvas to draw. Click anything to select it.
         </p>
@@ -124,6 +128,28 @@ export function Properties({
           <Arrange icon={ArrowDownToLine} label="Send to back" onClick={() => studio.reorder("back")} />
         </div>
       </Field>
+
+      {(() => {
+        // Any stamped layer of a block still on the slide offers its form back.
+        const stamped = selected.find((l) => l.block && slide?.blocks?.some((b) => b.instance === l.block!.instance));
+        return stamped ? (
+          <Field label="Block">
+            <button
+              type="button"
+              onClick={() => studio.setPicker({ mode: "edit", instance: stamped.block!.instance })}
+              className="flex h-7 w-full items-center justify-center gap-1.5 rounded-md border border-hairline text-caption text-secondary hover:border-accent-dim hover:text-accent"
+            >
+              <LayoutGrid size={13} strokeWidth={2} />
+              Edit as block
+            </button>
+            {stamped.verbatim ? (
+              <p className="mt-1.5 text-caption leading-4 text-muted">
+                Verbatim quote. Changing the words removes the mark.
+              </p>
+            ) : null}
+          </Field>
+        ) : null;
+      })()}
 
       <LayoutTools studio={studio} />
 
@@ -716,6 +742,51 @@ function MatchField({ studio, layer }: { studio: Studio; layer: Layer }) {
           Copies the numbers once. Nothing follows later edits.
         </p>
       )}
+    </Field>
+  );
+}
+
+/**
+ * The deck's furniture (Batch 20): which set, stamped from the brand's
+ * identity, or off. A choice for the whole deck, made from any slide.
+ */
+function FurnitureField({ studio }: { studio: Studio }) {
+  const { doc } = studio;
+  const current = doc.furniture?.set ?? "none";
+  const brands = listBrands();
+  const brandId = doc.styleId ? brandIdOf(doc.styleId) : null;
+  const brand = brands.find((b) => b.id === brandId);
+  const identity = doc.furniture?.identity ?? (brand ? brandIdentity(brand) : undefined);
+
+  const apply = (setId: string) => {
+    if (setId === "none") {
+      studio.replaceDoc(clearFurniture(doc));
+      return;
+    }
+    const logo = brand ? furnitureLogo(brand, doc.slides[0]?.background ?? "#000000", logoResolver()) : undefined;
+    studio.replaceDoc(stampFurniture(doc, setId, identity ?? { name: "", handles: {} }, { ...(logo ? { logo } : {}) }));
+  };
+
+  return (
+    <Field label="Furniture">
+      <select
+        value={current}
+        onChange={(e) => apply(e.target.value)}
+        className="h-7 w-full rounded-md border border-hairline bg-surface-1 px-1.5 text-caption text-primary outline-none"
+      >
+        {FURNITURE_SETS.map((s) => (
+          <option key={s.id} value={s.id}>
+            {s.label}
+          </option>
+        ))}
+      </select>
+      <p className="mt-1.5 text-caption leading-4 text-muted">
+        {current === "none"
+          ? "Your name, a counter, a swipe cue: placed on every slide and kept up to date as you reorder."
+          : identity?.name
+            ? `Signed ${identity.name}. Typing into a piece makes it yours; it is not updated again.`
+            : "Add your name and handles to the brand to sign these."}
+      </p>
     </Field>
   );
 }

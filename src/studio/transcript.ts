@@ -37,8 +37,10 @@ import type { Doc, Layer, Slide } from "./model.js";
 
 /* ── reading the words off a slide ────────────────────────────────────────── */
 
+// Furniture is not what a slide says: a transcript, a caption or alt text that
+// read "3 / 9" and the author's handle on every slide would be noise.
 const readable = (l: Layer): boolean =>
-  l.kind === "text" && l.visible && (l.text ?? "").trim() !== "";
+  l.kind === "text" && l.visible && (l.text ?? "").trim() !== "" && !l.furniture;
 
 /**
  * One slide's copy, largest type first.

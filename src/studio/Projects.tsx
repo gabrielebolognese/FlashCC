@@ -12,6 +12,7 @@ import { LayerView } from "./LayerView.js";
 import type { Doc } from "./model.js";
 import { slidePaint } from "./paint.js";
 import { applyBrand, listBrands, stampLogo, themeOf } from "./brand.js";
+import { furnishWith } from "./furniture.js";
 import { ALL_CLIENTS, belongsTo, listClients, UNASSIGNED, type Client } from "./clients.js";
 import { logoResolver } from "./library.js";
 import { PublishBatch } from "./PublishBatch.js";
@@ -277,7 +278,7 @@ export function Projects({
                     const full = loadDoc(summary.id);
                     if (!full) continue;
                     const out = applyBrand(full, brand, themeOf(full, listBrands()));
-                    saveDoc(stampLogo(out.doc, brand, logo).doc);
+                    saveDoc(furnishWith(stampLogo(out.doc, brand, logo).doc, brand, logo));
                     changed += out.changed;
                     skipped += out.skipped;
                   }

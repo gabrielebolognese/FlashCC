@@ -17,9 +17,41 @@ import type { Doc, Layer, Slide } from "./model.js";
 import type { Theme } from "./presets.js";
 
 /** The copy a document currently carries, one entry per slide. */
+/**
+ * Layers a regeneration must leave exactly as they are: anything the user
+ * changed, every block (Batch 19, placed by the user, not by the generator),
+ * and stamped furniture (Batch 20, which reseal looks after).
+ */
+export const survivesRegeneration = (l: Layer): boolean =>
+  // A slot's block is the generator's own output and is rebuilt; a block the
+  // user inserted is theirs and is kept.
+  Boolean(l.handEdited || (l.block && !l.block.slot) || l.furniture || l.furnitureOptOut);
+
+/**
+ * The slot blocks a document carries, by position, to hand back to generation
+ * so Re-lay lays a big number out as a big number again.
+ */
+function fillsOf(doc: Doc): BuildOptions["fillsAt"] {
+  const out = doc.slides.map((s) => {
+    const rec = s.blocks?.find((b) => b.slot);
+    return rec ? { id: rec.block, fields: rec.fields } : undefined;
+  });
+  return out.some(Boolean) ? out : undefined;
+}
+
+const withFills = (doc: Doc, options: BuildOptions): BuildOptions => {
+  const fillsAt = fillsOf(doc);
+  return fillsAt ? { ...options, fillsAt } : options;
+};
+
 export function textsOf(doc: Doc): string[] {
   return doc.slides.map((slide) => {
-    const texts = slide.layers.filter((l) => l.kind === "text" && (l.text ?? "").trim() !== "");
+    // The slide's own copy only. A block's words and a counter's "3 / 10" are
+    // not what the slide says, and feeding them back into generation would lay
+    // them out a second time as body text.
+    const texts = slide.layers.filter(
+      (l) => l.kind === "text" && (l.text ?? "").trim() !== "" && !l.block && !l.furniture && !l.furnitureOptOut,
+    );
     if (texts.length === 0) return "";
     // Biggest first, then the rest, which reassembles "heading. body" the way
     // the splitter produced it.
@@ -44,16 +76,23 @@ export function mergeRegenerated(doc: Doc, fresh: Slide[]): MergeResult {
   let kept = 0;
 
   const slides = fresh.map((slide, i) => {
-    const mine = (doc.slides[i]?.layers ?? []).filter((l) => l.handEdited);
+    const old = doc.slides[i];
+    const mine = (old?.layers ?? []).filter(survivesRegeneration);
     kept += mine.length;
     replaced += slide.layers.length;
-    return { ...slide, layers: [...slide.layers, ...mine] };
+    // The fresh slide's own slot block, plus whatever the user placed.
+    const blocks = [...(slide.blocks ?? []), ...(old?.blocks ?? []).filter((b) => !b.slot)];
+    return {
+      ...slide,
+      ...(blocks.length > 0 ? { blocks } : {}),
+      layers: [...slide.layers, ...mine],
+    };
   });
 
   // A shorter regeneration would strand hand-edited layers on slides that no
   // longer exist, so anything past the new end is appended to the last slide
   // rather than dropped.
-  const orphans = doc.slides.slice(fresh.length).flatMap((s) => s.layers.filter((l) => l.handEdited));
+  const orphans = doc.slides.slice(fresh.length).flatMap((s) => s.layers.filter(survivesRegeneration));
   const last = slides[slides.length - 1];
   if (orphans.length > 0 && last) {
     kept += orphans.length;
@@ -70,7 +109,7 @@ export function regenerate(
   options: BuildOptions = {},
   roles?: string[],
 ): MergeResult {
-  const fresh = buildSlides(textsOf(doc), theme, roles, options);
+  const fresh = buildSlides(textsOf(doc), theme, roles, withFills(doc, options));
   return mergeRegenerated(doc, fresh);
 }
 
@@ -106,7 +145,7 @@ export function restateSlide(
 
   const next = [...texts];
   next[index] = text;
-  const fresh = buildSlides(next, theme, roles, options);
+  const fresh = buildSlides(next, theme, roles, withFills(doc, options));
 
   if (fresh.length !== doc.slides.length) return mergeRegenerated(doc, fresh);
 
@@ -114,9 +153,14 @@ export function restateSlide(
   const old = doc.slides[index];
   if (!rebuilt || !old) return { doc, replaced: 0, kept: 0 };
 
-  const mine = old.layers.filter((l) => l.handEdited);
+  const mine = old.layers.filter(survivesRegeneration);
   const slides = [...doc.slides];
-  slides[index] = { ...rebuilt, layers: [...rebuilt.layers, ...mine] };
+  const blocks = [...(rebuilt.blocks ?? []), ...(old.blocks ?? []).filter((b) => !b.slot)];
+  slides[index] = {
+    ...rebuilt,
+    ...(blocks.length > 0 ? { blocks } : {}),
+    layers: [...rebuilt.layers, ...mine],
+  };
 
   return { doc: { ...doc, slides }, replaced: rebuilt.layers.length, kept: mine.length };
 }
@@ -139,7 +183,7 @@ export const markEdited = (l: Layer): Layer => (l.handEdited ? l : { ...l, handE
  * there is no slide-for-slide answer, so nothing changes and `replaced` is 0.
  */
 export function relaySlides(doc: Doc, ids: readonly string[], theme: Theme): MergeResult {
-  const fresh = buildSlides(textsOf(doc), theme);
+  const fresh = buildSlides(textsOf(doc), theme, undefined, withFills(doc, {}));
   if (fresh.length !== doc.slides.length) return { doc, replaced: 0, kept: 0 };
 
   let replaced = 0;
@@ -147,7 +191,7 @@ export function relaySlides(doc: Doc, ids: readonly string[], theme: Theme): Mer
   const slides = doc.slides.map((old, i) => {
     const rebuilt = fresh[i];
     if (!rebuilt || !ids.includes(old.id)) return old;
-    const mine = old.layers.filter((l) => l.handEdited);
+    const mine = old.layers.filter(survivesRegeneration);
     replaced += rebuilt.layers.length;
     kept += mine.length;
     return {
@@ -155,6 +199,10 @@ export function relaySlides(doc: Doc, ids: readonly string[], theme: Theme): Mer
       id: old.id,
       name: old.name,
       ...(old.alt ? { alt: old.alt } : {}),
+      ...(() => {
+        const blocks = [...(rebuilt.blocks ?? []), ...(old.blocks ?? []).filter((b) => !b.slot)];
+        return blocks.length > 0 ? { blocks } : {};
+      })(),
       layers: [...rebuilt.layers, ...mine],
     };
   });

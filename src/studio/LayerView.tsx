@@ -107,6 +107,38 @@ export function LayerView({
     );
   }
 
+  if (layer.kind === "path") {
+    if (!layer.path) return null;
+    const stroked = Boolean(layer.stroke) && layer.strokeWidth > 0;
+    return (
+      <svg
+        style={{
+          ...box,
+          ...(layer.shadow
+            ? { filter: `drop-shadow(0 ${layer.shadow.y}px ${layer.shadow.blur / 2}px ${layer.shadow.colour})` }
+            : {}),
+        }}
+        viewBox={`0 0 ${layer.pathW ?? layer.w} ${layer.pathH ?? layer.h}`}
+        preserveAspectRatio="none"
+      >
+        <path
+          d={layer.path}
+          fill={layer.fill === "none" ? "none" : layer.fill}
+          fillRule="evenodd"
+          stroke={stroked ? layer.stroke! : "none"}
+          strokeWidth={layer.strokeWidth}
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          vectorEffect="non-scaling-stroke"
+        />
+      </svg>
+    );
+  }
+
+  const shadow = layer.shadow
+    ? `0 ${layer.shadow.y}px ${layer.shadow.blur}px ${layer.shadow.colour}`
+    : undefined;
+
   if (layer.kind === "image") {
     if (!layer.src) {
       // Empty slot: dotted outline and an upload mark, until something lands on it.
@@ -140,7 +172,7 @@ export function LayerView({
       <img
         src={layer.src}
         alt=""
-        style={{ ...box, objectFit: layer.fit ?? "cover", borderRadius: layer.radius }}
+        style={{ ...box, objectFit: layer.fit ?? "cover", borderRadius: layer.radius, boxShadow: shadow }}
       />
     );
   }
@@ -195,6 +227,7 @@ export function LayerView({
         ...paint,
         borderRadius: layer.kind === "ellipse" ? "50%" : layer.radius,
         border: stroked ? `${layer.strokeWidth}px solid ${layer.stroke}` : undefined,
+        boxShadow: shadow,
       }}
     />
   );

@@ -1,4 +1,4 @@
-import { Circle, Minus, MousePointer2, ScanLine, Sparkle, Square, Triangle, Type } from "lucide-react";
+import { Circle, LayoutGrid, Minus, MousePointer2, ScanLine, Sparkle, Square, Triangle, Type } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 
 import { ICON_PATHS } from "../render/icons.js";
@@ -137,6 +137,17 @@ export function Toolbar({ studio }: { studio: Studio }) {
       </div>
 
       <span className="mx-1.5 h-5 w-px bg-hairline" />
+
+      {/* Blocks (Batch 19). Also on "/" over the canvas. */}
+      <button
+        type="button"
+        title="Insert a block ( / )"
+        aria-label="Insert a block"
+        onClick={() => studio.setPicker({ mode: "insert" })}
+        className="grid h-8 w-8 place-items-center rounded-lg text-tertiary hover:bg-white/[0.06] hover:text-primary"
+      >
+        <LayoutGrid size={15} strokeWidth={2} />
+      </button>
 
       {/* Show what the platform covers. A view setting, never part of the doc. */}
       <div ref={safeWrap} className="relative flex items-center">

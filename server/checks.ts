@@ -99,7 +99,7 @@ export function inventedMeasures(texts: readonly string[], source: string): Find
   return out;
 }
 
-export type DraftSlide = { role: string; text: string };
+export type DraftSlide = { role: string; text: string; fields?: string[] | undefined };
 
 export function checkDraft(
   slides: readonly DraftSlide[],
@@ -175,7 +175,10 @@ export function checkDraft(
     }
   }
 
-  return [...out, ...inventedMeasures(texts, brief)];
+  // A block's fields are words the slide will show (a big number most of all),
+  // so they answer to the brief exactly as the slide's own copy does.
+  const withFields = slides.map((s, i) => [texts[i] ?? "", ...(s.fields ?? [])].join("\n"));
+  return [...out, ...inventedMeasures(withFields, brief)];
 }
 
 export type HookVariant = { angle: string; text: string };

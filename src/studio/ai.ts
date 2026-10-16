@@ -3,7 +3,31 @@ import { hasVoice, type Voice } from "./brand.js";
 import { readRefusal } from "./gate.js";
 import type { Structure } from "./structures.js";
 
-export type DraftedSlide = { role: string; text: string };
+export type DraftedSlide = { role: string; text: string; fields?: string[] | undefined };
+
+/** A block a slot asked for, with the words the model gave it. */
+export type SlotFill = { id: string; fields: Record<string, string> };
+
+/**
+ * The block fields that came back, by slot id, for the slots that asked.
+ *
+ * Keyed by role rather than by position, because Compose lets people add,
+ * remove and edit slides between drafting and laying out, and a role is the
+ * one thing that survives that. A slot whose fields came back empty gets
+ * nothing, and lays out as words like any other slide.
+ */
+export function fillsFor(drafted: readonly DraftedSlide[], structure: Structure): Record<string, SlotFill> {
+  const out: Record<string, SlotFill> = {};
+  for (const slot of structure.slots) {
+    if (!slot.block || out[slot.id]) continue;
+    const hit = drafted.find((d) => d.role === slot.id && (d.fields ?? []).some((f) => f.trim()));
+    if (!hit) continue;
+    const fields: Record<string, string> = {};
+    slot.block.fields.forEach((f, i) => (fields[f.key] = (hit.fields?.[i] ?? "").trim()));
+    out[slot.id] = { id: slot.block.id, fields };
+  }
+  return out;
+}
 
 /**
  * Ask the drafting server for slide copy. The key lives server-side, so this is a
@@ -53,6 +77,7 @@ export async function draftSlides(
           label: s.label,
           note: s.detail,
           placeholder: s.placeholder,
+          ...(s.block ? { block: s.block } : {}),
         })),
       },
     }),

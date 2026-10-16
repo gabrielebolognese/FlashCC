@@ -19,7 +19,7 @@ import type { Asset, LogoRole } from "./assets.js";
 import type { Plan } from "./cloud.js";
 import { luminance } from "./colour.js";
 import { markDeleted } from "./tombstones.js";
-import { makeLayer, uid, type Doc, type Layer, type Slide } from "./model.js";
+import { makeLayer, uid, type Doc, type Identity, type Layer, type Slide } from "./model.js";
 import type { Theme } from "./presets.js";
 import { DEFAULT_STYLE, styleById, type Style } from "./styles.js";
 
@@ -106,6 +106,16 @@ export type Brand = {
   /** The artboard new carousels start at. */
   width: number;
   height: number;
+  /**
+   * Who the carousels are by (Batch 20.1): the post card (19.5) and the author
+   * chip read it, once, when they are stamped. Never live.
+   */
+  identity?: Identity | undefined;
+  /**
+   * Which furniture set new carousels in this brand arrive with (20.6). Absent
+   * and "none" both mean bare slides.
+   */
+  furniture?: string | undefined;
   createdAt: string;
   updatedAt: string;
 };
@@ -561,3 +571,31 @@ export function removeBrand(id: string): Brand[] {
   markDeleted("brand", id);
   return next;
 }
+
+/**
+ * Whose name goes on this deck: the identity it was furnished with, else its
+ * brand's. A snapshot either way, nothing here is read at render.
+ */
+export function identityOf(doc: Doc, brands: readonly Brand[]): Identity | undefined {
+  if (doc.furniture?.identity) return doc.furniture.identity;
+  const id = doc.styleId ? brandIdOf(doc.styleId) : null;
+  return id ? brands.find((b) => b.id === id)?.identity : undefined;
+}
+
+/**
+ * The brand's mark for a slide, resolved, as the furniture's logo piece wants
+ * it. The same choice `stampLogo` makes: the mark, else the light or dark
+ * version by the slide it lands on.
+ */
+export function furnitureLogo(
+  brand: Brand,
+  background: string,
+  resolve: (assetId: string) => { src: string; w?: number | undefined; h?: number | undefined } | undefined,
+): { src: string; assetId: string; w?: number | undefined; h?: number | undefined } | undefined {
+  const assetId = logoAssetId(brand, background);
+  const file = assetId ? resolve(assetId) : undefined;
+  return assetId && file ? { ...file, assetId } : undefined;
+}
+
+/** The identity a brand stamps with: its own, or a bare one named after it. */
+export const brandIdentity = (brand: Brand): Identity => brand.identity ?? { name: brand.name, handles: {} };

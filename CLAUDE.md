@@ -52,7 +52,9 @@ Single test by name: `npx vitest run -t "is deterministic"`
 ## The model
 
 A document is **artboards of layers**, the Photoshop/Figma model. There is no document
-model, no template engine, no roles, no blocks, and nothing derived at render time.
+model, no template engine, no roles, and nothing derived at render time. The block library
+(Batch 19) is presets for content with a shape: it runs once and leaves plain layers carrying a
+stamp, never a live block.
 
 ```
 Doc { width, height, palette, slides }
@@ -67,6 +69,13 @@ Two tags ride on that model and are never read at render: `Layer.groupId`, which
 select and move together (a tag, not a container, one level only), and `Slide.composition`, stamped
 at generation so Tidy can use the spacing steps the slide was built from. The layout tools in
 `tidy.ts` and `slideset.ts` compute coordinates once and forget they ran.
+
+Three more stamps, all read only by the tools that wrote them: `Layer.block` (which block,
+instance and part made it, `blocks.ts`), `Layer.furniture` (a deck furniture piece, `furniture.ts`),
+and `Layer.verbatim` (a quote still word for word). Furniture follows **stamp and reseal**: it is
+rewritten at the structural funnels in `useStudio.ts` and at export, never on an ordinary edit,
+and typing into a piece hands it over to the user. There is one more layer kind, `path`, for the
+shapes the others cannot draw (donut segments, arrows, QR codes).
 
 Invariants worth keeping:
 

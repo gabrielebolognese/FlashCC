@@ -24,6 +24,29 @@ export type Slot = {
   examples: string[];
   /** The slot "add slide" clones. */
   repeatable?: boolean;
+  /**
+   * A block this slot is shown as (Batch 19.7). The STRUCTURE chose it, not the
+   * model: the model is asked for these fields, in words, and never sees a list
+   * of blocks or decides which one to use.
+   */
+  block?: SlotBlock | undefined;
+};
+
+export type SlotBlock = {
+  id: string;
+  label: string;
+  /** What each field must say, in the order the model returns them. */
+  fields: { key: string; note: string }[];
+};
+
+/** "Let the numbers persuade": a result slot is a big number and what it means. */
+const RESULT_AS_STAT: SlotBlock = {
+  id: "stat",
+  label: "big number",
+  fields: [
+    { key: "value", note: "the single most important figure, exactly as written, such as 3x or 61K" },
+    { key: "label", note: "what that figure measures, in under eight words" },
+  ],
 };
 
 export type Structure = {
@@ -208,6 +231,7 @@ export const STRUCTURES: Structure[] = [
       },
       {
         id: "result",
+        block: RESULT_AS_STAT,
         label: "Final result",
         note: "A number beats three adjectives",
         detail: "A figure, a before/after, or the client's own words.",
@@ -397,6 +421,7 @@ export const STRUCTURES: Structure[] = [
       },
       {
         id: "result",
+        block: RESULT_AS_STAT,
         label: "The result",
         note: "Let the numbers persuade",
         detail: "Specific beats triumphant.",
