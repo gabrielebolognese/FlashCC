@@ -45,6 +45,7 @@ history and should never be used to answer a question about how the app works.
 | `npm run typecheck` | Type check only; run before considering a change done |
 | `npm test` | `vitest run --passWithNoTests` |
 | `npm run test:watch` | vitest watch |
+| `npm run build:icons` | Regenerates the bundled Tabler icon index from `@tabler/icons` |
 
 Single test file: `npx vitest run src/doc/split.test.ts`
 Single test by name: `npx vitest run -t "is deterministic"`
@@ -120,7 +121,7 @@ Invariants worth keeping:
   one program. This has cost time four times now, `Analytics`/`analytics`, `Library`/`library`,
   `LongForm`/`longform`, `Review`/`review`, so the component takes the compound name:
   `insights.ts` + `Analytics.tsx`, `library.ts` + `AssetLibrary.tsx`, `longform.ts` +
-  `Repurpose.tsx`, `review.ts` + `ReviewLink.tsx`.
+  `Repurpose.tsx`, `review.ts` + `ReviewLink.tsx`, `imagetools.ts` + `PictureTools.tsx`.
 - Source in `src/`, tests colocated as `*.test.ts`.
 - Strict flags in force: `verbatimModuleSyntax` (use `import type`),
   `noUncheckedIndexedAccess` (indexed access is `T | undefined`),
@@ -136,6 +137,25 @@ Invariants worth keeping:
 - Template validation, the phase-2 FlashFX converter.
 - Size-aware `compositions.ts`. `W`/`H`/`M` are module constants, so generation only ever targets
   1080×1350. `reflow.ts` re-lays existing layers onto another artboard, which is a different job.
+
+## Pictures
+
+- **A stock API is not a scrape.** Batch 13 refused to fetch somebody else's page, and that stands:
+  no feature fetches a page or an image from a link someone pasted. A stock provider's API is the
+  owner offering, under written terms, to license exactly this use, so `server/stock.ts` may call
+  Unsplash and Pexels, and nothing else. Their terms are followed to the stricter of the two:
+  hotlink the URL they return (never copy it into our bucket), ping Unsplash's download endpoint
+  when a photo is used, and carry the photographer's credit wherever the picture goes, into the
+  first comment included. A new image source has to be a licensed API in the same sense.
+- **Heavy things load when used.** The icon index (`src/render/iconsets/`, regenerate with
+  `npm run build:icons`) and the cut-out runtime and model (`onnxruntime-web`,
+  `public/models/u2netp.onnx`) are dynamic imports reached only from the screen that needs them.
+  Nothing new goes in the main bundle that the editor does not use on every load.
+- **Picture tools store values, CSS paints them.** Focal point, mask, filter and texture are fields
+  read by `LayerView`/`slidePaint`. A tool that re-runs a pipeline at render breaks invariant 1.
+- Licences checked before the first line: Tabler (MIT), onnxruntime-web (MIT), U^2-Net weights
+  (Apache-2.0), rembg's ONNX export (MIT). The popular in-browser removal library is AGPL and must
+  not be added.
 
 ## Export
 

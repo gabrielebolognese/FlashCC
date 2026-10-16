@@ -35,6 +35,9 @@ import { clearFurniture, FURNITURE_SETS, stampFurniture } from "./furniture.js";
 import { logoResolver } from "./library.js";
 import { FORMATS, allFonts, type Layer, type MediaItem, type SlideImage } from "./model.js";
 import { DEFAULT_SCRIM } from "./paint.js";
+import { TextureField } from "./TextureField.js";
+import { PictureTools, TextScrimField } from "./PictureTools.js";
+import { focalFromClick } from "./imagetools.js";
 import { unitsOf } from "./tidy.js";
 import type { Studio } from "./useStudio.js";
 
@@ -68,6 +71,7 @@ export function Properties({
             onImage={studio.setBackgroundImage}
           />
         </Field>
+        <TextureField studio={studio} />
         <Field label="Canvas">
           <div className="flex gap-1">
             {FORMATS.map((f) => (
@@ -97,7 +101,7 @@ export function Properties({
   }
 
   const isText = selected.every((l) => l.kind === "text");
-  const isIcon = selected.some((l) => l.kind === "icon");
+  const isIcon = selected.some((l) => l.kind === "icon" || l.icon);
 
   return (
     <aside className="w-[232px] shrink-0 overflow-y-auto border-l border-hairline bg-surface-1 p-3">
@@ -175,6 +179,9 @@ export function Properties({
         </Field>
       ) : null}
 
+      {one?.kind === "image" && one.src ? <PictureTools key={`pic-${one.id}`} studio={studio} layer={one} /> : null}
+      {isText && one ? <TextScrimField studio={studio} layer={one} /> : null}
+
       {isText ? (
         <>
           <Field label="Font">
@@ -242,8 +249,20 @@ export function Properties({
           // An icon is a stroked path; a ramp has nothing to fill.
           <Colour
             palette={doc.palette}
-            value={one?.fill ?? "#ffffff"}
-            onChange={(fill) => set({ fill, stroke: fill })}
+            value={one?.icon && one.fill === "none" ? (one.stroke ?? "#ffffff") : (one?.fill ?? "#ffffff")}
+            // A bundled outline icon is ALL stroke and a filled one all fill:
+            // recolouring one must not turn the other on.
+            onChange={(c) =>
+              studio.updateEach(
+                (l) =>
+                  l.icon
+                    ? l.fill === "none"
+                      ? { ...l, stroke: c }
+                      : { ...l, fill: c }
+                    : { ...l, fill: c, stroke: c },
+                selection,
+              )
+            }
           />
         ) : (
           <PaintPicker
@@ -473,6 +492,7 @@ function PaintPicker({
                 image ?? {
                   src: first.src,
                   ...(first.assetId ? { assetId: first.assetId } : {}),
+                  ...(first.credit ? { credit: first.credit } : {}),
                   fit: "cover",
                   scrim: DEFAULT_SCRIM,
                 },
@@ -510,9 +530,28 @@ function BackgroundImage({
   onChange: (i: SlideImage | undefined) => void;
 }) {
   const scrim = image.scrim ?? DEFAULT_SCRIM;
+  const focal = image.focal ?? { x: 0.5, y: 0.5 };
 
   return (
     <div>
+      {/* The focal point (21.4): clicked on the whole picture, kept in frame by every crop. */}
+      <div className="relative mb-1.5 cursor-crosshair overflow-hidden rounded-md border border-hairline">
+        <img
+          src={image.src}
+          alt=""
+          draggable={false}
+          title="Click the subject to keep it in frame"
+          onClick={(e) => {
+            const r = e.currentTarget.getBoundingClientRect();
+            onChange({ ...image, focal: focalFromClick({ x: e.clientX, y: e.clientY }, r) });
+          }}
+          className="block h-auto w-full"
+        />
+        <span
+          className="pointer-events-none absolute h-3 w-3 -translate-x-1/2 -translate-y-1/2 rounded-full border-2 border-white bg-black/40"
+          style={{ left: `${focal.x * 100}%`, top: `${focal.y * 100}%` }}
+        />
+      </div>
       <div className="grid grid-cols-4 gap-1">
         {media.map((m) => (
           <button
@@ -520,7 +559,10 @@ function BackgroundImage({
             type="button"
             title={m.name}
             onClick={() =>
-              onChange({ ...image, src: m.src, ...(m.assetId ? { assetId: m.assetId } : {}) })
+              // Both replaced, never kept: the previous picture's asset id or
+              // credit left on a different picture would resolve or credit
+              // the wrong one.
+              onChange({ ...image, src: m.src, assetId: m.assetId, credit: m.credit })
             }
             className={[
               "h-10 overflow-hidden rounded-md border-2",

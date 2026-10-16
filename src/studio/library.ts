@@ -54,6 +54,7 @@ export const forgetUrls = (): void => urls.clear();
 /** The address to paint, or nothing, never a broken empty string. */
 export function urlFor(asset: Asset): string | undefined {
   if (asset.data) return asset.data;
+  if (asset.remote) return asset.remote;
   return urls.get(asset.id);
 }
 

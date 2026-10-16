@@ -33,7 +33,7 @@
  * people reject, and the deck is the source of truth, not a prompt.
  */
 
-import type { Doc, Layer, Slide } from "./model.js";
+import type { Credit, Doc, Layer, Slide } from "./model.js";
 
 /* ── reading the words off a slide ────────────────────────────────────────── */
 
@@ -198,8 +198,44 @@ export function clamp(text: string, limit: number): string {
  */
 export function firstCommentOf(doc: Doc, options: CaptionOptions = {}): string {
   const text = transcriptOf(doc, { heading: "Full text of the carousel, for anyone who needs it:" });
-  return options.platform ? clamp(text, captionLimit(options.platform)) : text;
+  const credits = creditLines(creditsOf(doc));
+  if (credits.length === 0) return options.platform ? clamp(text, captionLimit(options.platform)) : text;
+  // The credits go last and are never the part clamped away: the transcript is
+  // a courtesy, the credit is a condition of the licence.
+  const tail = `\n\n${credits.join("\n")}`;
+  if (!options.platform) return `${text}${tail}`;
+  return `${clamp(text, Math.max(0, captionLimit(options.platform) - tail.length))}${tail}`;
 }
+
+/* ── stock photo credits (21.2) ──────────────────────────────────────────── */
+
+const PROVIDER_NAME: Record<string, string> = { unsplash: "Unsplash", pexels: "Pexels" };
+
+/**
+ * Every photographer whose picture is on a visible slide, once each, in deck
+ * order. The pool is not counted: a photo searched for and never placed is not
+ * in the carousel and is owed nothing.
+ */
+export function creditsOf(doc: Doc): Credit[] {
+  const seen = new Set<string>();
+  const out: Credit[] = [];
+  const take = (c: Credit | undefined) => {
+    if (!c || seen.has(c.page)) return;
+    seen.add(c.page);
+    out.push(c);
+  };
+  for (const slide of doc.slides) {
+    take(slide.image?.credit);
+    for (const l of slide.layers) if (l.kind === "image" && l.visible) take(l.credit);
+  }
+  return out;
+}
+
+/** "Photo by NAME on Unsplash (link)", the form both providers' guidelines ask for. */
+export const creditLine = (c: Credit): string =>
+  `Photo by ${c.name} on ${PROVIDER_NAME[c.provider] ?? c.provider} (${c.url})`;
+
+export const creditLines = (credits: readonly Credit[]): string[] => credits.map(creditLine);
 
 /** Roughly how much of the platform's allowance a draft is using. */
 export const captionFit = (text: string, platform: string): { used: number; limit: number; over: boolean } => {

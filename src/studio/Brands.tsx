@@ -16,6 +16,7 @@ import {
   Check,
   ImagePlus,
   Palette,
+  Pipette,
   Plus,
   RefreshCw,
   Sparkles,
@@ -26,6 +27,7 @@ import {
 import { useMemo, useRef, useState } from "react";
 
 import { listAssets, LOGO_ROLE_LABEL, LOGO_ROLES, type Asset, type LogoRole } from "./assets.js";
+import { paletteFromImage, type Swatch } from "./palette.js";
 import {
   gatherDecks,
   learnVoice,
@@ -605,6 +607,79 @@ function VoiceEditor({ brand, onChange }: { brand: Brand; onChange: (b: Brand) =
 
 /* ── editor ───────────────────────────────────────────────────────────────── */
 
+/* ── a palette from an image (21.6) ──────────────────────────────────────── */
+
+/**
+ * Pick a logo, a product or a photo and get the four colour roles back,
+ * already passing contrast. A proposal: nothing changes until "Use these".
+ */
+function FromImage({ onUse }: { onUse: (t: Pick<Theme, "bg" | "fg" | "accent" | "muted">) => void }) {
+  const input = useRef<HTMLInputElement>(null);
+  const [result, setResult] = useState<{ swatches: Swatch[]; theme: Theme | null } | null>(null);
+  const [error, setError] = useState<string | null>(null);
+
+  const read = async (file: File | undefined) => {
+    if (!file) return;
+    setError(null);
+    const url = URL.createObjectURL(file);
+    try {
+      const r = await paletteFromImage(url);
+      if (!r.theme) setError("Nothing opaque in that picture to take colours from.");
+      setResult(r);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Could not read that picture");
+    } finally {
+      URL.revokeObjectURL(url);
+    }
+  };
+
+  return (
+    <div className="mt-3 rounded-xl border border-hairline p-3">
+      <input ref={input} type="file" accept="image/*" hidden onChange={(e) => void read(e.target.files?.[0])} />
+      <div className="flex items-center gap-2">
+        <button
+          type="button"
+          onClick={() => input.current?.click()}
+          className="flex h-7 items-center gap-1.5 rounded-lg border border-hairline px-2.5 text-caption text-secondary hover:border-accent-dim hover:text-accent"
+        >
+          <Pipette size={13} strokeWidth={2} />
+          From an image
+        </button>
+        <span className="text-caption text-muted">A logo, a product or a photo. Stays on this device.</span>
+      </div>
+      {error ? <p className="mt-2 text-caption text-danger">{error}</p> : null}
+      {result?.theme ? (
+        <div className="mt-3 flex items-center gap-3">
+          <div className="flex overflow-hidden rounded-md border border-hairline" title="What the picture is made of">
+            {result.swatches.map((sw) => (
+              <span key={sw.hex} className="h-7" style={{ background: sw.hex, width: Math.max(6, Math.round(sw.share * 120)) }} />
+            ))}
+          </div>
+          <div
+            className="flex h-7 items-center gap-1.5 rounded-md border border-hairline px-2 text-caption"
+            style={{ background: result.theme.bg, color: result.theme.fg }}
+          >
+            Aa
+            <span style={{ color: result.theme.accent }}>accent</span>
+            <span style={{ color: result.theme.muted }}>muted</span>
+          </div>
+          <button
+            type="button"
+            onClick={() => {
+              const { bg, fg, accent, muted } = result.theme!;
+              onUse({ bg, fg, accent, muted });
+              setResult(null);
+            }}
+            className="h-7 rounded-lg px-2.5 text-caption text-accent hover:bg-accent-wash"
+          >
+            Use these
+          </button>
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
 function Editor({
   brand,
   onChange,
@@ -661,6 +736,8 @@ function Editor({
               </div>
             ))}
           </div>
+          {/* The picked colours replace a gradient too: it was drawn from the old ones. */}
+          <FromImage onUse={(t) => set({ theme: { ...brand.theme, ...t, bgGradient: undefined } })} />
         </div>
 
         <Logos brand={brand} onChange={onChange} />

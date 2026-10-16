@@ -1,9 +1,9 @@
 import { Circle, LayoutGrid, Minus, MousePointer2, ScanLine, Sparkle, Square, Triangle, Type } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 
-import { ICON_PATHS } from "../render/icons.js";
-import { makeLayer, type Tool } from "./model.js";
+import type { Tool } from "./model.js";
 import { hasSafeZone, PLATFORMS, type PlatformId } from "./platforms.js";
+import { IconPicker } from "./IconPicker.js";
 import type { Studio } from "./useStudio.js";
 
 const TOOLS: { id: Tool; icon: typeof Type; label: string; key: string }[] = [
@@ -25,7 +25,6 @@ export function Toolbar({ studio }: { studio: Studio }) {
   const [safeOpen, setSafeOpen] = useState(false);
   const wrap = useRef<HTMLDivElement>(null);
   const safeWrap = useRef<HTMLDivElement>(null);
-  const glyphs = Object.keys(ICON_PATHS);
 
   useEffect(() => {
     if (!iconOpen) return;
@@ -96,44 +95,7 @@ export function Toolbar({ studio }: { studio: Studio }) {
           <Sparkle size={15} strokeWidth={2} />
         </button>
 
-        {iconOpen ? (
-          <div
-            className="absolute left-1/2 top-10 z-overlay grid w-[268px] -translate-x-1/2 grid-cols-9 gap-0.5 rounded-2xl border border-hairline p-1.5 shadow-overlay"
-            style={{ background: "rgba(26,42,66,.92)", backdropFilter: "blur(24px) saturate(1.8)" }}
-          >
-            {glyphs.map((g) => (
-              <button
-                key={g}
-                type="button"
-                title={g}
-                onClick={() => {
-                  const l = makeLayer(
-                    "icon",
-                    { x: studio.doc.width / 2 - 90, y: studio.doc.height / 2 - 90, w: 180, h: 180 },
-                    studio.doc.palette[2] ?? "#d9a521",
-                  );
-                  studio.addLayer({ ...l, glyph: g, name: g });
-                  setIconOpen(false);
-                  studio.setTool("select");
-                }}
-                className="grid h-7 w-7 place-items-center rounded-md text-tertiary hover:bg-white/[0.06] hover:text-primary"
-              >
-                <svg
-                  width={14}
-                  height={14}
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth={2}
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                >
-                  <path d={ICON_PATHS[g as keyof typeof ICON_PATHS]} />
-                </svg>
-              </button>
-            ))}
-          </div>
-        ) : null}
+        {iconOpen ? <IconPicker studio={studio} onClose={() => setIconOpen(false)} /> : null}
       </div>
 
       <span className="mx-1.5 h-5 w-px bg-hairline" />

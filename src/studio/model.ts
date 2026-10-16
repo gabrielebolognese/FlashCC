@@ -95,6 +95,15 @@ export type Layer = {
   path?: string | undefined;
   pathW?: number | undefined;
   pathH?: number | undefined;
+  /**
+   * Stroke scales with the shape, in the path's own units. An icon drawn at 2
+   * units on a 24-unit grid stays the weight it was designed at however large
+   * it is placed. Off (the default), a stroke is artboard pixels, which is
+   * what a chart line or an arrow wants.
+   */
+  scaleStroke?: boolean | undefined;
+  /** Which bundled icon this is (21.1), so the picker knows the deck's style. */
+  icon?: { set: string; name: string } | undefined;
 
   /** A soft drop shadow. Screenshot polish (19.2) is the reason it exists. */
   shadow?: { y: number; blur: number; colour: string } | undefined;
@@ -120,6 +129,16 @@ export type Layer = {
   src?: string | undefined;
   fit?: "cover" | "contain" | undefined;
   /**
+   * The point of the picture that must stay in frame (21.4), 0 to 1 of its
+   * width and height. Painted as `object-position`, so every crop and every
+   * reflow keeps the subject in. Absent is the centre.
+   */
+  focal?: { x: number; y: number } | undefined;
+  /** A shape the picture is cut to (21.4). See imagetools.ts. */
+  mask?: ImageMask | undefined;
+  /** A look stored on the picture (21.4), rendered by CSS, never re-run. */
+  filter?: ImageFilter | undefined;
+  /**
    * The library asset this picture came from, when it came from one.
    *
    * `src` is the URL currently being painted and goes stale, a signed URL
@@ -129,6 +148,31 @@ export type Layer = {
    * project with no account works.
    */
   assetId?: string | undefined;
+  /** Who to credit, for a stock photo (21.2). See `Credit`. */
+  credit?: Credit | undefined;
+};
+
+export type ImageMask = "circle" | "rounded" | "arch" | "blob" | "slant";
+
+export type ImageFilter =
+  | { kind: "mono" | "contrast" | "blur" }
+  /** The brand colours it was applied in, stored: a later brand change does not repaint it. */
+  | { kind: "duotone"; dark: string; light: string };
+
+/**
+ * The attribution a stock photo carries (21.2), stored beside the picture
+ * wherever the picture goes: the pool, a layer, a slide background. A copy,
+ * never a lookup, so it survives the photo leaving the provider's search.
+ * `transcript.creditsOf` gathers the ones a deck actually uses.
+ */
+export type Credit = {
+  provider: string;
+  /** The photographer. */
+  name: string;
+  /** Their page on the provider, referral-tagged where the provider asks. */
+  url: string;
+  /** The photo's own page. */
+  page: string;
 };
 
 /**
@@ -147,6 +191,7 @@ export type MediaItem = {
   /** Decoded file size, not the length of a base64 string. */
   bytes: number;
   assetId?: string | undefined;
+  credit?: Credit | undefined;
 };
 
 /**
@@ -165,6 +210,9 @@ export type MediaItem = {
 export type SlideImage = {
   src: string;
   assetId?: string | undefined;
+  credit?: Credit | undefined;
+  /** See `Layer.focal`. Painted as `background-position`. */
+  focal?: { x: number; y: number } | undefined;
   fit?: "cover" | "contain" | undefined;
   /**
    * How much black sits between the picture and the text, 0 to 1.
@@ -176,6 +224,21 @@ export type SlideImage = {
   scrim?: number | undefined;
 };
 
+/** The generated backgrounds (21.3). See backdrops.ts. */
+export type TextureKind = "mesh" | "grain" | "dots" | "lines" | "blobs" | "paper" | "tiles";
+
+/**
+ * A generated texture over the slide's background. `src` is the SVG as it was
+ * generated and is what paints; the rest records what it was generated from,
+ * so the control can show it and regenerate on purpose. Never re-read at paint.
+ */
+export type SlideTexture = {
+  kind: TextureKind;
+  seed: number;
+  strength: number;
+  src: string;
+};
+
 export type Slide = {
   id: string;
   name: string;
@@ -184,6 +247,8 @@ export type Slide = {
   gradient?: Gradient | undefined;
   /** Painted over both of the above, under every layer, when set. */
   image?: SlideImage | undefined;
+  /** Painted over all of the above, under every layer, when set (21.3). */
+  texture?: SlideTexture | undefined;
   /**
    * What this slide says, for somebody using a screen reader.
    *

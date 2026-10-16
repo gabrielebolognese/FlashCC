@@ -1,5 +1,7 @@
 import { describe, expect, it } from "vitest";
 
+import { makeSlide } from "./model.js";
+
 import {
   addSpend,
   briefFor,
@@ -14,6 +16,7 @@ import {
   perIdeaCeiling,
   perIdeaFloor,
   planRun,
+  withCover,
   recapHeadline,
   RUN_STEPS,
   runDone,
@@ -368,5 +371,31 @@ describe("the beat between questions", () => {
 
   it("has something to say past the end rather than nothing", () => {
     expect(settleNote(99)).toBe("Working");
+  });
+});
+
+describe("a different picture for every carousel (21.7)", () => {
+  it("cycles three images through nine carousels as 0,1,2,0,1,2,0,1,2", () => {
+    expect(planRun(IDEAS, 9, ["ink"], 3).map((s) => s.imageIndex)).toEqual([0, 1, 2, 0, 1, 2, 0, 1, 2]);
+  });
+
+  it("cycles on its own count, independent of ideas and styles", () => {
+    const plan = planRun(IDEAS, 8, ["ink", "paper"], 4);
+    expect(plan.map((s) => s.imageIndex)).toEqual([0, 1, 2, 3, 0, 1, 2, 3]);
+    expect(plan.map((s) => s.styleId)).toEqual(planRun(IDEAS, 8, ["ink", "paper"]).map((s) => s.styleId));
+  });
+
+  it("assigns no picture without a pool", () => {
+    for (const s of planRun(IDEAS, 6, ["ink"])) expect(s).not.toHaveProperty("imageIndex");
+  });
+
+  it("puts the picture behind the cover only, with its credit and a scrim", () => {
+    const slides = [makeSlide(), makeSlide(), makeSlide()];
+    const credit = { provider: "unsplash", name: "Ana", url: "u", page: "p" };
+    const out = withCover(slides, { name: "desk", src: "https://images.unsplash.com/x", credit });
+    expect(out[0]!.image).toMatchObject({ src: "https://images.unsplash.com/x", credit, fit: "cover" });
+    expect(out[0]!.image!.scrim).toBeGreaterThan(0);
+    expect(out[1]!.image).toBeUndefined();
+    expect(withCover(slides, undefined)).toEqual(slides);
   });
 });

@@ -26,6 +26,7 @@ import { draft, draftConfigured, draftStatus, hooks } from "./draft.js";
 import { exportDeck, renderDocument, renderImages } from "./export.js";
 import { HttpError, json } from "./http.js";
 import { addComment, decide, readShare } from "./review.js";
+import { stockConfigured, stockSearch, stockUsed } from "./stock.js";
 import { devPro, hasSecretKey } from "./supabase.js";
 
 const PORT = Number(process.env.PORT ?? 8787);
@@ -48,6 +49,8 @@ const ROUTES: Record<string, Record<string, Handler>> = {
     "/api/export": exportDeck,
     "/api/slides": renderImages,
     "/api/document": renderDocument,
+    "/api/stock": stockSearch,
+    "/api/stock/used": stockUsed,
     /*
       The four /api/billing routes were here: checkout, portal, webhook and
       status. They were removed with the payment integration, to be rebuilt.
@@ -73,6 +76,8 @@ const server = createServer((req, res) => {
       ok: true,
       export: true,
       draft: draftConfigured(),
+      // Which stock photo providers have a key. The picker offers only these.
+      stock: stockConfigured(),
       // No payment integration is wired. Reported rather than omitted, so the
       // answer to "can this take money" is explicit instead of absent.
       billing: false,

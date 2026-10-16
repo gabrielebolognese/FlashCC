@@ -33,10 +33,12 @@ import {
   Trash2,
   X,
 } from "lucide-react";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 
 import { researchAngles, type Source } from "./angles.js";
 import { alignToSlots, draftSlides, fillsFor } from "./ai.js";
+import { filterAssets, listAssets } from "./assets.js";
+import { urlFor } from "./library.js";
 import { contextVoice, listBrands } from "./brand.js";
 import { buildSlides, type BuildOptions } from "./compositions.js";
 import { Chip } from "./Dash.js";
@@ -64,6 +66,8 @@ import {
   perIdeaCeiling,
   perIdeaFloor,
   planRun,
+  withCover,
+  type RunImage,
   recapHeadline,
   RUN_STEPS,
   runPercent,
@@ -160,6 +164,8 @@ export function BulkRun({
   const [length, setLength] = useState<RunLength>("medium");
   const [structure, setStructure] = useState<Structure>(() => STRUCTURES[0]!);
   const [picked, setPicked] = useState<string[]>(() => [styles[0]?.id ?? "ink"]);
+  /** The run's cover pictures (21.7), in the order they cycle. */
+  const [pool, setPool] = useState<RunImage[]>([]);
   const [deep, setDeep] = useState(true);
 
   const [scheduling, setScheduling] = useState(false);
@@ -225,7 +231,7 @@ export function BulkRun({
   /* ── the run ───────────────────────────────────────────────────────────── */
 
   async function go() {
-    const plan = planRun(real, totalFor(real.length, perIdea), picked);
+    const plan = planRun(real, totalFor(real.length, perIdea), picked, pool.length);
     if (plan.length === 0) return;
 
     stop.current = false;
@@ -340,12 +346,15 @@ export function BulkRun({
             style.theme.bg, style.theme.fg, style.theme.accent, style.theme.muted,
             "#ffffff", "#000000", "#e5545a", "#3dbe7a", "#4c86d6", "#db2777",
           ],
-          slides: withStyleImage(
-            buildSlides(texts, style.theme, drafted.slides.map((d) => d.role), {
-              ...build,
-              fills: fillsFor(drafted.slides, asked),
-            }),
-            style,
+          slides: withCover(
+            withStyleImage(
+              buildSlides(texts, style.theme, drafted.slides.map((d) => d.role), {
+                ...build,
+                fills: fillsFor(drafted.slides, asked),
+              }),
+              style,
+            ),
+            step.imageIndex === undefined ? undefined : pool[step.imageIndex],
           ),
         };
 
@@ -690,6 +699,8 @@ export function BulkRun({
                   })}
                 </div>
               </div>
+
+              <CoverPool pool={pool} onChange={setPool} />
             </Ask>
           ) : null}
 
@@ -1382,6 +1393,78 @@ function Block({
       <span className="text-overline uppercase text-tertiary">{label}</span>
       {hint ? <p className="mb-2 mt-0.5 text-caption leading-4 text-muted">{hint}</p> : <div className="mb-2" />}
       {children}
+    </div>
+  );
+}
+
+/**
+ * The run's image pool (21.7): pictures from the library, picked in the order
+ * they should cycle. "Canva bulk create only gives you one image; I want a
+ * different image for each post" is the reason this exists.
+ */
+function CoverPool({ pool, onChange }: { pool: RunImage[]; onChange: (p: RunImage[]) => void }) {
+  const shelf = useMemo(
+    () =>
+      filterAssets(listAssets(), { kind: "image" }).flatMap((a) => {
+        const src = urlFor(a);
+        return src ? [{ asset: a, src }] : [];
+      }),
+    [],
+  );
+  const at = (src: string) => pool.findIndex((p) => p.src === src);
+
+  return (
+    <div className="mt-6">
+      <span className="text-[15px] text-tertiary">
+        A different cover picture for each, optional
+        {pool.length > 0 ? `: ${pool.length}, cycling in this order` : ""}
+      </span>
+      {shelf.length === 0 ? (
+        <p className="mt-2 text-[14px] leading-5 text-muted">
+          Pictures in your library show up here. Add some from Media in the editor, including stock photos.
+        </p>
+      ) : (
+        <div className="mt-2 grid grid-cols-6 gap-2">
+          {shelf.slice(0, 36).map(({ asset, src }) => {
+            const i = at(src);
+            return (
+              <button
+                key={asset.id}
+                type="button"
+                title={asset.name}
+                onClick={() =>
+                  onChange(
+                    i >= 0
+                      ? pool.filter((_, j) => j !== i)
+                      : pool.length >= MAX_RUN
+                        ? pool
+                        : [
+                            ...pool,
+                            {
+                              name: asset.name,
+                              src,
+                              ...(asset.remote ? {} : { assetId: asset.id }),
+                              ...(asset.credit ? { credit: asset.credit } : {}),
+                            },
+                          ],
+                  )
+                }
+                className={[
+                  "relative aspect-square overflow-hidden rounded-xl border-2",
+                  i >= 0 ? "border-accent" : "border-hairline hover:border-surface-5",
+                ].join(" ")}
+              >
+                <img src={src} alt="" className="h-full w-full object-cover" />
+                {i >= 0 ? (
+                  <span className="absolute left-1 top-1 grid h-5 min-w-5 place-items-center rounded-md bg-black/70 px-1 text-[12px] text-accent">
+                    {i + 1}
+                  </span>
+                ) : null}
+              </button>
+            );
+          })}
+        </div>
+      )}
     </div>
   );
 }

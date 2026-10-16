@@ -2,6 +2,7 @@ import type { CSSProperties } from "react";
 
 import { ICON_PATHS, ICON_VIEWBOX } from "../render/icons.js";
 import { gradientCss } from "./gradient.js";
+import { filterCss, focalPosition, maskClip } from "./imagetools.js";
 import { fontStack, type Layer } from "./model.js";
 
 /** Paints one layer. Pure, no interaction, no selection chrome. */
@@ -129,7 +130,7 @@ export function LayerView({
           strokeWidth={layer.strokeWidth}
           strokeLinecap="round"
           strokeLinejoin="round"
-          vectorEffect="non-scaling-stroke"
+          vectorEffect={layer.scaleStroke ? undefined : "non-scaling-stroke"}
         />
       </svg>
     );
@@ -168,12 +169,62 @@ export function LayerView({
         </div>
       );
     }
+    const position = layer.focal ? focalPosition(layer.focal) : undefined;
+    if (!layer.mask && !layer.filter) {
+      return (
+        <img
+          src={layer.src}
+          alt=""
+          style={{
+            ...box,
+            objectFit: layer.fit ?? "cover",
+            objectPosition: position,
+            borderRadius: layer.radius,
+            boxShadow: shadow,
+          }}
+        />
+      );
+    }
+
+    // A mask or a filter (21.4). The shadow moves to a drop-shadow on the
+    // wrapper, because a clip-path clips a box-shadow away and a drop-shadow
+    // follows the clipped shape. Duotone is painted with blend modes rather
+    // than an SVG filter: no element ids, so a slide painted twice on one page
+    // (canvas and filmstrip) cannot pick up the other copy's definition.
+    const clip = layer.mask ? maskClip(layer.mask, layer.w, layer.h, layer.id) : undefined;
+    const duo = layer.filter?.kind === "duotone" ? layer.filter : null;
+    const fill: CSSProperties = { position: "absolute", inset: 0, width: "100%", height: "100%" };
     return (
-      <img
-        src={layer.src}
-        alt=""
-        style={{ ...box, objectFit: layer.fit ?? "cover", borderRadius: layer.radius, boxShadow: shadow }}
-      />
+      <div
+        style={{
+          ...box,
+          filter: layer.shadow ? `drop-shadow(0 ${layer.shadow.y}px ${layer.shadow.blur / 2}px ${layer.shadow.colour})` : undefined,
+        }}
+      >
+        <div
+          style={{
+            ...fill,
+            overflow: "hidden",
+            clipPath: clip,
+            borderRadius: clip ? undefined : layer.radius,
+            isolation: "isolate",
+            background: duo ? duo.light : undefined,
+          }}
+        >
+          <img
+            src={layer.src}
+            alt=""
+            style={{
+              ...fill,
+              objectFit: layer.fit ?? "cover",
+              objectPosition: position,
+              filter: filterCss(layer.filter),
+              mixBlendMode: duo ? "multiply" : undefined,
+            }}
+          />
+          {duo ? <div style={{ ...fill, background: duo.dark, mixBlendMode: "lighten" }} /> : null}
+        </div>
+      </div>
     );
   }
 

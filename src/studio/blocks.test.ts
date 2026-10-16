@@ -238,7 +238,7 @@ describe("placing a block (19.6)", () => {
     const board = { w: 1080, h: 1350 };
     const full: Slide = {
       ...makeSlide(),
-      layers: [{ ...makeSlide().layers, ...buildSlides(["x"], theme)[0]!.layers[0]!, x: 96, y: 140, w: 888, h: 1070 }],
+      layers: [{ ...buildSlides(["x"], theme)[0]!.layers[0]!, x: 96, y: 140, w: 888, h: 1070 }],
     };
     expect(freeRect(full, board, placementArea(board), blockById("table")!.minBox)).toBeNull();
   });

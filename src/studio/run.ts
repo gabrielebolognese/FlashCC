@@ -9,6 +9,9 @@
  * network; what it does is follow this list.
  */
 
+import type { Credit, Slide } from "./model.js";
+import { DEFAULT_SCRIM } from "./paint.js";
+
 export const MIN_RUN = 3;
 
 /**
@@ -30,7 +33,12 @@ export type Step = {
   idea: string;
   ideaIndex: number;
   styleId: string;
+  /** Which picture from the run's image pool goes on this carousel's cover (21.7). */
+  imageIndex?: number | undefined;
 };
+
+/** One picture in a run's pool: what the cover's background becomes. */
+export type RunImage = { name: string; src: string; assetId?: string | undefined; credit?: Credit | undefined };
 
 export const tidyIdeas = (ideas: readonly string[]): string[] =>
   ideas.map((i) => i.trim()).filter(Boolean);
@@ -57,6 +65,13 @@ export function planRun(
   ideas: readonly string[],
   count: number,
   styleIds: readonly string[],
+  /**
+   * How many pictures are in the run's pool (21.7). They cycle on their own
+   * count like the styles, so nine carousels with three pictures give
+   * 0, 1, 2, 0, 1, 2, 0, 1, 2: "a different image for each post", in an order
+   * that can be predicted before the run starts. Zero means no pool.
+   */
+  imageCount = 0,
 ): Step[] {
   const real = tidyIdeas(ideas);
   if (real.length === 0) return [];
@@ -73,8 +88,32 @@ export function planRun(
       idea: real[ideaIndex]!,
       ideaIndex,
       styleId: styles[i % styles.length]!,
+      ...(imageCount > 0 ? { imageIndex: i % imageCount } : {}),
     };
   });
+}
+
+/**
+ * The carousel's cover with the step's picture behind it, at the default
+ * scrim, credit and all. The cover only: a photograph behind every slide is
+ * the noise 21.3 exists to avoid, and the cover is what a feed shows.
+ */
+export function withCover(slides: readonly Slide[], image: RunImage | undefined): Slide[] {
+  if (!image) return [...slides];
+  return slides.map((s, i) =>
+    i === 0
+      ? {
+          ...s,
+          image: {
+            src: image.src,
+            ...(image.assetId ? { assetId: image.assetId } : {}),
+            ...(image.credit ? { credit: image.credit } : {}),
+            fit: "cover" as const,
+            scrim: s.image?.scrim ?? DEFAULT_SCRIM,
+          },
+        }
+      : s,
+  );
 }
 
 /**

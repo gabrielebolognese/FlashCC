@@ -1,9 +1,10 @@
-import { ImagePlus, Library as LibraryIcon, Trash2 } from "lucide-react";
+import { Camera, ImagePlus, Library as LibraryIcon, Trash2 } from "lucide-react";
 import { useMemo, useRef, useState } from "react";
 
 import { assetToMedia, filterAssets, listAssets, type Asset } from "./assets.js";
 import { importImages, urlFor } from "./library.js";
 import { ACCEPT, formatBytes, MAX_POOL, poolBytes } from "./media.js";
+import { StockPicker } from "./StockPicker.js";
 import type { Studio } from "./useStudio.js";
 
 export const MEDIA_DRAG_TYPE = "application/x-flashcc-media";
@@ -24,6 +25,7 @@ export function MediaPool({ studio }: { studio: Studio }) {
   const [over, setOver] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [browsing, setBrowsing] = useState(false);
+  const [stock, setStock] = useState(false);
 
   const media = studio.doc.media;
   const full = media.length >= MAX_POOL;
@@ -100,7 +102,7 @@ export function MediaPool({ studio }: { studio: Studio }) {
           }}
         />
 
-        <div className="mb-2 grid grid-cols-2 gap-1.5">
+        <div className="mb-2 grid grid-cols-3 gap-1.5">
           <button
             type="button"
             disabled={busy || full}
@@ -124,7 +126,17 @@ export function MediaPool({ studio }: { studio: Studio }) {
             <LibraryIcon size={14} strokeWidth={2} />
             Library
           </button>
+          <button
+            type="button"
+            disabled={full}
+            onClick={() => setStock(true)}
+            className="flex h-9 items-center justify-center gap-1.5 rounded-xl border border-hairline text-caption text-tertiary hover:border-accent-dim hover:text-accent disabled:opacity-40"
+          >
+            <Camera size={14} strokeWidth={2} />
+            Stock
+          </button>
         </div>
+        {stock ? <StockPicker studio={studio} onClose={() => setStock(false)} /> : null}
 
         {error ? (
           <p className="mb-2 rounded-xl border border-danger-dim bg-danger-wash px-2.5 py-2 text-caption leading-4 text-secondary">

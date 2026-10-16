@@ -18,7 +18,7 @@ is still current.
 | --- | --- |
 | **Orientation** | [1 What it is](#1-what-it-is) · [2 Running it](#2-running-it) · [3 The invariants](#3-the-invariants) |
 | **The canvas** | [4 Data model](#4-the-data-model) · [5 Canvas](#5-the-canvas) · [6 Text](#6-text-measurement-and-fitting) · [7 Colour](#7-colour-and-contrast) · [8 Gradients](#8-gradients) · [9 Format change](#9-changing-format-reflow) |
-| **Making a deck** | [10 Frameworks](#10-the-four-frameworks) · [11 Generation](#11-generation) · [11b Blocks and furniture](#11b-blocks-and-deck-furniture) · [12 Styles](#12-styles-and-themes) · [13 Onboarding](#13-onboarding) · [14 AI drafting](#14-ai-drafting) · [15 Bulk and long form](#15-bulk-create-and-long-form-ingest) · [16 Media, fonts and assets](#16-media-and-fonts) · [17 Screen flow](#17-screen-flow) |
+| **Making a deck** | [10 Frameworks](#10-the-four-frameworks) · [11 Generation](#11-generation) · [11b Blocks and furniture](#11b-blocks-and-deck-furniture) · [12 Styles](#12-styles-and-themes) · [13 Onboarding](#13-onboarding) · [14 AI drafting](#14-ai-drafting) · [15 Bulk and long form](#15-bulk-create-and-long-form-ingest) · [16 Media, fonts and assets](#16-media-and-fonts) · [16b Imagery](#16b-imagery-icons-and-backgrounds) · [17 Screen flow](#17-screen-flow) |
 | **The product** | [17b Clients and review](#17b-clients-and-review) · [18 Pipeline, calendar and series](#18-the-pipeline) · [19 Analytics](#19-analytics) · [19b History](#19b-version-history) · [20 Library](#20-the-library) · [21 Export](#21-export) |
 | **Infrastructure** | [22 Persistence](#22-persistence) · [23 Sync](#23-sync) · [24 Auth](#24-auth) · [25 Billing](#25-billing) · [26 Database](#26-database) · [27 Design tokens](#27-design-tokens) · [28 Testing](#28-testing) |
 | **Reality check** | [29 Known defects](#29-known-defects) |
@@ -92,12 +92,16 @@ document's own palette. An app colour inside a slide is a bug.
 ```ts
 Doc  { version: 3, id, name, width, height, palette[], media[],
        group?, framework?, styleId?, archived?, slides[], createdAt, updatedAt }
-Slide{ id, name, background, gradient?, layers[] }
+Slide{ id, name, background, gradient?, image?, texture?, layers[] }
 Layer{ id, name, kind, x, y, w, h, rotation, opacity, visible, locked,
        fill, gradient?, stroke, strokeWidth, radius, …kind-specific }
 ```
 
-`LayerKind` is `text | rect | ellipse | triangle | line | icon | image`.
+`LayerKind` is `text | rect | ellipse | triangle | line | icon | image | path`.
+
+Batch 21 added, all optional: on an image layer `focal`, `mask`, `filter` and `credit`; on a path
+layer `scaleStroke` and `icon`; on `SlideImage` `focal` and `credit`; `Slide.texture`. See
+[16b](#16b-imagery-icons-and-backgrounds).
 
 **Coordinates are artboard pixels.** A layer at `x: 540` is at 540. Not fractions, not percentages.
 
@@ -1485,6 +1489,129 @@ deliberately not reactive, anything that should re-render already has the accoun
 
 ---
 
+## 16b. Imagery, icons and backgrounds
+
+Batch 21. Every picture tool writes properties onto a layer or a slide once, and `LayerView` (or
+`slidePaint` for a slide) turns them into CSS. Nothing re-runs at render, so invariants 1 and 3 hold:
+the canvas, the thumbnails and the Chromium export read the same fields.
+
+### Icons (`iconsets.ts`, `IconPicker.tsx`, 21.1)
+
+**Tabler Icons 3.49, MIT**: 5,184 outline and 1,054 filled. `npm run build:icons`
+(`scripts/build-icons.mjs`) reads `@tabler/icons` and writes three JSON files under
+`src/render/iconsets/`, each icon one joined path string, plus a search index of names and tags,
+with Tabler's licence beside them. They are **dynamic imports**, loaded on first open of the picker,
+never with the app (about 470KB gzipped for both styles and the words).
+
+An inserted icon is an ordinary `path` layer (`pathW`/`pathH` 24, `scaleStroke: true`) carrying its
+own path data: it renders and exports with no index loaded. Outline is a 2-unit stroke on Tabler's
+24 grid, so it keeps its designed weight at any size; filled is a fill. It lands in the theme's
+accent, in free space found by `freeRect`. `icon: {set, name}` is a stamp read only by
+`deckIconStyle`, so the picker opens on the style the deck already uses (**one style per deck**),
+with the other behind a switch. The Colour control sets the stroke of an outline icon and the fill
+of a filled one. `searchIcons` ranks exact name, then prefix, then substring, then tag, ties by name.
+
+### Stock photos (`server/stock.ts`, `stock.ts`, `StockPicker.tsx`, 21.2)
+
+**Why this is not the Batch 13 rejection:** Batch 13 refused to fetch somebody else's page. A stock
+API is the owner offering, under written terms, to license exactly this use. That line is written
+into CLAUDE.md.
+
+`POST /api/stock {provider, query, page}` proxies Unsplash or Pexels with the key from
+`UNSPLASH_ACCESS_KEY` / `PEXELS_API_KEY` (server only) and returns one normalised shape
+(`normaliseUnsplash`, `normalisePexels`, pure and tested). `/api/health` reports
+`stock: {unsplash, pexels}` and the picker offers only providers with a key; with none it says so.
+
+Built to the **stricter** guidelines, Unsplash's, for both providers:
+
+| Rule | How |
+| --- | --- |
+| Hotlink, never copy | `src` is the provider's CDN URL, sized for a 2x export (`w=2160`). Nothing goes to our bucket. `inline.ts` fetches it at export like any remote picture |
+| Report the download | `POST /api/stock/used` calls Unsplash's `download_location` when a photo is chosen. `isDownloadLocation` only lets through `https://api.unsplash.com/photos/<id>/download`, so the route cannot be used to make the server GET an arbitrary URL with the key attached |
+| Credit with links | Every result carries `credit {provider, name, url, page}`; Unsplash links carry `utm_source=flashcc&utm_medium=referral`. The picker shows "NAME on PROVIDER", linked, under every result |
+
+A chosen photo becomes a pool item (`stockMedia`, no `assetId`, the URL is durable) and a
+**local-only** library entry (`stockAsset`: `remote` + `credit`, `path: ""`, `folder: "Stock"`,
+`key` the provider's id). The `assets` table requires a bucket path, so a reference does not sync;
+documents that use it carry the URL and the credit themselves. The credit travels wherever the
+picture goes: `fillWithMedia`, `placeMedia`, the slide background and a cut-out all copy it.
+`transcript.creditsOf` gathers the credits of photos actually on visible slides, once each, and
+`firstCommentOf` appends "Photo by NAME on PROVIDER (link)" after the transcript, **never clamped
+away**: the transcript is shortened instead, because the credit is a licence condition. Abuse
+ceiling: 600 searches an hour per account (per address signed out). Nothing anybody meets.
+
+### Generated backgrounds (`backdrops.ts`, `TextureField.tsx`, 21.3)
+
+Seven generators, `mesh grain dots lines blobs paper tiles`, each an SVG transparent wherever it is
+not drawing, in the theme's own colours. `applyTexture` generates once and stores
+`Slide.texture {kind, seed, strength, src}`: `src` is the SVG data URL and is what paints;
+`kind`/`seed`/`strength` record the input. `slidePaint` puts it on top of the background stack
+(over a picture and its scrim, or a gradient), `cover` with the SVG's own `slice`, so a canvas
+resize does not distort a pattern.
+
+Seeded by `deckSeed`, which is `seedOf` over the deck's words (Batch 4's seed), through a mulberry32
+PRNG: one carousel is consistent, two differ, the same carousel twice is identical. The patterns use
+the deck seed on every slide; the mesh and the blobs shift per slide so they do not read as a
+watermark. Patterns fade out from a seeded corner before the middle, and blobs keep to the corners,
+because a texture behind the headline is a contrast problem.
+
+**Noise costs bytes.** `strengthCap` holds grain and paper to 0.6 on a JPEG destination with a 2MB
+ceiling (LinkedIn); the slider stops there and says why. Measured through the real export
+(Playwright Chromium), a 10-slide 1080×1350 LinkedIn PDF at the cap: **grain 1.30MB, paper 0.72MB**,
+both under 2MB. The pre-flight size check is what would catch a regression.
+
+### Image tools (`imagetools.ts`, `PictureTools.tsx`, 21.4)
+
+| Tool | Stored as | Painted as |
+| --- | --- | --- |
+| Focal point | `Layer.focal` / `SlideImage.focal`, 0 to 1 | `object-position` / `background-position`. The picture's x% point lines up with the box's x% point, so the focal point is inside the frame for every crop, reflow and grid crop |
+| Shape mask | `mask: circle \| rounded \| arch \| blob \| slant` | `clip-path`, sized to the box; the blob is a seeded path from the layer id |
+| Filter | `filter: mono \| contrast \| blur`, or `duotone {dark, light}` | CSS `filter`. Duotone is grayscale under a `multiply` on the light colour, then a `lighten` layer of the dark colour: no SVG filter ids, so a slide painted twice on one page cannot pick up the other copy's definition. Its colours are the theme's darker ground and accent, stored when applied |
+| Text scrim | an ordinary `rect` layer with a gradient, placed directly under the text (`withScrim`) | full width, darkest at the edge the text is nearer, dark under light text and light under dark |
+| Replace image | `fillWithMedia` | swaps `src`, `assetId` and `credit` (never keeps a stale `assetId`, which `resolveDoc` would otherwise use to put the old picture back) and keeps box, fit, focal, mask and filter |
+
+A masked or filtered image renders as a wrapper (drop-shadow, which follows a clip) around a clipped
+box; an image with neither stays a single `<img>`, byte for byte what it was before.
+
+### Background removal, on the device (`cutout.ts`, `CutoutButton.tsx`, 21.5)
+
+**U^2-Net, small variant (u2netp)**: weights Apache-2.0 (Qin et al.), ONNX export MIT (rembg), served
+from `public/models/u2netp.onnx` (4.6MB, sha256 and licences in `public/models/README.md`). Run by
+**onnxruntime-web 1.30 (MIT)**, WebAssembly, one thread unless the page is cross-origin isolated.
+The AGPL library most people reach for is deliberately not used. Nothing is uploaded.
+
+The runtime (`onnxruntime-web/wasm`, its `.wasm` emitted by Vite as a hashed asset, about 3.7MB
+gzipped) and the model load on the first removal only, and the session is kept for the visit. The
+button says "about 19MB the first time" until a removal has completed in that browser.
+
+Pure and tested: `preprocess` (320×320, scale by the image's own max, ImageNet mean and deviation,
+planar), `maskFromPrediction` (min-max, then a curve from 0.05 to 0.6 that drops haze and keeps thin
+limbs opaque, chosen by eye on a portrait, an animal and a product), `applyMask`, `outputSize`
+(capped at 2160 on the long side). The cut-out is a PNG data URL that replaces the layer's picture
+(credit kept) and also lands in the pool; the library hoists it like any upload. Measured in
+headless Chromium: about 2.7s for a 600px portrait on first run with the model cached, under 2s for
+later runs on smaller pictures, so a second removal in a session starts well inside 3 seconds.
+
+### A palette from an image (`palette.ts`, Brands, 21.6)
+
+"From an image" in the brand editor. `quantise` is median cut over a 5-bit histogram, transparent
+pixels ignored, ties broken by value: deterministic. `vividOf` bins the pixels with chroma at least
+0.25 by hue and averages the heaviest bin, **before** median cut can average a small vivid colour
+into its neighbours; null under 1%, so a grey photo gets no invented accent. `proposeTheme` keeps the
+dominant hue for the ground (pushed light or dark the way the picture leans), takes the accent from
+the vivid hue (else the most saturated swatch over 3%), and guarantees fg and muted at 4.5:1 and the
+accent at 3:1 on the ground, darkening or lightening the accent only as far as it takes. A proposal:
+nothing changes until "Use these", which also clears a gradient drawn from the old colours.
+
+### A different picture for every carousel in a run (`run.ts`, `BulkRun.tsx`, 21.7)
+
+`planRun(ideas, count, styles, imageCount)` gives each step `imageIndex = i % imageCount`, on its own
+cycle like the styles: three pictures over nine carousels is `0,1,2,0,1,2,0,1,2` (tested).
+The Look step picks pictures from the library in the order they should cycle, numbered. `withCover`
+puts the step's picture behind the **cover only**, with its credit and the default scrim.
+
+---
+
 ## 17. Screen flow
 
 ```
@@ -2455,7 +2582,7 @@ all disabled under `prefers-reduced-motion`.
 
 ## 28. Testing
 
-296 tests across 17 files. They are design guards, not coverage theatre, several encode an argument
+1,473 tests across 71 files (as of Batch 21). They are design guards, not coverage theatre, several encode an argument
 that would otherwise be lost:
 
 - **mean vs median**, five posts and one at 100k, proving a mean baseline would switch outlier
@@ -2721,6 +2848,21 @@ anywhere in the interface, and "delete" reads as stronger than it is.
 **Fix:** either an "unpublish" action that clears `<user>/<doc>/` from the `slides` bucket, or
 wording on the publish confirmation that says plainly the slides stay up until the deck is
 republished or removed.
+
+### D28, The small cut-out model is soft on thin limbs
+
+u2netp is the 4.6MB variant, chosen so the first removal is a download people will wait for. It
+scores a raised arm or a strand of hair at middling confidence; the 0.05 to 0.6 curve in
+`maskFromPrediction` keeps most of it, but a thin limb against a busy background can still come out
+partly transparent. The full U^2-Net is 176MB, which is not a button anybody presses twice. A
+better small model (or a refinement pass) is the fix, not a different curve.
+
+### D29, Stock photos on the library shelf do not sync
+
+The `assets` table requires a bucket path, and a stock photo has none on purpose (hotlink, never
+copy). So the shelf entry is local to the device. The documents that use a photo carry its URL and
+credit and sync normally; only "pick it again from Library on another machine" is missing. A
+nullable `path` with a `remote_url` column is the migration that fixes it.
 
 ### D20, Smaller things
 

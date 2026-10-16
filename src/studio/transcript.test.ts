@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  creditsOf,
   captionFit,
   captionLimit,
   captionOf,
@@ -180,5 +181,36 @@ describe("the first comment", () => {
   it("respects the platform ceiling too", () => {
     const long = deck(Array.from({ length: 40 }, () => slide([text("word ".repeat(40), 60)])));
     expect(firstCommentOf(long, { platform: "instagram" }).length).toBeLessThanOrEqual(2200);
+  });
+});
+
+describe("stock photo credits (21.2)", () => {
+  const ana = { provider: "unsplash", name: "Ana Lee", url: "https://unsplash.com/@analee?utm_source=flashcc&utm_medium=referral", page: "https://unsplash.com/photos/a" };
+  const sam = { provider: "pexels", name: "Sam Ortiz", url: "https://www.pexels.com/@sam", page: "https://www.pexels.com/photo/b" };
+  const photo = (credit: typeof ana, patch: Partial<Layer> = {}): Layer => ({
+    ...makeLayer("image", { x: 0, y: 0, w: 100, h: 100 }, "#000"),
+    src: "https://images.unsplash.com/x",
+    credit,
+    ...patch,
+  });
+
+  it("are gathered once each, from layers and slide backgrounds, in deck order", () => {
+    const d = deck([
+      { ...slide([text("Hook", 80)]), image: { src: "https://images.pexels.com/y", credit: sam } },
+      slide([photo(ana), photo(ana)]),
+    ]);
+    expect(creditsOf(d).map((c) => c.name)).toEqual(["Sam Ortiz", "Ana Lee"]);
+  });
+
+  it("skip hidden layers and the unused pool", () => {
+    const d = { ...deck([slide([photo(ana, { visible: false })])]), media: [{ id: "m", name: "x", src: "s", w: 1, h: 1, bytes: 0, credit: sam }] };
+    expect(creditsOf(d)).toEqual([]);
+  });
+
+  it("appear in the first comment, and survive the platform clamp", () => {
+    const d = deck([slide([text("word ".repeat(600), 60), photo(ana)])]);
+    const out = firstCommentOf(d, { platform: "instagram" });
+    expect(out.length).toBeLessThanOrEqual(2200);
+    expect(out.endsWith(`Photo by Ana Lee on Unsplash (${ana.url})`)).toBe(true);
   });
 });

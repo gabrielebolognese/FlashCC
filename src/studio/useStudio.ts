@@ -393,7 +393,14 @@ export function useStudio(initial: Doc) {
                 // Carried, not just the URL: a signed URL expires and the
                 // document has to be able to ask for a fresh one. See
                 // assets.resolveDoc.
-                ...(media.assetId ? { assetId: media.assetId } : {}),
+                // Replaced, never kept: a stale asset id would let
+                // `resolveDoc` put the PREVIOUS picture back on the next open.
+                // Everything else on the layer (box, fit, focal, mask,
+                // filter) stays, which is what Replace image (21.4) promises.
+                assetId: media.assetId,
+                // The photo's credit goes where the photo goes, or a stock
+                // picture placed and then removed from the pool loses it.
+                credit: media.credit,
                 name: media.name,
                 fit: l.fit ?? "cover",
               }
@@ -416,6 +423,7 @@ export function useStudio(initial: Doc) {
         ...makeLayer("image", { x: Math.round(at.x - w / 2), y: Math.round(at.y - h / 2), w, h }, "#000000"),
         src: media.src,
         ...(media.assetId ? { assetId: media.assetId } : {}),
+        ...(media.credit ? { credit: media.credit } : {}),
         name: media.name,
         radius: 12,
       };
@@ -425,7 +433,8 @@ export function useStudio(initial: Doc) {
     [doc.width, doc.height, index, patchSlide],
   );
 
-  const replaceDoc = useCallback((next: Doc) => commit(reseal(next)), [commit]);
+  // `coalesce` folds a run of edits from one control (a slider) into one undo step.
+  const replaceDoc = useCallback((next: Doc, coalesce?: string) => commit(reseal(next), coalesce), [commit]);
 
   /* ── layout tools that act once (Batch 18) ─────────────────────────── */
 

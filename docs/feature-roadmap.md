@@ -3366,7 +3366,7 @@ it, or a caption would read "3 / 9" and the author's handle nine times.
 
 ## Batch 21, Imagery, icons and backgrounds
 
-**Status:** next
+**Status:** done
 **Size:** large. Stock search and background removal are each real work.
 **Why here:** after blocks, pictures are the second reason somebody leaves for Canva
 mid-session. A carousel that needs one icon per tip, a photo behind the cover, or a
@@ -3497,11 +3497,64 @@ sheet is already the place where cycling is decided.
   licensed route.
 - **No animated stickers or GIFs.** Batch 26 is where motion lives.
 
+### Built as
+
+All seven. Every tool stores a value and CSS paints it; the heavy parts load on first use.
+
+**Unknowns, answered.** An image layer could not carry a focal point; it now does
+(`Layer.focal`, painted as `object-position`). The client bundle did not grow: the icon index
+(about 470KB gzipped), the ONNX runtime (about 3.7MB gzipped) and the model (4.6MB) are all
+dynamic imports reached only from the screen that uses them.
+
+**21.1.** Tabler Icons 3.49 (MIT), 5,184 outline and 1,054 filled, indexed by `npm run build:icons`
+into `src/render/iconsets/` and loaded on first open of the picker. An icon is an ordinary `path`
+layer that carries its own path data, in the accent, with `scaleStroke` so an outline keeps its
+designed weight at any size. One set, two styles: the picker opens on the deck's style
+(`deckIconStyle`) with the other behind a switch. The old dozen-glyph dropdown is gone.
+
+**21.2.** Both providers, built to Unsplash's terms because they are the stricter: hotlinked, never
+copied (so the photo is a reference and `inline.ts` fetches it at export, as the plan foresaw), the
+download endpoint pinged on use, and the credit linked with a referral tag. Keys stay on the server
+(`/api/stock`, `UNSPLASH_ACCESS_KEY`, `PEXELS_API_KEY`); with neither set the picker says so. The
+credit is stored beside the picture everywhere it goes, and the done-when is a test:
+`firstCommentOf` ends with "Photo by NAME on Unsplash (link)", and the transcript is clamped instead
+of the credit. Ceiling: 600 searches an hour per account. The line between this and Batch 13 is in
+`CLAUDE.md`. One gap: the library entry is local, because the `assets` table needs a bucket path a
+hotlink does not have (D29).
+
+**21.3.** Seven generators in `backdrops.ts`, stored per slide as the generated SVG with the seed
+and strength recorded beside it, seeded from the deck's words. The strength cap is real: noise
+stops at 0.6 on LinkedIn. Measured through the Playwright export, a 10-slide LinkedIn PDF at the cap
+is 1.30MB with grain and 0.72MB with paper, so no generator pushes it over 2MB at default strength
+or at the top of the slider. The editor and the export render through the same Chromium, from the
+same stored SVG.
+
+**21.4.** Focal point (by a click, on layers and slide backgrounds), five masks as `clip-path`, four
+filters as CSS (duotone in the brand's colours, painted with blend modes so it needs no SVG ids),
+the text scrim as one gradient layer placed under the text, and Replace image, which swaps the
+picture and its credit and keeps the rest. Replace exposed a real bug: `fillWithMedia` kept the old
+`assetId` when the new picture had none, so `resolveDoc` would have put the old picture back on the
+next open. It is fixed.
+
+**21.5.** u2netp (Apache-2.0 weights, MIT ONNX export) on onnxruntime-web (MIT), both checked
+before the first line, the AGPL library avoided. Served from our own origin. The button says the
+first run downloads about 19MB; the session is kept for the visit. Measured: about 2.7s for a 600px
+portrait, under 2s after that. Edges on an animal and a product are clean; a raised arm comes out
+soft, which is the small model's limit (D28).
+
+**21.6.** "From an image" in the brand editor: deterministic median cut, plus a vivid-hue pass so a
+small bright accent is not averaged into its neighbours, and a proposal that passes contrast (fg and
+muted 4.5:1, accent 3:1) before it is offered. Tested on five kinds of picture.
+
+**21.7.** `planRun` takes the pool size; the done-when is a test (`0,1,2,0,1,2,0,1,2`). The Look
+step picks pictures from the library in cycling order, and each one goes behind its carousel's
+cover only, with its credit.
+
 ---
 
 ## Batch 22, Typography and emphasis
 
-**Status:** queued
+**Status:** next
 **Size:** large, because 22.3 changes the text model.
 **Why here:** a carousel is mostly type. The first half made type fit; it never made
 type expressive. The single most common hand edit on generated slides, after

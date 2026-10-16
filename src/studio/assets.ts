@@ -24,7 +24,7 @@
  * missing `path` as ordinary rather than as an error.
  */
 
-import type { Doc, MediaItem, Slide } from "./model.js";
+import type { Credit, Doc, MediaItem, Slide } from "./model.js";
 import { uid } from "./model.js";
 import { markDeleted } from "./tombstones.js";
 
@@ -79,6 +79,15 @@ export type Asset = {
    * remove back into every sync.
    */
   data?: string | undefined;
+
+  /**
+   * A stock photo (21.2): the provider's URL, used as it is, and who to credit.
+   * The provider's terms ask for a hotlink rather than a copy, so a remote
+   * asset has no bytes and no bucket path and stays on this device's shelf;
+   * the documents that use it carry the URL and credit themselves.
+   */
+  remote?: string | undefined;
+  credit?: Credit | undefined;
 
   createdAt: string;
   updatedAt: string;
@@ -180,12 +189,14 @@ export function makeAsset(patch: Partial<Asset> & { kind: AssetKind; mime: strin
 /** A library entry as the media pool sees it. The pool is a view, not a copy. */
 export const assetToMedia = (asset: Asset, url: string): MediaItem => ({
   id: asset.id,
-  assetId: asset.id,
+  // A remote asset is its URL; there is nothing for `resolveDoc` to re-sign.
+  ...(asset.remote ? {} : { assetId: asset.id }),
   name: asset.name,
   src: url,
   w: asset.w ?? 0,
   h: asset.h ?? 0,
   bytes: asset.bytes,
+  ...(asset.credit ? { credit: asset.credit } : {}),
 });
 
 /* ── organising ───────────────────────────────────────────────────────────── */
