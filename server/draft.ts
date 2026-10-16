@@ -11,6 +11,7 @@
  * which lives in `anthropic.ts` because it is the same policy for every route.
  * What is left is the shape of each request and the schema of each answer.
  */
+import { stripMarks } from "../src/studio/marks.js";
 import type { IncomingMessage, ServerResponse } from "node:http";
 
 import { zodOutputFormat } from "@anthropic-ai/sdk/helpers/zod";
@@ -18,7 +19,7 @@ import { z } from "zod";
 
 import { anthropic, callModel, draftConfigured, MODELS } from "./anthropic.js";
 import { bearer, HttpError, json, rateLimit, readJson } from "./http.js";
-import { checkDraft, checkHooks, flagged, repair, withContentRetry } from "./checks.js";
+import { checkDraft, checkHooks, flagged, repair, slideCopy, withContentRetry } from "./checks.js";
 import { countFindings } from "./tally.js";
 import {
   assembleDraft,
@@ -148,7 +149,8 @@ export async function draft(req: IncomingMessage, res: ServerResponse): Promise<
       return {
         slides: parsed.slides.map((s) => ({
           ...s,
-          text: repair(s.text),
+          // One marked span per slide at most (22.3): the first is kept.
+          text: slideCopy(s.text),
           fields: fieldsFor(s.role, s.fields, slots),
         })),
       };
@@ -181,7 +183,7 @@ const MAX_FIELD = 80;
 export function fieldsFor(role: string, raw: readonly string[] | undefined, slots: readonly SlotSpec[]): string[] {
   const spec = slots.find((s) => s.id === role)?.block;
   if (!spec || !Array.isArray(raw)) return [];
-  return spec.fields.map((_, i) => repair(String(raw[i] ?? "")).slice(0, MAX_FIELD));
+  return spec.fields.map((_, i) => stripMarks(repair(String(raw[i] ?? ""))).slice(0, MAX_FIELD));
 }
 
 /* ── hook variants ────────────────────────────────────────────────────────── */
@@ -258,7 +260,7 @@ export async function hooks(req: IncomingMessage, res: ServerResponse): Promise<
   const parsed = response.parsed_output;
   if (!parsed) throw new HttpError(502, "The hooks came back unreadable");
 
-  const hooks = parsed.hooks.slice(0, count).map((h) => ({ ...h, text: repair(h.text) }));
+  const hooks = parsed.hooks.slice(0, count).map((h) => ({ ...h, text: slideCopy(h.text) }));
 
   // Counted but not retried. A hook picker showing four good openings and one
   // repeat is usable; spending a second call to make it five is not worth it

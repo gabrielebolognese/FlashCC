@@ -23,6 +23,11 @@ import { fitToSafeArea } from "./safearea.js";
 // Never on an ordinary layer edit, so a piece somebody deleted on purpose is
 // not put straight back.
 import { reseal } from "./furniture.js";
+import { listBrands, themeOf } from "./brand.js";
+import { hasMarks } from "./marks.js";
+import { markColourFor } from "./texteffects.js";
+import { bundledIdsIn, ensureFacesFor } from "./typefaces.js";
+import { loadKerning } from "./typemetrics.js";
 import { markEdited } from "./regenerate.js";
 import { isUnnamed, nameFromDoc } from "./search.js";
 import { deleteSet, duplicateSet, inDeckOrder, moveSet } from "./slideset.js";
@@ -56,11 +61,16 @@ const LIMIT = 120;
  * a fresh one beside it. Somebody who typed "Swipe for the secret" into the
  * swipe cue has said what they want.
  */
-function retouched(before: Layer, after: Layer): Layer {
+function retouched(before: Layer, after: Layer, marks?: () => string): Layer {
   if (after.text === undefined || after.text === before.text) return after;
   let next = after;
   if (next.verbatim) next = { ...next, verbatim: undefined };
   if (next.furniture) next = { ...next, furnitureOptOut: next.furniture, furniture: undefined };
+  // The first mark typed into a layer that never had one (22.3): it takes the
+  // deck's accent, chosen once and stored, like every colour on a layer.
+  if (marks && !next.markColour && next.kind === "text" && hasMarks(next.text ?? "")) {
+    next = { ...next, markColour: marks() };
+  }
   return next;
 }
 
@@ -168,6 +178,20 @@ export function useStudio(initial: Doc) {
     [index, patchSlide],
   );
 
+  // The faces this deck draws with (Batch 22): kerning for its bundled
+  // families, so measurement is exact, and the CJK faces if it has CJK text.
+  // Both are no-ops once loaded.
+  useEffect(() => {
+    void loadKerning(bundledIdsIn([doc]));
+    void ensureFacesFor(doc.slides.flatMap((s) => s.layers.map((l) => l.text ?? "")));
+  }, [doc]);
+
+  /** The emphasis colour for a layer on a slide, from the deck's theme. */
+  const markFor = useCallback(
+    (s: Slide, l: Layer) => markColourFor(themeOf(doc, listBrands()), s.background, l.fill),
+    [doc],
+  );
+
   const updateLayers = useCallback(
     (ids: string[], patch: Partial<Layer>, coalesce?: string) => {
       patchSlide(
@@ -177,23 +201,28 @@ export function useStudio(initial: Doc) {
         // them both is the whole of it.
         (s) => ({
           ...s,
-          layers: s.layers.map((l) => (ids.includes(l.id) ? markEdited(retouched(l, { ...l, ...patch })) : l)),
+          layers: s.layers.map((l) =>
+            ids.includes(l.id) ? markEdited(retouched(l, { ...l, ...patch }, () => markFor(s, l))) : l,
+          ),
         }),
         coalesce,
       );
     },
-    [index, patchSlide],
+    [index, patchSlide, markFor],
   );
 
   const updateEach = useCallback(
     (fn: (l: Layer) => Layer, ids: string[], coalesce?: string) => {
       patchSlide(
         index,
-        (s) => ({ ...s, layers: s.layers.map((l) => (ids.includes(l.id) ? markEdited(retouched(l, fn(l))) : l)) }),
+        (s) => ({
+          ...s,
+          layers: s.layers.map((l) => (ids.includes(l.id) ? markEdited(retouched(l, fn(l), () => markFor(s, l))) : l)),
+        }),
         coalesce,
       );
     },
-    [index, patchSlide],
+    [index, patchSlide, markFor],
   );
 
   const removeSelected = useCallback(() => {

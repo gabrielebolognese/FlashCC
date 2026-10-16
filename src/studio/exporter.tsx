@@ -22,6 +22,7 @@ import { renderToStaticMarkup } from "react-dom/server";
 import { authHeader } from "./bearer.js";
 import { readRefusal } from "./gate.js";
 import { listCustomFonts } from "./fonts.js";
+import { bundledFaceCss } from "./typefaces.js";
 import { inlineDoc, inlineSources } from "./inline.js";
 import { LayerView } from "./LayerView.js";
 import type { Doc, Slide } from "./model.js";
@@ -46,12 +47,17 @@ function slideHtml(slide: Slide): string {
   return `<div style="position:absolute; inset:0; ${backgroundCss(slide)}">${layers}</div>`;
 }
 
-/** Every uploaded face, inlined, so the server can use fonts it does not have. */
-async function fontCss(): Promise<string> {
-  const faces = await inlineSources(listCustomFonts());
-  return faces
-    .map((f) => `@font-face { font-family: "${f.family}"; src: url(${f.src}); font-display: block; }`)
-    .join("\n");
+/**
+ * Every uploaded face, and every bundled face the deck draws with (Batch 22),
+ * inlined, so the server can use fonts it does not have. The bundled half is
+ * what makes an emoji or a Japanese line export as it looks in the editor.
+ */
+async function fontCss(doc: Doc): Promise<string> {
+  const [faces, bundled] = await Promise.all([inlineSources(listCustomFonts()), bundledFaceCss(doc)]);
+  return [
+    ...faces.map((f) => `@font-face { font-family: "${f.family}"; src: url(${f.src}); font-display: block; }`),
+    bundled,
+  ].join("\n");
 }
 
 export type RenderPayload = {
@@ -78,7 +84,7 @@ export type RenderPayload = {
  * would only ever show up in whichever one is used less.
  */
 export async function renderPayload(doc: Doc, platform: Platform): Promise<RenderPayload> {
-  const [carried, css] = await Promise.all([inlineDoc(doc), fontCss()]);
+  const [carried, css] = await Promise.all([inlineDoc(doc), fontCss(doc)]);
   return {
     name: doc.name,
     output: platform.output,

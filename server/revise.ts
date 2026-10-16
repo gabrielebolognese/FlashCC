@@ -19,13 +19,14 @@
  *
  * One call, no second pass.
  */
+
 import type { IncomingMessage, ServerResponse } from "node:http";
 
 import { zodOutputFormat } from "@anthropic-ai/sdk/helpers/zod";
 import { z } from "zod";
 
 import { anthropic, callModel, draftConfigured, MODELS } from "./anthropic.js";
-import { repair } from "./checks.js";
+import { repair, slideCopy } from "./checks.js";
 import { bearer, HttpError, json, rateLimit, readJson } from "./http.js";
 import { assembleRevise, MAX_INSTRUCTION, type SlotSpec, type Voice } from "./prompts.js";
 import { requirePro } from "./supabase.js";
@@ -81,7 +82,7 @@ export function usableChanges(
     if (!Number.isFinite(at) || at < 0 || at >= deckLength) continue;
     if (seen.has(at)) continue;
 
-    const text = repair(c.text ?? "");
+    const text = slideCopy(c.text ?? "");
     if (!text) continue;
 
     seen.add(at);

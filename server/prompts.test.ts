@@ -663,3 +663,28 @@ describe("slots that ask for a block (19.7)", () => {
     expect(lines.split("\n").at(-1)).not.toContain("fields");
   });
 });
+
+describe("emphasis marks from a model (22.3)", () => {
+  it("plainText keeps the three marks and strips other markup", async () => {
+    const { stripMarkup } = await import("./prompts.js");
+    expect(plainText("Stop *guessing*, **measure** the ==cost==")).toBe("Stop *guessing*, **measure** the ==cost==");
+    expect(stripMarkup("## Title")).toBe("Title");
+    expect(stripMarkup("see [the guide](https://x.y)")).toBe("see the guide");
+    expect(stripMarkup("use `npm` and ~~old~~ <b>new</b>")).toBe("use npm and old new");
+    expect(stripMarkup("__strong__ and _soft_ but snake_case_name")).toBe("strong and soft but snake_case_name");
+  });
+
+  it("slideCopy keeps the first mark and drops the second", async () => {
+    const { slideCopy } = await import("./checks.js");
+    expect(slideCopy("Stop *guessing* and start **measuring**")).toBe("Stop *guessing* and start measuring");
+    expect(slideCopy("No marks \u2014 at all")).toBe("No marks, at all");
+  });
+
+  it("asks for one marked span at most, in every prompt that writes slides", async () => {
+    const p = await import("./prompts.js");
+    for (const sys of [p.DRAFT_SYSTEM, p.REWRITE_SYSTEM, p.HOOK_SYSTEM]) {
+      expect(sys).toContain("*this*");
+      expect(sys).toContain("At most one per slide");
+    }
+  });
+});

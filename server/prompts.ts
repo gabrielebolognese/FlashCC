@@ -81,6 +81,7 @@ Rules:
 - Write in the brief's own voice and vocabulary. Do not add claims, numbers, or results the brief does not contain.
 - If the brief does not give you what a slot asks for, write something true and general instead. Never invent a client, a company, a number, a timeframe or a result. A vague slide is recoverable; a fabricated one gets published and is not.
 - No em dashes, ever. A comma or a full stop, never a dash.
+- You may mark the ONE word or short phrase that carries a slide by wrapping it in single asterisks, like *this*: the style decides how it looks. At most one per slide, and most slides need none. No other formatting of any kind: no bold, no markdown, no headings.
 - No hashtags, no emoji, no "in today's fast-paced world".
 - Return one entry per slot, in order, using the given slot ids.`;
 
@@ -105,6 +106,7 @@ Rules:
 - Stay inside the character limit you are given.
 - Use the deck's own vocabulary and register. You are editing somebody's writing, not replacing their voice with yours.
 - No em dashes, ever. A comma or a full stop, never a dash.
+- You may mark the ONE word or short phrase that carries a slide by wrapping it in single asterisks, like *this*: the style decides how it looks. At most one per slide, and most slides need none. No other formatting of any kind: no bold, no markdown, no headings.
 - No hashtags, no emoji.
 - Name what each alternative actually did in AT MOST FOUR WORDS: "tighter", "names the cost", "plainer words". Not a sentence, not an explanation. Never "option 1", never "better".`;
 
@@ -119,6 +121,7 @@ Rules:
 - Specific beats clever: a number, a cost, a consequence, a named mistake. Never a category.
 - Use the deck's own voice and vocabulary. Do not add claims, numbers or results it does not contain.
 - No em dashes, ever. A comma or a full stop, never a dash.
+- You may mark the ONE word or short phrase that carries a slide by wrapping it in single asterisks, like *this*: the style decides how it looks. At most one per slide, and most slides need none. No other formatting of any kind: no bold, no markdown, no headings.
 - No hashtags, no emoji, no clickbait the deck cannot pay off.
 - Name the angle in two or three words.`;
 
@@ -144,7 +147,7 @@ Rules:
  * the output is published under somebody else's name.
  */
 export const plainText = (text: string): string =>
-  text
+  stripMarkup(text)
     .replace(/\s*\u2014+\s*/g, ", ")
     // A range keeps its meaning with a hyphen. Everything else was punctuation.
     .replace(/(\d)\s*\u2013\s*(\d)/g, "$1-$2")
@@ -156,6 +159,23 @@ export const plainText = (text: string): string =>
     .replace(/^[\s,]+/, "")
     .replace(/[\s,]+$/, "")
     .trim();
+
+/**
+ * Markup a model trained on the web reaches for, removed: headings, links,
+ * code, strikethrough, underscore emphasis and HTML tags. The three emphasis
+ * marks (`*accent*`, `**bold**`, `==highlight==`, see src/studio/marks.ts) are
+ * KEPT: they are words, part of what a sentence means (22.3). How many of them
+ * a slide may carry is decided by the route, with `limitMarks`.
+ */
+export const stripMarkup = (text: string): string =>
+  text
+    .replace(/<\/?[a-z][^>\n]*>/gi, "")
+    .replace(/^\s{0,3}#{1,6}\s+/gm, "")
+    .replace(/\[([^\]\n]+)\]\([^)\n]*\)/g, "$1")
+    .replace(/`([^`\n]+)`/g, "$1")
+    .replace(/~~([^~\n]+)~~/g, "$1")
+    .replace(/__([^_\n]+)__/g, "$1")
+    .replace(/(^|[\s(])_(\S(?:[^_\n]*\S)?)_(?=$|[\s).,!?;:])/gm, "$1$2");
 
 /* ── voice ────────────────────────────────────────────────────────────────── */
 
@@ -639,6 +659,7 @@ Rules:
 - A revised slide has to read alongside the ones you did not touch. Do not leave a dangling reference to something you removed.
 - Add no claim, number, name or result the deck does not already contain, unless the instruction supplies it.
 - Keep the lengths: the first slide under 90 characters, the rest under 220.
+- You may mark the ONE word or short phrase that carries a slide by wrapping it in single asterisks, like *this*: the style decides how it looks. At most one per slide, and most slides need none. No other formatting of any kind: no bold, no markdown, no headings.
 - No em dashes, ever. No hashtags, no emoji.
 - If the instruction asks for something you cannot do without inventing material, change what you can and leave the rest alone.`;
 

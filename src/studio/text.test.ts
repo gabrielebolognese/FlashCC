@@ -3,7 +3,7 @@ import { describe, expect, it } from "vitest";
 import { buildSlides, MAX_SLIDES } from "./compositions.js";
 import { THEMES } from "./presets.js";
 import { STRUCTURES } from "./structures.js";
-import { clampY, fitToBox, ladder, lineCount, textWidth, wrapLines } from "./text.js";
+import { clampY, fitToBox, isRtl, ladder, lineCount, textWidth, wrapLines } from "./text.js";
 
 const theme = THEMES.ink!;
 const H = 1350;
@@ -166,5 +166,63 @@ describe("generated slides never overflow", () => {
         expect(l.y + l.h).toBeLessThanOrEqual(H + 0.5);
       }
     }
+  });
+});
+
+describe("runs, scripts and breaks (Batch 22)", () => {
+  it("strips marks before wrapping and returns plain lines", () => {
+    expect(wrapLines("Stop *guessing*", 40, 4000)).toEqual(["Stop guessing"]);
+  });
+
+  it("measures a bold run wider than the same words unmarked, on a system face", () => {
+    expect(textWidth("a **bold** word", 48, { family: "sans", weight: 400 })).toBeGreaterThan(
+      textWidth("a bold word", 48, { family: "sans", weight: 400 }),
+    );
+  });
+
+  it("gives CJK a full em per character and breaks between characters", () => {
+    expect(textWidth("日本語", 100, { family: "sans" })).toBeCloseTo(306, 0);
+    const lines = wrapLines("今日は良い天気ですね明日も晴れるでしょう", 50, 260, { family: "sans" });
+    expect(lines.length).toBeGreaterThan(1);
+    for (const l of lines) expect(textWidth(l, 50, { family: "sans" })).toBeLessThanOrEqual(260);
+    expect(lines.join("")).toBe("今日は良い天気ですね明日も晴れるでしょう");
+  });
+
+  it("never starts a line with closing punctuation, never ends one with opening punctuation (kinsoku)", () => {
+    const text = "これは「テスト」です。これも、テストです。";
+    // From three characters wide up: narrower than an atom, the browser breaks it too.
+    for (const w of [160, 200, 250, 300, 350]) {
+      const lines = wrapLines(text, 50, w, { family: "sans" });
+      for (const l of lines) {
+        expect("」。、）".includes(l[0] ?? "")).toBe(false);
+        expect("「（".includes(l[l.length - 1] ?? "")).toBe(false);
+      }
+    }
+  });
+
+  it("counts an emoji sequence as one picture", () => {
+    const one = textWidth("👍", 48);
+    expect(textWidth("👨‍👩‍👧", 48)).toBeCloseTo(one, 5);
+    expect(textWidth("🇮🇹", 48)).toBeCloseTo(one, 5);
+    expect(textWidth("❤️", 48)).toBeCloseTo(one, 5);
+  });
+
+  it("measures Cyrillic, Greek, Arabic and Hebrew as words with real widths", () => {
+    for (const t of ["Привет мир", "Γειά σου κόσμε", "مرحبا بالعالم", "שלום עולם"]) {
+      const w = textWidth(t, 48);
+      expect(w).toBeGreaterThan(t.length * 48 * 0.3);
+      expect(w).toBeLessThan(t.length * 48 * 0.9);
+      expect(wrapLines(t, 48, 120).length).toBeGreaterThan(1);
+    }
+  });
+});
+
+describe("isRtl", () => {
+  it("follows the first strong character, as dir=auto does", () => {
+    expect(isRtl("שלום עולם")).toBe(true);
+    expect(isRtl("مرحبا")).toBe(true);
+    expect(isRtl("123 مرحبا")).toBe(true);
+    expect(isRtl("Hello שלום")).toBe(false);
+    expect(isRtl("日本語")).toBe(false);
   });
 });

@@ -3,6 +3,9 @@ import type { CSSProperties } from "react";
 import { ICON_PATHS, ICON_VIEWBOX } from "../render/icons.js";
 import { gradientCss } from "./gradient.js";
 import { filterCss, focalPosition, maskClip } from "./imagetools.js";
+import { boldWeight, hasMarks, parseMarks } from "./marks.js";
+import { blockStyle, lineStyle, markStyle } from "./texteffects.js";
+import { isMeasured as isBundled } from "./typemetrics.js";
 import { fontStack, type Layer } from "./model.js";
 
 /** Paints one layer. Pure, no interaction, no selection chrome. */
@@ -42,7 +45,13 @@ export function LayerView({
       lineHeight: layer.lineHeight ?? 1.2,
       letterSpacing: `${layer.letterSpacing ?? 0}em`,
       color: layer.fill,
-      textAlign: layer.align ?? "left",
+      // Start and end rather than left and right, with `dir="auto"` below: a
+      // Hebrew or Arabic line aligns to its own start (22.5), and every Latin
+      // line still aligns exactly where it did.
+      textAlign: layer.align === "right" ? "end" : layer.align === "center" ? "center" : "start",
+      // A bundled face is measured at the weight it ships (22.2). Faux bold
+      // would draw a weight nothing measured, so only italic may be synthesised.
+      ...(isBundled(layer.fontFamily) ? { fontSynthesis: "style" } : {}),
       fontStyle: layer.italic ? "italic" : "normal",
       textDecoration: layer.underline ? "underline" : "none",
       textTransform: layer.uppercase ? "uppercase" : "none",
@@ -58,11 +67,13 @@ export function LayerView({
             color: "transparent",
           }
         : {}),
+      ...blockStyle(layer),
     };
 
     if (editing && onCommitText) {
       return (
         <div
+          dir="auto"
           style={{ ...style, pointerEvents: "auto", outline: "2px solid #d9a521", cursor: "text" }}
           contentEditable
           suppressContentEditableWarning
@@ -86,7 +97,38 @@ export function LayerView({
         </div>
       );
     }
-    return <div style={style}>{layer.text}</div>;
+    // The marks and the whole-line effects (22.3, 22.4). A plain layer keeps
+    // the bare text node it always had, so nothing that rendered before
+    // renders any differently now.
+    const text = layer.text ?? "";
+    const runs = hasMarks(text) ? parseMarks(text) : null;
+    const line = lineStyle(layer, Boolean(runs?.some((r) => r.mark)));
+    if (!runs && !line) {
+      return (
+        <div dir="auto" style={style}>
+          {text}
+        </div>
+      );
+    }
+    const boldAt = boldWeight(layer.fontWeight ?? 600);
+    const content = runs
+      ? runs.map((r, i) =>
+          r.mark ? (
+            <span key={i} style={markStyle(r.mark, layer, boldAt)}>
+              {r.text}
+            </span>
+          ) : (
+            r.text
+          ),
+        )
+      : text;
+    // One block child: the container is a flex column, and loose spans in it
+    // would each become a flex item stacked on its own line.
+    return (
+      <div dir="auto" style={style}>
+        <div>{line ? <span style={line}>{content}</span> : content}</div>
+      </div>
+    );
   }
 
   if (layer.kind === "icon") {

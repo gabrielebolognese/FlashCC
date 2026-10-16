@@ -16,6 +16,7 @@
  * roadmap rejected all four on evidence and none of them becomes a better idea
  * for being next to a caption box.
  */
+import { stripMarks } from "../src/studio/marks.js";
 import type { IncomingMessage, ServerResponse } from "node:http";
 
 import { zodOutputFormat } from "@anthropic-ai/sdk/helpers/zod";
@@ -103,7 +104,7 @@ export function postsOf(raw: unknown, slides: number): number[] | undefined {
  */
 export function threadLines(raw: readonly string[], posts: number): string[] {
   return Array.from({ length: posts }, (_, i) => {
-    const text = repair(raw[i] ?? "").replace(/^\s*\d+\s*[/.)]\s*\d*\s*/, "");
+    const text = stripMarks(repair(raw[i] ?? "")).replace(/^\s*\d+\s*[/.)]\s*\d*\s*/, "");
     const line = text.length > MAX_POST_LINE ? `${text.slice(0, MAX_POST_LINE - 1).trimEnd()}…` : text;
     return `${i + 1}/${posts} ${line}`.trim();
   });
@@ -289,7 +290,8 @@ export async function caption(req: IncomingMessage, res: ServerResponse): Promis
 
   const captions = parsed.captions
     .map((c) => {
-      const text = repair(c.text);
+      // A caption is posted as plain text, where an asterisk is an asterisk.
+      const text = stripMarks(repair(c.text));
       return { note: shortNote(repair(c.note)), text, chars: text.length };
     })
     .filter((c) => c.text.length > 0)
@@ -365,7 +367,7 @@ export async function alt(req: IncomingMessage, res: ServerResponse): Promise<vo
    * nothing about it looks wrong.
    */
   const out = Array.from({ length: deck.length }, (_, i) => {
-    const text = repair(parsed.alt[i] ?? "");
+    const text = stripMarks(repair(parsed.alt[i] ?? ""));
     return text.length > MAX_ALT_CHARS ? `${text.slice(0, MAX_ALT_CHARS - 1).trimEnd()}…` : text;
   });
 

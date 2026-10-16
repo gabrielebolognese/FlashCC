@@ -5,6 +5,7 @@
  * and then it is gone, there is no live template to fight with, nothing is re-derived,
  * and every layer it produced is as editable as one you drew yourself.
  */
+import type { RampId } from "./ramps.js";
 import type { Gradient } from "./gradient.js";
 import { makeLayer, makeSlide, uid, type Doc, type Layer, type Slide } from "./model.js";
 
@@ -18,6 +19,8 @@ export type Theme = {
   bodyFont?: string | undefined;
   /** Painted behind every slide instead of the flat bg. */
   bgGradient?: Gradient | undefined;
+  /** The type ramp (22.1). Absent keeps each composition's own sizes. */
+  ramp?: RampId | undefined;
 };
 
 export const THEMES: Record<string, Theme> = {

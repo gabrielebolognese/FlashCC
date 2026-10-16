@@ -33,6 +33,7 @@
  * people reject, and the deck is the source of truth, not a prompt.
  */
 
+import { stripMarks } from "./marks.js";
 import type { Credit, Doc, Layer, Slide } from "./model.js";
 
 /* ── reading the words off a slide ────────────────────────────────────────── */
@@ -68,7 +69,9 @@ export function slideText(slide: Slide): string {
  * styling, and a screen reader spells out shouted text letter by letter.
  */
 function normalise(text: string, wasUppercased: boolean): string {
-  const flat = text
+  // Emphasis is how a word looks, not what it says (22.3): a transcript, a
+  // caption or alt text that printed asterisks would read as broken.
+  const flat = stripMarks(text)
     .replace(/\r\n?/g, "\n")
     .split(/\n{2,}/)
     .map((para) => para.replace(/\s*\n\s*/g, " ").trim())

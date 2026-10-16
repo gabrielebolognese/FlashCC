@@ -23,6 +23,7 @@
  * Nothing here judges whether the writing is good. Every rule is a defect
  * anybody would recognise as a defect.
  */
+import { limitMarks, stripMarks } from "../src/studio/marks.js";
 import { BODY_CHARS, HOOK_CHARS, MAX_ALT_CHARS, plainText, type SlotSpec } from "./prompts.js";
 
 export type Tier = "repair" | "retry" | "flag";
@@ -57,6 +58,14 @@ export const repair = (text: string): string =>
     .replace(/[ \t]{2,}/g, " ")
     .replace(/[ \t]+$/gm, "")
     .trim();
+
+/**
+ * A slide's copy as the model wrote it, made publishable: repaired, and held to
+ * ONE emphasis mark (22.3). The model may choose the word that matters; two
+ * marked words on a slide is no emphasis at all, so the first is kept and the
+ * rest are unwrapped, words intact.
+ */
+export const slideCopy = (text: string): string => limitMarks(repair(text), 1);
 
 /* ── the rules ────────────────────────────────────────────────────────────── */
 
@@ -137,12 +146,14 @@ export function checkDraft(
     }
 
     const ceiling = at === 0 ? HOOK_CHARS : BODY_CHARS;
-    if (t.length > ceiling) {
+    // Counted as read: an emphasis mark's asterisks are not characters anybody sees.
+    const seen = stripMarks(t).length;
+    if (seen > ceiling) {
       out.push({
         at,
         tier: "retry",
         code: "over-ceiling",
-        message: `${t.length} characters, over the ${ceiling} this slot allows.`,
+        message: `${seen} characters, over the ${ceiling} this slot allows.`,
       });
     }
   });
@@ -193,12 +204,12 @@ export function checkHooks(hooks: readonly HookVariant[], deck: readonly string[
       out.push({ at, tier: "retry", code: "empty-hook", message: "An opening came back empty." });
       return;
     }
-    if (text.length > HOOK_CHARS) {
+    if (stripMarks(text).length > HOOK_CHARS) {
       out.push({
         at,
         tier: "retry",
         code: "over-ceiling",
-        message: `${text.length} characters, over ${HOOK_CHARS}.`,
+        message: `${stripMarks(text).length} characters, over ${HOOK_CHARS}.`,
       });
     }
     const key = letters(text);

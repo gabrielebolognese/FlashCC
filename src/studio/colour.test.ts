@@ -115,16 +115,18 @@ function hsl(h: number, s: number, l: number): string {
 }
 
 describe("fonts", () => {
-  it("ships eight built-ins with unique ids, labels and stacks", () => {
-    expect(FONTS).toHaveLength(8);
-    expect(new Set(FONTS.map((f) => f.id)).size).toBe(8);
-    expect(new Set(FONTS.map((f) => f.label)).size).toBe(8);
-    expect(new Set(FONTS.map((f) => f.stack)).size).toBe(8);
+  it("ships eight system stacks and the bundled faces, every id, label and stack unique", () => {
+    expect(FONTS.filter((f) => !f.bundled)).toHaveLength(8);
+    expect(FONTS.filter((f) => f.bundled).length).toBeGreaterThanOrEqual(30);
+    const n = FONTS.length;
+    expect(new Set(FONTS.map((f) => f.id)).size).toBe(n);
+    expect(new Set(FONTS.map((f) => f.label)).size).toBe(n);
+    expect(new Set(FONTS.map((f) => f.stack)).size).toBe(n);
   });
 
   it("ends every stack in a generic family, so nothing falls back to nothing", () => {
     for (const f of FONTS) {
-      expect(f.stack, f.label).toMatch(/(sans-serif|serif|monospace)$/);
+      expect(f.stack, f.label).toMatch(/(sans-serif|serif|monospace|cursive)$/);
     }
   });
 

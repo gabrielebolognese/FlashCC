@@ -13,6 +13,7 @@
  */
 
 import type { Gradient } from "./gradient.js";
+import { MEASURED } from "./typemetrics.js";
 
 export type LayerKind = "text" | "rect" | "ellipse" | "triangle" | "line" | "icon" | "image" | "path";
 
@@ -81,6 +82,16 @@ export type Layer = {
   italic?: boolean | undefined;
   underline?: boolean | undefined;
   uppercase?: boolean | undefined;
+  /**
+   * The colour `*accent*` runs and highlighter strokes take (22.3). Stored when
+   * the layer is made, from the style, so the style decides how emphasis looks
+   * and the painter never has to guess. Absent falls back to the fill.
+   */
+  markColour?: string | undefined;
+  /** The one effect this text carries (22.4). Gradient text is `gradient`, and setting either clears the other. */
+  textEffect?: TextEffect | undefined;
+  /** The effect's colour: the label's box, the outline's stroke, the shadow. Absent uses the effect's default. */
+  effectColour?: string | undefined;
 
   /** icon */
   glyph?: string | undefined;
@@ -151,6 +162,8 @@ export type Layer = {
   /** Who to credit, for a stock photo (21.2). See `Credit`. */
   credit?: Credit | undefined;
 };
+
+export type TextEffect = "highlight" | "scribble" | "label" | "outline" | "shadow";
 
 export type ImageMask = "circle" | "rounded" | "arch" | "blob" | "slant";
 
@@ -376,10 +389,37 @@ export type FontChoice = {
    * a client's licensed type does not turn up in another client's picker.
    */
   brandId?: string | undefined;
+  /** Shipped with the app and measured from its own file (22.2). */
+  bundled?: boolean | undefined;
+};
+
+/**
+ * What every stack falls back to before its generic family (22.5, 22.6): colour
+ * emoji (Twemoji, see typefaces.ts), then the scripts the chosen face may not
+ * cover. All bundled, so the editor and the export draw an emoji or a Japanese
+ * sentence with the same file on any machine. Emoji first, so a face with a monochrome heart in it does not
+ * win; the text faces before it still own digits and ASCII.
+ */
+export const FALLBACK_FAMILIES = [
+  "FCC Twemoji",
+  "FCC Noto Sans",
+  "FCC Noto Sans Arabic",
+  "FCC Noto Sans Hebrew",
+  "FCC Noto Sans JP",
+  "FCC Noto Sans SC",
+  "FCC Noto Sans KR",
+];
+const FALLBACKS = FALLBACK_FAMILIES.map((f) => `"${f}"`).join(", ");
+
+/** A system stack with the fallbacks spliced in before its trailing generic family. */
+const withFallbacks = (stack: string): string => {
+  const parts = stack.split(",").map((p) => p.trim());
+  const generic = parts.pop() ?? "sans-serif";
+  return [...parts, FALLBACKS, generic].join(", ");
 };
 
 /** Faces that exist on essentially every machine, so nothing has to be downloaded. */
-export const FONTS: FontChoice[] = [
+const SYSTEM: FontChoice[] = [
   { id: "sans", label: "Sans", stack: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif' },
   { id: "serif", label: "Serif", stack: 'Georgia, "Times New Roman", Times, serif' },
   { id: "mono", label: "Mono", stack: '"SF Mono", ui-monospace, "Cascadia Code", Consolas, monospace' },
@@ -388,7 +428,41 @@ export const FONTS: FontChoice[] = [
   { id: "slab", label: "Slab", stack: 'Rockwell, "Roboto Slab", "Courier New", Georgia, serif' },
   { id: "elegant", label: "Elegant", stack: 'Didot, "Bodoni MT", "Playfair Display", Garamond, Georgia, serif' },
   { id: "impact", label: "Impact", stack: 'Impact, Haettenschweiler, "Arial Narrow Bold", "Arial Black", sans-serif' },
-];
+].map((f) => ({ ...f, stack: withFallbacks(f.stack) }));
+
+/** The generic family each bundled face falls back to last. */
+const GENERIC: Record<string, string> = {
+  plexmono: "monospace",
+  jetbrains: "monospace",
+  spacemono: "monospace",
+  playfair: "serif",
+  sourceserif: "serif",
+  fraunces: "serif",
+  dmserif: "serif",
+  baskerville: "serif",
+  cormorant: "serif",
+  bodoni: "serif",
+  cinzel: "serif",
+  marcellus: "serif",
+  caveat: "cursive",
+  kalam: "cursive",
+  patrickhand: "cursive",
+  gochihand: "cursive",
+};
+
+/**
+ * The pairing library's faces (22.2), from `npm run build:fonts`. Shipped with
+ * the app, measured from their own files, and drawn with synthesis of bold
+ * turned off so the weight measured is the weight drawn.
+ */
+const BUNDLED: FontChoice[] = Object.entries(MEASURED).map(([id, m]) => ({
+  id,
+  label: m.family.replace(/^FCC /, ""),
+  stack: `"${m.family}", ${FALLBACKS}, ${GENERIC[id] ?? "sans-serif"}`,
+  bundled: true,
+}));
+
+export const FONTS: FontChoice[] = [...SYSTEM, ...BUNDLED];
 
 /**
  * Faces the user uploaded. Registered at runtime, so `fontStack` has to consult this

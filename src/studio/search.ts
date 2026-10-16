@@ -18,6 +18,7 @@
  * document, so the filters populate themselves and cannot rot.
  */
 
+import { stripMarks } from "./marks.js";
 import { FORMATS, type Doc } from "./model.js";
 import type { DocSummary } from "./storage.js";
 import { STRUCTURES } from "./structures.js";
@@ -208,7 +209,7 @@ export function facetsOf(docs: DocSummary[], ctx: Context = { publishedIds: new 
  * than "Why do your edits feel slow?…".
  */
 export function nameFromHook(hook: string, max = 48): string {
-  const clean = hook.replace(/\s+/g, " ").trim();
+  const clean = stripMarks(hook).replace(/\s+/g, " ").trim();
   if (clean === "") return "Untitled";
   if (clean.length <= max) return clean.replace(/[.,;:!?\s]+$/, "") || "Untitled";
 

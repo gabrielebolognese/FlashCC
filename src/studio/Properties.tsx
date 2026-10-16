@@ -25,6 +25,8 @@ import {
   Underline,
   Wand2,
 } from "lucide-react";
+import { TextEffectField } from "./TextEffectField.js";
+import { FontOptions } from "./TypeControls.js";
 import { useState, type ReactNode } from "react";
 
 import { IconButton } from "../ui/IconButton.js";
@@ -190,11 +192,7 @@ export function Properties({
               onChange={(e) => set({ fontFamily: e.target.value })}
               className="h-7 w-full rounded-md border border-hairline bg-surface-1 px-1.5 text-caption text-primary outline-none"
             >
-              {allFonts(brandIdOf(doc.styleId ?? "") ?? undefined).map((f) => (
-                <option key={f.id} value={f.id}>
-                  {f.label}
-                </option>
-              ))}
+              <FontOptions brandId={brandIdOf(doc.styleId ?? "") ?? undefined} />
             </select>
           </Field>
 
@@ -241,6 +239,14 @@ export function Properties({
               UPPER
             </button>
           </div>
+
+          {one ? (
+            <TextEffectField
+              studio={studio}
+              layer={one}
+              swatch={(value, onChange) => <Colour palette={doc.palette} value={value} onChange={onChange} />}
+            />
+          ) : null}
         </>
       ) : null}
 
@@ -270,7 +276,8 @@ export function Properties({
             colour={one?.fill ?? "#ffffff"}
             gradient={one?.gradient}
             onColour={(fill) => set({ fill, gradient: undefined })}
-            onGradient={(gradient) => set({ gradient })}
+            // Gradient text is an effect too (22.4): it replaces any other.
+            onGradient={(gradient) => set(isText ? { gradient, textEffect: undefined } : { gradient })}
           />
         )}
       </Field>

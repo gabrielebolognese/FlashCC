@@ -21,3 +21,6 @@ interface ImportMetaEnv {
 interface ImportMeta {
   readonly env: ImportMetaEnv;
 }
+
+/** fontkit ships no types; it is only used by the font build and a measurement test. */
+declare module "fontkit";

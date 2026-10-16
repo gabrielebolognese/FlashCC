@@ -21,7 +21,8 @@
 import { missingFurniture, pieceLabel } from "./furniture.js";
 import type { Doc, Layer } from "./model.js";
 import { safeBox, shapeOf, type Platform } from "./platforms.js";
-import { lineCount, type Measure } from "./text.js";
+import { stripMarks } from "./marks.js";
+import { layerLines } from "./text.js";
 
 export type Severity = "block" | "warn";
 
@@ -47,12 +48,6 @@ const PLACEHOLDERS = [
   "your name",
 ];
 
-const measureOf = (l: Layer): Measure => ({
-  // The id, not the stack, see the note on Measure.family.
-  family: l.fontFamily,
-  letterSpacing: l.letterSpacing,
-  uppercase: l.uppercase,
-});
 
 const isText = (l: Layer): boolean => l.kind === "text" && (l.text ?? "").trim() !== "";
 
@@ -195,7 +190,7 @@ export function preflight(doc: Doc, platform: Platform): Finding[] {
 
         // Does the copy actually fit the box it was given? The generator
         // guarantees this; a person typing into an existing layer does not.
-        const lines = lineCount(l.text ?? "", size, l.w, measureOf(l));
+        const lines = layerLines(l, size, l.w);
         const needed = lines * size * (l.lineHeight ?? 1.2);
         if (needed > l.h + 1) {
           add({
@@ -207,7 +202,7 @@ export function preflight(doc: Doc, platform: Platform): Finding[] {
           });
         }
 
-        if (PLACEHOLDERS.includes((l.text ?? "").trim().toLowerCase())) {
+        if (PLACEHOLDERS.includes(stripMarks(l.text ?? "").trim().toLowerCase())) {
           add({
             severity: "warn",
             code: "placeholder-text",

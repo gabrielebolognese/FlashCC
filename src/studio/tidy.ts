@@ -18,7 +18,7 @@
 
 import type { Doc, Layer, Slide } from "./model.js";
 import { markEdited } from "./regenerate.js";
-import { lineCount, type Measure } from "./text.js";
+import { layerLines } from "./text.js";
 
 export type Box = { x: number; y: number; w: number; h: number };
 export type Moves = Map<string, Partial<Box>>;
@@ -223,18 +223,13 @@ export function equalGap(
   return { moves, gap };
 }
 
-const measureOf = (l: Layer): Measure => ({
-  family: l.fontFamily,
-  letterSpacing: l.letterSpacing,
-  uppercase: l.uppercase,
-});
 
 /** The height a text layer needs at a width, or null for anything that is not text. */
 function textHeight(l: Layer, w: number): number | null {
   if (l.kind !== "text") return null;
   const size = l.fontSize ?? 40;
   const lh = l.lineHeight ?? 1.2;
-  return Math.max(1, lineCount(l.text ?? "", size, w, measureOf(l))) * size * lh;
+  return layerLines(l, size, w) * size * lh;
 }
 
 /**

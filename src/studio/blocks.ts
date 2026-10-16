@@ -31,6 +31,7 @@ import { bestText, contrast, mix } from "./colour.js";
 import { makeLayer, type Identity, type Layer, type LayerKind } from "./model.js";
 import type { Theme } from "./presets.js";
 import { fitToBox, ladder, textWidth, type Measure } from "./text.js";
+import { markColourFor } from "./texteffects.js";
 
 /* ── the shape of a block ─────────────────────────────────────────────────── */
 
@@ -151,12 +152,17 @@ class Out {
   ): { layer: Layer; height: number } {
     const lh = o.lh ?? 1.25;
     const m = o.m ?? {};
+    // Measured at the weight, case and tracking it is drawn with: a bundled
+    // face (22.2) is measured per weight, and 700 is wider than 400.
     const f = fitToBox(t, {
       maxWidth: at.w,
       maxHeight: at.h,
       sizes: steps(o.max),
       lineHeight: lh,
       ...m,
+      weight: m.weight ?? o.weight ?? 500,
+      uppercase: m.uppercase ?? o.extra?.uppercase,
+      letterSpacing: m.letterSpacing ?? o.extra?.letterSpacing,
     });
     if (f.overflows && t.trim()) this.overflow.push(part);
     const height = Math.min(Math.max(f.height, f.fontSize * lh), Math.max(at.h, f.height));
@@ -170,6 +176,7 @@ class Out {
       fontWeight: o.weight ?? 500,
       lineHeight: lh,
       fontFamily: m.family ?? "sans",
+      markColour: markColourFor(this.ctx.theme, this.ctx.theme.bg, fill),
       ...o.extra,
     });
     return { layer, height };

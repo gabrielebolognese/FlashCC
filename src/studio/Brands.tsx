@@ -11,6 +11,7 @@
  * database is what actually holds, and a paywall that only refuses after a round
  * trip, with an error, is a worse experience than one that explains itself first.
  */
+import { FontOptions, PairPicker, RampPicker } from "./TypeControls.js";
 import {
   AlertTriangle,
   Check,
@@ -746,6 +747,20 @@ function Editor({
 
         <VoiceEditor brand={brand} onChange={onChange} />
 
+        <div>
+          <span className="text-overline uppercase text-tertiary">Type pairing</span>
+          <div className="mt-2">
+            <PairPicker theme={brand.theme} onPick={(p) => setTheme({ displayFont: p.display, bodyFont: p.body })} />
+          </div>
+        </div>
+
+        <div>
+          <span className="text-overline uppercase text-tertiary">Type ramp</span>
+          <div className="mt-2">
+            <RampPicker value={brand.theme.ramp} onChange={(ramp) => setTheme({ ramp })} />
+          </div>
+        </div>
+
         <div className="grid grid-cols-2 gap-3">
           <label className="block">
             <span className="text-overline uppercase text-tertiary">Headings</span>
@@ -754,11 +769,7 @@ function Editor({
               onChange={(e) => setTheme({ displayFont: e.target.value })}
               className={`${field} mt-1.5`}
             >
-              {fonts.map((f) => (
-                <option key={f.id} value={f.id}>
-                  {f.label}
-                </option>
-              ))}
+              <FontOptions brandId={brand.id} />
             </select>
           </label>
           <label className="block">
@@ -768,11 +779,7 @@ function Editor({
               onChange={(e) => setTheme({ bodyFont: e.target.value })}
               className={`${field} mt-1.5`}
             >
-              {fonts.map((f) => (
-                <option key={f.id} value={f.id}>
-                  {f.label}
-                </option>
-              ))}
+              <FontOptions brandId={brand.id} />
             </select>
           </label>
         </div>

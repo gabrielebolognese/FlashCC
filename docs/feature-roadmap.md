@@ -3554,7 +3554,7 @@ cover only, with its credit.
 
 ## Batch 22, Typography and emphasis
 
-**Status:** next
+**Status:** done
 **Size:** large, because 22.3 changes the text model.
 **Why here:** a carousel is mostly type. The first half made type fit; it never made
 type expressive. The single most common hand edit on generated slides, after
@@ -3665,11 +3665,55 @@ preview, and a test renders one on the server in CI.
 - **No variable-font axis sliders.** Weight steps from the pair are enough.
 - **No font uploads beyond Batch 5.** The asset path already handles them.
 
+### Built as
+
+All six. 22.3's unknown is answered: a text layer held no runs, and it still does not. The marks
+are characters in the stored text, so the text model did not change shape; what changed is that
+`text.ts` measures runs and `LayerView` paints them.
+
+**22.1.** Tight 1.2, Editorial 1.333 and Loud 1.5 in `ramps.ts`, on `Theme.ramp`, chosen in the
+brand and style editors. A ramp sets the top of each role's ladder only; the 60% floor is
+unchanged and every step sits on or above 18 (body) and 24 (headline). No ramp keeps each
+layout's own sizes, so no existing style changed.
+
+**22.2.** 24 pairs in six voices from 38 OFL families, shipped with the app through fontsource,
+registered as unicode-range subsets so a deck downloads only what it draws. The landmine is
+handled at the root: `npm run build:fonts` measures every face from its own woff2 (advances per
+weight, kerning and two-letter ligatures through fontkit's shaper), a pair is typed with the
+measured ids so a face without metrics does not compile, and `pairs.test.ts` builds hard decks in
+every pair, at every format and under every ramp, with zero overflow. Measured in Chromium against
+the DOM, a 96px headline lands within a pixel in six faces of seven; Caveat measures 0.5% long
+because of its contextual alternates (D30). The work also found reflow measuring a CSS stack (F1
+again) and replaced the four copies of the layer measure with one.
+
+**22.3** as specified. The done-when holds: a Playfair headline with one accented word renders with
+0 differing pixels between the editor's faces and the server export, measures within a pixel of
+its rendered width and wraps where Chromium wraps; `slideCopy` keeps the first of two
+model-written marks and unwraps the second. Found on the way: a shared global regex made the
+first mark of a line print its asterisks after `hasMarks` had looked at it.
+
+**22.4** as specified, one effect per layer enforced by `withEffect`. The mark colour must differ
+from the words as well as read on the ground, because the plain Dark style's accent is the same
+white as its text and marked words came out invisible.
+
+**22.5.** Bundled fallbacks for Cyrillic, Greek, Arabic, Hebrew and CJK in every stack; CJK breaks
+between characters with kinsoku; `sentences()` and the split points know CJK and Arabic
+punctuation; RTL aligns to its start through `dir="auto"` and mirrors the composition. One test
+suite per script.
+
+**22.6** as specified, with a different font than planned. Fontsource's Noto Color Emoji is
+OpenType-SVG, which Chrome does not draw, so it exported blank; Twemoji as a COLR font draws in
+every engine. Not a server image change: the export carries the emoji face like any other, so a
+server with no emoji font renders them. Five common emoji export pixel-identical to the editor,
+and `server/emoji.test.ts` renders them through `render.ts`. It also found that the render waited
+on `document.fonts.ready` before layout had requested a face, so a slide could screenshot blank
+text during the face's block period; fixed.
+
 ---
 
 ## Batch 23, Panoramic carousels
 
-**Status:** queued
+**Status:** next
 **Size:** medium to large
 **Why here:** the seamless carousel, where a line, a photo or a shape runs across
 the slide edge so the swipe feels like one continuous image, is one of the most

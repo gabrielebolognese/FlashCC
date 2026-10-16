@@ -260,11 +260,20 @@ export function sentences(text: string): string[] {
   const out: string[] = [];
   let start = 0;
 
-  const boundary = /([.!?]+)(["')\]]*)\s+(?=[A-Z0-9"'(\[])/g;
+  // A Latin sentence ends at a terminator, a space, and a capital (any script's
+  // capital, or a letter from a script with no case: Arabic, Hebrew). A CJK
+  // sentence ends at its own full stop, with no space after it (22.5).
+  const boundary = /([.!?؟]+)(["')\]]*)\s+(?=[\p{Lu}\p{Lt}\p{Lo}\p{N}"'(\[])|([。！？]+)([」』）"']*)/gu;
   let match: RegExpExecArray | null;
 
   while ((match = boundary.exec(clean)) !== null) {
     const end = match.index + match[0].length;
+    if (match[3]) {
+      const sentence = clean.slice(start, end).trim();
+      if (sentence) out.push(sentence);
+      start = end;
+      continue;
+    }
     const before = clean.slice(start, match.index);
     const lastWord = (before.match(/([\w.]+)$/)?.[1] ?? "").toLowerCase().replace(/\./g, "");
 

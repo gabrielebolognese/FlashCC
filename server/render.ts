@@ -113,7 +113,13 @@ export async function renderSlides(req: RenderRequest): Promise<RenderedSlide[]>
       // Passed as a string rather than a closure on purpose: this runs in the
       // page, and the server has no DOM lib, so a closure would mean either a
       // cast or pulling DOM types into a process that has no DOM.
-      await sheet.evaluate("document.fonts.ready");
+      //
+      // Layout is forced first (reading offsetHeight). A face only starts
+      // loading once layout asks for one of its characters, and until then
+      // `document.fonts.ready` is already resolved, so waiting on it alone let
+      // a slide screenshot during the face's invisible `block` period and ship
+      // blank text: found by the emoji test (22.6), true of uploads as well.
+      await sheet.evaluate("(document.body.offsetHeight, document.fonts.ready)");
 
       const element = await sheet.$("#slide");
       if (!element) throw new HttpError(500, "Slide root went missing during render");

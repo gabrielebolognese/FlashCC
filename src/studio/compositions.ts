@@ -13,7 +13,10 @@
 import { blockById, withDefaults } from "./blocks.js";
 import { makeLayer, makeSlide, uid, type Layer, type Slide } from "./model.js";
 import type { Theme } from "./presets.js";
-import { clampY, fitToBox, ladder, lineCount, type Measure } from "./text.js";
+import { outsideMarks } from "./marks.js";
+import { rampRange, type Step } from "./ramps.js";
+import { clampY, fitToBox, isRtl, ladder, lineCount, type Measure } from "./text.js";
+import { markColourFor } from "./texteffects.js";
 
 /**
  * How far type may shrink before splitting is the better answer, as a fraction
@@ -64,8 +67,11 @@ type Ctx = { text: string; index: number; total: number; theme: Theme; decor: nu
  * another. Mono measures 15% wider against a 2% safety margin, which overflowed
  * three slides out of four on the Terminal style.
  */
-const display = (t: Theme): Measure => ({ family: t.displayFont ?? "sans" });
-const body = (t: Theme): Measure => ({ family: t.bodyFont ?? t.displayFont ?? "sans" });
+const display = (t: Theme, weight: number): Measure => ({ family: t.displayFont ?? "sans", weight });
+const body = (t: Theme, weight: number): Measure => ({ family: t.bodyFont ?? t.displayFont ?? "sans", weight });
+
+/** A role's ladder: the composition's own range, or the style's ramp step (22.1). */
+const range = (t: Theme, step: Step, own: [number, number]): [number, number] => rampRange(t.ramp, step, own);
 
 /**
  * Fit text to a box by actually wrapping it.
@@ -145,7 +151,7 @@ const TITLE: Composition = {
   build: ({ text: t, theme, decor }, r) => {
     const LH = 1.06;
     const RULE = decor > 0 ? 56 : 0; // rule + the air under it
-    const f = fit(t, { w: r.w, h: r.h - RULE }, [104, 40], LH, { ...display(theme), letterSpacing: -0.02 });
+    const f = fit(t, { w: r.w, h: r.h - RULE }, range(theme, "display", [104, 40]), LH, { ...display(theme, 700), letterSpacing: -0.02 });
     // Sits in the upper third of its free space rather than on the floor of the
     // region: pinned to the bottom, a short hook stranded itself at the very edge
     // with a wall of dead space above it. A long one still grows upward from here.
@@ -173,7 +179,7 @@ const UNDERLINE: Composition = {
   build: ({ text: t, theme, decor }, r) => {
     const LH = 1.15;
     const RULE = decor > 0 ? 32 : 0;
-    const f = fit(t, { w: r.w, h: r.h - RULE }, [70, 30], LH, display(theme));
+    const f = fit(t, { w: r.w, h: r.h - RULE }, range(theme, "headline", [70, 30]), LH, display(theme, 700));
     return [
       text(t, { x: r.x, y: r.y, w: r.w, h: f.height }, theme.fg, {
         fontSize: f.fontSize,
@@ -201,8 +207,8 @@ const HEADING_BODY: Composition = {
     const GAP = 32;
     // The heading gets at most 40% of the region; the body takes what is left, so a
     // long heading cannot squeeze the body off the slide.
-    const hf = fit(head, { w: r.w, h: r.h * 0.4 }, [58, 30], 1.15, display(theme));
-    const bf = fit(rest, { w: r.w, h: r.h - hf.height - GAP }, [40, 22], 1.45, body(theme));
+    const hf = fit(head, { w: r.w, h: r.h * 0.4 }, range(theme, "subhead", [58, 30]), 1.15, display(theme, 700));
+    const bf = fit(rest, { w: r.w, h: r.h - hf.height - GAP }, range(theme, "body", [40, 22]), 1.45, body(theme, 400));
     const total = hf.height + GAP + bf.height;
     const y = clampY(centred(r, total), total, r.y, r.h);
     return [
@@ -229,7 +235,7 @@ const STATEMENT: Composition = {
   spacing: [24, 40, 56, 96],
   build: ({ text: t, theme }, r) => {
     const LH = 1.18;
-    const f = fit(t, { w: r.w, h: r.h }, [76, 30], LH, display(theme));
+    const f = fit(t, { w: r.w, h: r.h }, range(theme, "headline", [76, 30]), LH, display(theme, 700));
     return [
       text(t, { x: r.x, y: clampY(centred(r, f.height), f.height, r.y, r.h), w: r.w, h: f.height }, theme.fg, {
         fontSize: f.fontSize,
@@ -251,7 +257,7 @@ const NUMBERED: Composition = {
     const LH = 1.4;
     const numH = 110;
     const HEAD = numH + 24 + 6 + 36; // numeral, tick and the air around them
-    const f = fit(t, { w: r.w, h: r.h - HEAD }, [46, 22], LH, display(theme));
+    const f = fit(t, { w: r.w, h: r.h - HEAD }, range(theme, "subhead", [46, 22]), LH, display(theme, 500));
     const total = HEAD + f.height;
     const y = clampY(centred(r, total), total, r.y, r.h);
     return [
@@ -284,7 +290,7 @@ const QUOTE: Composition = {
   build: ({ text: t, theme, decor }, r) => {
     const LH = 1.25;
     const INDENT = 44;
-    const f = fit(t, { w: r.w - INDENT, h: r.h }, [62, 26], LH, display(theme));
+    const f = fit(t, { w: r.w - INDENT, h: r.h }, range(theme, "subhead", [62, 26]), LH, display(theme, 500));
     const y = clampY(centred(r, f.height), f.height, r.y, r.h);
     return [
       ...(decor > 0
@@ -309,7 +315,7 @@ const BLOCK: Composition = {
   build: ({ text: t, theme }, r) => {
     const LH = 1.2;
     const MIN_PAD = 28;
-    const f = fit(t, { w: r.w, h: r.h - MIN_PAD * 2 }, [68, 26], LH, display(theme));
+    const f = fit(t, { w: r.w, h: r.h - MIN_PAD * 2 }, range(theme, "headline", [68, 26]), LH, display(theme, 700));
     const padY = Math.min(64, Math.max(MIN_PAD, (r.h - f.height) / 2));
     const blockH = Math.min(r.h, f.height + padY * 2);
     const y = clampY(centred(r, blockH), blockH, r.y, r.h);
@@ -334,8 +340,8 @@ const CAPS: Composition = {
   build: ({ text: t, theme }, r) => {
     const LH = 1.3;
     // Measured uppercased and tracked out, since that is what actually renders.
-    const m: Measure = { ...display(theme), letterSpacing: 0.06, uppercase: true };
-    const f = fit(t, { w: r.w, h: r.h }, [56, 22], LH, m);
+    const m: Measure = { ...display(theme, 700), letterSpacing: 0.06, uppercase: true };
+    const f = fit(t, { w: r.w, h: r.h }, range(theme, "headline", [56, 22]), LH, m);
     return [
       text(t, { x: r.x, y: clampY(centred(r, f.height), f.height, r.y, r.h), w: r.w, h: f.height }, theme.fg, {
         fontSize: f.fontSize,
@@ -467,6 +473,20 @@ function applyFonts(layer: Layer, theme: Theme): Layer {
   return font ? { ...layer, fontFamily: font } : layer;
 }
 
+/**
+ * The colour emphasis takes on this layer (22.3): the style decides, once, at
+ * generation. Its ground is the slide, except the colour block's own text,
+ * which sits on the accent.
+ */
+function withMarkColour(l: Layer, theme: Theme, comp: string): Layer {
+  if (l.kind !== "text") return l;
+  const ground = comp === "block" && l.name === "Text" ? theme.accent : theme.bg;
+  return { ...l, markColour: markColourFor(theme, ground, l.fill) };
+}
+
+/** A layer reflected across the artboard's vertical centre line. */
+const mirrored = (l: Layer): Layer => ({ ...l, x: W - l.x - l.w, ...(l.align === "right" ? { align: "left" as const } : {}) });
+
 export type BuildOptions = {
   /** Reserve a picture band on every slide. */
   images?: boolean | undefined;
@@ -579,14 +599,18 @@ export function buildSlides(
 function splitAtMiddle(text: string): string[] {
   const t = text.trim();
   const breaks: number[] = [];
-  const re = /[.!?]["')\]]*\s+/g;
+  const re = /[.!?؟]["')\]]*\s+|[。！？]+[」』）"']*/g;
   let m: RegExpExecArray | null;
   while ((m = re.exec(t)) !== null) breaks.push(m.index + m[0].length);
 
   if (breaks.length === 0) {
     for (let i = 1; i < t.length - 1; i += 1) if (/\s/.test(t[i] ?? "")) breaks.push(i + 1);
   }
-  const usable = breaks.filter((i) => i > 0 && i < t.length);
+  if (breaks.length === 0) {
+    for (let i = 1; i < t.length; i += 1) if (/[\u3040-\u9fff\uac00-\ud7af]/.test((t[i - 1] ?? "") + (t[i] ?? ""))) breaks.push(i);
+  }
+  // Never between the two halves of an emphasis mark (22.3).
+  const usable = outsideMarks(t, breaks).filter((i) => i > 0 && i < t.length);
   if (usable.length === 0) return [t];
 
   const middle = t.length / 2;
@@ -615,9 +639,14 @@ function layout(entries: Entry[], theme: Theme, options: BuildOptions): Slide[] 
     }
     const comp = compositionFor(i, kept.length, k.role, seed);
     const { image, textRegion } = bandsFor(comp.image, images);
+    const rtl = isRtl(k.text);
     const built = comp
       .build({ text: k.text, index: i, total: kept.length, theme, decor }, textRegion)
-      .map((l) => applyFonts(l, theme));
+      .map((l) => withMarkColour(applyFonts(l, theme), theme, comp.id))
+      // Right-to-left copy (22.5) gets the composition mirrored: the rule, the
+      // bar and the number go to the right, where the line starts. The words
+      // themselves align to their own start through `dir="auto"` in LayerView.
+      .map((l) => (rtl ? mirrored(l) : l));
 
     // Picture first so it sits behind the text, which is what you want if either
     // ends up dragged over the other later.
@@ -657,10 +686,18 @@ function blockSlide(
   const layers = built.layers.map((l) => applyFonts({ ...l, block: { ...l.block!, slot: true } }, theme));
 
   const bodyY = box.y + box.h + 40;
-  const f = fit(text, { w: r.w, h: r.y + r.h - bodyY }, [40, 24], 1.4, body(theme));
+  const f = fit(text, { w: r.w, h: r.y + r.h - bodyY }, range(theme, "body", [40, 24]), 1.4, body(theme, 400));
   layers.push(
     applyFonts(
-      { ...makeLayer("text", { x: r.x, y: bodyY, w: r.w, h: f.height }, theme.muted), text, fontSize: f.fontSize, fontWeight: 400, lineHeight: 1.4, name: "Body" },
+      {
+        ...makeLayer("text", { x: r.x, y: bodyY, w: r.w, h: f.height }, theme.muted),
+        text,
+        fontSize: f.fontSize,
+        fontWeight: 400,
+        lineHeight: 1.4,
+        name: "Body",
+        markColour: markColourFor(theme, theme.bg, theme.muted),
+      },
       theme,
     ),
   );

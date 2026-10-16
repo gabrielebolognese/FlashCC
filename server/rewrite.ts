@@ -10,6 +10,7 @@
  * recomputed from the new text by `compositions.ts`, on the client, through
  * `restateSlide`. Nothing in this file knows a slide has a size.
  */
+
 import type { IncomingMessage, ServerResponse } from "node:http";
 
 import { zodOutputFormat } from "@anthropic-ai/sdk/helpers/zod";
@@ -29,7 +30,7 @@ import {
   type SlotSpec,
   type Voice,
 } from "./prompts.js";
-import { checkRewrite, repair } from "./checks.js";
+import { checkRewrite, repair, slideCopy } from "./checks.js";
 import { requirePro } from "./supabase.js";
 import { countFindings } from "./tally.js";
 
@@ -141,7 +142,7 @@ export async function rewrite(req: IncomingMessage, res: ServerResponse): Promis
    */
   const seen = new Set<string>();
   const options = parsed.options
-    .map((o) => ({ note: shortNote(repair(o.note)), text: repair(o.text) }))
+    .map((o) => ({ note: shortNote(repair(o.note)), text: slideCopy(o.text) }))
     .filter((o) => {
       const key = o.text.toLowerCase().replace(/[^a-z0-9]/g, "");
       if (!key || seen.has(key)) return false;

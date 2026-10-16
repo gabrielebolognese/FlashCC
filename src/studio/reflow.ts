@@ -24,19 +24,14 @@
  * than the one it fixes.
  */
 
-import { fontStack, type Layer, type Slide } from "./model.js";
-import { lineCount, type Measure } from "./text.js";
+import type { Layer, Slide } from "./model.js";
+import { layerLines } from "./text.js";
 
 export type Size = { w: number; h: number };
 
 /** A layer covering essentially the whole board is a background, not content. */
 const FULL_BLEED = 0.98;
 
-const measureOf = (l: Layer): Measure => ({
-  family: fontStack(l.fontFamily),
-  letterSpacing: l.letterSpacing,
-  uppercase: l.uppercase,
-});
 
 function isFullBleed(l: Layer, from: Size): boolean {
   return (
@@ -80,7 +75,7 @@ export function reflowLayer(layer: Layer, from: Size, to: Size): Layer {
   // whatever the copy actually needs, measured, not guessed.
   const size = layer.fontSize ?? 40;
   const lineHeight = layer.lineHeight ?? 1.2;
-  const lines = lineCount(layer.text ?? "", size, w, measureOf(layer));
+  const lines = layerLines(layer, size, w);
   const needed = Math.max(lines * size * lineHeight, size * lineHeight);
 
   return {

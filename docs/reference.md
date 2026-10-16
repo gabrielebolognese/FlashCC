@@ -17,7 +17,7 @@ is still current.
 | | |
 | --- | --- |
 | **Orientation** | [1 What it is](#1-what-it-is) · [2 Running it](#2-running-it) · [3 The invariants](#3-the-invariants) |
-| **The canvas** | [4 Data model](#4-the-data-model) · [5 Canvas](#5-the-canvas) · [6 Text](#6-text-measurement-and-fitting) · [7 Colour](#7-colour-and-contrast) · [8 Gradients](#8-gradients) · [9 Format change](#9-changing-format-reflow) |
+| **The canvas** | [4 Data model](#4-the-data-model) · [5 Canvas](#5-the-canvas) · [6 Text](#6-text-measurement-and-fitting) · [6b Type](#6b-type-pairs-ramps-emphasis-effects-scripts) · [7 Colour](#7-colour-and-contrast) · [8 Gradients](#8-gradients) · [9 Format change](#9-changing-format-reflow) |
 | **Making a deck** | [10 Frameworks](#10-the-four-frameworks) · [11 Generation](#11-generation) · [11b Blocks and furniture](#11b-blocks-and-deck-furniture) · [12 Styles](#12-styles-and-themes) · [13 Onboarding](#13-onboarding) · [14 AI drafting](#14-ai-drafting) · [15 Bulk and long form](#15-bulk-create-and-long-form-ingest) · [16 Media, fonts and assets](#16-media-and-fonts) · [16b Imagery](#16b-imagery-icons-and-backgrounds) · [17 Screen flow](#17-screen-flow) |
 | **The product** | [17b Clients and review](#17b-clients-and-review) · [18 Pipeline, calendar and series](#18-the-pipeline) · [19 Analytics](#19-analytics) · [19b History](#19b-version-history) · [20 Library](#20-the-library) · [21 Export](#21-export) |
 | **Infrastructure** | [22 Persistence](#22-persistence) · [23 Sync](#23-sync) · [24 Auth](#24-auth) · [25 Billing](#25-billing) · [26 Database](#26-database) · [27 Design tokens](#27-design-tokens) · [28 Testing](#28-testing) |
@@ -98,6 +98,9 @@ Layer{ id, name, kind, x, y, w, h, rotation, opacity, visible, locked,
 ```
 
 `LayerKind` is `text | rect | ellipse | triangle | line | icon | image | path`.
+
+Batch 22 added, all optional: on a text layer `markColour`, `textEffect` and `effectColour`, and
+`Theme.ramp`; `fontFamily` may now name a bundled face (§6b).
 
 Batch 21 added, all optional: on an image layer `focal`, `mask`, `filter` and `credit`; on a path
 layer `scaleStroke` and `icon`; on `SlideImage` `focal` and `credit`; `Slide.texture`. See
@@ -283,7 +286,28 @@ name from the first text layer on slide 1. A name you chose is never overwritten
 `measureText` was rejected deliberately: *"a layout that differs between test and production is
 worse than one that is slightly conservative in both."*
 
-### Advance table (em)
+Since Batch 22 there are two kinds of face, measured two ways:
+
+- **Bundled** (the pairing library, §6b): measured from the face's own advances and kerning,
+  generated from the woff2 files the browser renders (`typemetrics.ts`). Within a pixel of the
+  rendered width (tested against fontkit's shaper, and in Chromium against the DOM: Playfair
+  -0.01px, Inter +0.2px, Fraunces with a bold mark +0.8px at 96px). `MEASURED_SAFETY = 1.005`.
+- **System** (the eight stacks every machine has): the estimate below, `SAFETY = 1.02`.
+
+`Measure` is `{ family, weight, letterSpacing, uppercase }`. **`weight` is required for a bundled
+face**: 700 is wider than 400, and every composition and block now passes the weight it draws at.
+`layerMeasure(l)` is the one way to measure a layer; the four copies in pre-flight, split, reflow
+and tidy are gone (reflow's was passing a CSS stack as the family, F1 again). `layerLines(l, size,
+w)` adds the label-box inset (§6b).
+
+**Runs.** Text is parsed for emphasis marks first (`marks.ts`); a `**bold**` run is measured at
+`boldWeight(base)` (700, or 900 on a bold line). **Scripts.** CJK is one em a character; emoji,
+Arabic, Hebrew, Cyrillic and Greek take averages measured from the bundled fallbacks
+(`advances.json` `fallbacks`), or the bundled face's own Cyrillic and Greek where it has them.
+Joiners, variation selectors, skin tones and combining marks are zero width; a ZWJ sequence and a
+flag are one picture.
+
+### Advance table for system faces (em)
 
 | Class | Characters | Advance |
 | --- | --- | --- |
@@ -301,10 +325,12 @@ slightly smaller font and predicting one too few puts text off the slide.
 
 ### Wrapping
 
-Greedy, with `pre-wrap` semantics. Split on `\n` (hard breaks), then on `/(\s+)/` keeping
-whitespace runs as tokens. If a word does not fit, flush the line; if the token was whitespace, drop
-it (browsers drop leading whitespace on a wrapped line); an over-wide single word is broken
-mid-word by scanning for the longest prefix that fits.
+Greedy, with `pre-wrap` semantics. Split on `\n` (hard breaks), then into break opportunities: a
+run of spaces, a word, or **a single CJK character** (CJK breaks between almost any two). Kinsoku:
+closing punctuation and small kana (`、。」）ー`…) join the atom before them and opening punctuation
+(`「（`…) the atom after, so neither lands at the wrong end of a line. Spaces never cause a break
+(they hang at the end, and are dropped at the start, as browsers do); an over-wide atom is broken
+by scanning for the longest prefix that fits. Lines come back as plain text, marks stripped.
 
 `lineCount` is `Math.max(1, lines)`, never zero.
 
@@ -320,8 +346,112 @@ mid-word by scanning for the longest prefix that fits.
 `clampY` pins an oversized block to the top of its region rather than centring it, so the start
 stays readable.
 
-> **This guarantee currently holds for sans and serif only.** See §29 D1, it is the most
-> consequential defect in this document.
+> D1 (mono overflowing) is fixed; the bundled faces are measured, not estimated. See §29 for
+> what is left: D30 (a handwritten face's contextual alternates).
+
+---
+
+## 6b. Type: pairs, ramps, emphasis, effects, scripts
+
+Batch 22. Everything here is a value stored on a layer or a theme and painted by `LayerView`;
+nothing re-runs at render.
+
+### The bundled faces (`npm run build:fonts`, `typemetrics.ts`, `typefaces.ts`)
+
+`scripts/build-fonts.mjs` reads 38 families from `@fontsource/*` (all OFL-1.1), plus the fallbacks,
+and writes `src/render/fonts/`:
+
+| File | Holds | Loaded |
+| --- | --- | --- |
+| `faces.ts` | one entry per woff2 subset (547), with its unicode-range, imported `?url` | with the app; registering downloads nothing |
+| `faces-cjk.ts` | Noto Sans JP, SC and KR subsets (698) | the first time CJK text is seen (`ensureFacesFor`) |
+| `advances.json` | per family and weight, the advance of every Latin character in thousandths of an em, script averages, and the fallbacks' averages | with the app (about 30KB gzipped) |
+| `kern/<id>.json` | kerning and two-letter ligature deltas between letters, digits, punctuation and the space | per family, with the studio's deck (`loadKerning`) |
+| `ids.ts` | `MeasuredId`, the ids as a type | build time |
+| `LICENSE-fonts.md` | every family's package, version and licence | shipped |
+
+Faces are namespaced `FCC <name>` like uploads. `LayerView` sets `font-synthesis: style` on a
+bundled face, so no faux bold draws a weight nothing measured; `matchWeight` mirrors the CSS
+font-matching rules so measurement picks the weight the browser picks. Every stack, system or
+bundled, ends with the fallbacks before its generic family: `FCC Twemoji`, `FCC Noto Sans`, Noto
+Sans Arabic, Hebrew, JP, SC, KR.
+
+**The export** (`bundledFaceCss`, `facesFor`, pure and tested) inlines exactly the faces a deck
+draws with: its families at the weights the browser will pick (bold marks included), for the
+characters it contains, plus the subset holding the space (a line's height and baseline come from
+the first face covering U+0020, and leaving it out moved an emoji-only line by a pixel). Fallbacks
+are matched only on characters beyond Latin, so the emoji face never rides along for a digit.
+
+### Pairs (`pairs.ts`, `TypeControls.tsx`, 22.2)
+
+24 pairs, four in each voice: editorial, technical, friendly, luxury, brutal, handwritten. Each is
+`{display, body}` typed `MeasuredId`, so a pair naming a face with no metrics does not compile.
+`pairs.test.ts` builds two hard decks in every pair at every format (4:5 generated; 3:4, 1:1 and
+9:16 through reflow) and under every ramp, and asserts zero overflow. The picker (brand editor and
+style editor) shows each pair set in its own two faces. Font selects group system, bundled and
+uploaded faces.
+
+### Ramps (`ramps.ts`, 22.1)
+
+| Ramp | Ratio | caption | body | subhead | headline | display |
+| --- | --- | --- | --- | --- | --- | --- |
+| Tight | 1.2 | 30 | 36 | 43 | 52 | 62 |
+| Editorial | 1.333 | 27 | 36 | 48 | 64 | 85 |
+| Loud | 1.5 | 24 | 36 | 54 | 81 | 122 |
+
+`Theme.ramp`. A ramp sets the **top** of each role's fit ladder (`rampRange`); the ladder below and
+its 60% floor are unchanged, and nothing goes under the pre-flight floors (18 body, 24 headline).
+No ramp keeps each composition's own sizes. Roles: Title is display; Statement, Underline, Block
+and Caps are headline; a heading, Numbered and Quote are subhead; prose is body.
+
+### Emphasis (`marks.ts`, 22.3)
+
+`*word*` accent colour, `**word**` heavier (`boldWeight`), `==word==` highlighter. Stored in the
+text, so what is stored is what renders; typed the same in Compose and on the canvas (edit mode
+shows the raw marks). A mark needs non-space at both ends of its contents, does not nest and does
+not cross a line break, so arithmetic and stray asterisks are left alone.
+
+- `Layer.markColour` is chosen once: at generation (`markColourFor`: the accent if it reads on the
+  ground at 3:1 **and** differs from the words at 1.4:1, else the foreground, else muted), or the
+  first time a mark is typed into a layer that has none (`retouched` in `useStudio`).
+- Plain readers strip marks: transcript, caption, alt, names, placeholder checks.
+- Cuts never land inside a mark (`outsideMarks`, in `split.ts` and `splitAtMiddle`).
+- **The model may write marks** (invariant 5 holds: emphasis is part of what a sentence means,
+  the style decides how it looks). The draft, hook, rewrite and revise prompts allow one marked
+  span; `slideCopy` keeps the first and unwraps the rest; `plainText` keeps the three marks and
+  strips other markup (`stripMarkup`); captions and alt text strip them; length checks count what
+  a reader sees.
+
+### Effects (`texteffects.ts`, `TextEffectField.tsx`, 22.4)
+
+`Layer.textEffect`: highlighter, scribble underline, label box, outline, soft shadow; gradient text
+stays `gradient`. **One per layer**: `withEffect` clears the others (gradient included) and turns
+`==` marks into accent marks under any effect but the highlighter. The highlighter and scribble go
+on the marked words when there are some, on the whole line when not. The label box's padding is
+counted in measurement (`textInset`); its colour is chosen to hold the words. The outline never
+goes under 2px. `Layer.effectColour` overrides each effect's colour.
+
+### Scripts other than Latin (22.5)
+
+Fallback faces for Cyrillic and Greek (Noto Sans), Arabic, Hebrew, Japanese, Chinese and Korean;
+CJK line breaking and kinsoku (above); `sentences()` and the split points know `。！？` and `؟`
+and any script's capitals. **Right to left**: `LayerView` sets `dir="auto"` and aligns to start
+and end, so an Arabic or Hebrew line aligns to its own start; `buildSlides` mirrors a composition
+for RTL copy (`isRtl`), so the rule, the bar and the number sit where the line starts.
+`scripts.test.ts` is one suite per script.
+
+### Emoji (22.6)
+
+The emoji face is **Twemoji as a COLRv0 font** (`twemoji-colr-font`, font OFL-1.1, artwork
+CC-BY 4.0, attributed in `LICENSE-fonts.md`), drawn identically by Chrome, Firefox and Safari. It
+is not Noto Color Emoji: fontsource ships that as OpenType-SVG, which Chrome does not draw at all,
+so every emoji exported blank (the server test found it). A slide of five common emoji exports
+**pixel-identical** to the editor's rendering of the same markup (0 differing pixels, same
+Chromium), and `server/emoji.test.ts` renders them through `server/render.ts` and counts colour.
+
+The same work found an export bug that predates it: `render.ts` waited on `document.fonts.ready`
+before layout had asked for any face, so the wait resolved at once and a slide could screenshot
+inside a face's invisible `block` period. Layout is forced first now.
 
 ---
 
@@ -2148,7 +2278,10 @@ the FontFace API for uploads, and the html-to-canvas converters are unreliable o
 One browser is kept warm across requests; launching Chromium is most of the time budget for a
 ten-slide deck. Uploaded faces travel with the markup as `@font-face` rules carrying their data
 URLs, they live in that browser's library and the server has never heard of them, so anything not
-sent is silently substituted with Arial.
+sent is silently substituted with Arial. Since Batch 22 the bundled faces a deck uses travel the
+same way (`bundledFaceCss`, §6b), which is what lets an emoji or a Japanese line render on a
+server with no such fonts installed, and the render forces layout before waiting on
+`document.fonts.ready` so the wait actually waits.
 
 **The payload is inlined before it is sent** (`inline.ts`). Since the asset library, pictures and
 faces are signed URLs into a bucket, and a payload carrying those would make the renderer fetch a
@@ -2604,7 +2737,7 @@ Found by reading the code for this document. Ordered by consequence. None are fi
 > original text, because the reasoning is the useful part and a defect list that
 > silently loses its entries teaches nothing. Each carries a note.
 
-### D1, ~~Text is fitted with sans metrics, then restyled. Terminal overflows.~~ FIXED
+### D1, ~~Text is fitted with sans metrics, then restyled. Terminal overflows.~~ FIXED (and measured exactly for bundled faces since Batch 22)
 
 `compositions.ts` fits every text layer through `fit()` with the **default** `Measure`, then maps
 `applyFonts` over the result. So the size is chosen using sans metrics and the layer is *then* given
@@ -2863,6 +2996,26 @@ The `assets` table requires a bucket path, and a stock photo has none on purpose
 copy). So the shelf entry is local to the device. The documents that use a photo carry its URL and
 credit and sync normally; only "pick it again from Library on another machine" is missing. A
 nullable `path` with a `remote_url` column is the migration that fixes it.
+
+### D30, A handwritten face's contextual alternates are not measured
+
+The pair tables capture kerning and two-letter ligatures, not contextual alternates. Caveat uses
+them to vary its letters and measures about 0.5% long (5.6px on a 96px line in Chromium). Long is
+the safe direction; nothing overflows, a line may break a word early. Measuring through a shaper
+at build time for whole common words would close it.
+
+### D31, The system stacks still differ between machines
+
+The eight original stacks (`sans`, `serif`...) are whatever the machine has: SF on a Mac, Segoe on
+Windows, DejaVu on the export server. That predates Batch 22 and is why the pairs exist; the
+bundled faces render identically everywhere. Making a bundled face the default would change every
+existing deck's look, so it is a decision, not a fix.
+
+### D32, The main bundle grew by about 110KB gzipped
+
+The advance tables (about 30KB), the face manifest (13KB) and the type code. The kerning, the CJK
+manifest and every font file are separate and lazy. If it matters, the face manifest can move
+behind a dynamic import, at the cost of a frame of fallback type on first paint.
 
 ### D20, Smaller things
 

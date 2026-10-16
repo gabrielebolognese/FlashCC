@@ -1,10 +1,11 @@
 import { ArrowLeft, Check, ImagePlus, Palette, X } from "lucide-react";
+import { FontOptions, PairPicker, RampPicker } from "./TypeControls.js";
 import { useEffect, useMemo, useRef, useState } from "react";
 
 import { buildSlides } from "./compositions.js";
 import { slidePaint } from "./paint.js";
 import { LayerView } from "./LayerView.js";
-import { allFonts } from "./model.js";
+import { fontStack, allFonts } from "./model.js";
 import type { BuildOptions } from "./compositions.js";
 import { PREVIEW_COUNT, previewDeck } from "./preview.js";
 import { StepGuide, Strong } from "./StepGuide.js";
@@ -331,6 +332,14 @@ function CustomStyle({
               <Swatch label="Muted" value={style.theme.muted} onChange={(muted) => set({ muted })} />
             </Section>
 
+            <Section label="Pairing">
+              <PairPicker theme={style.theme} onPick={(p) => set({ displayFont: p.display, bodyFont: p.body })} />
+            </Section>
+
+            <Section label="Type ramp">
+              <RampPicker value={style.theme.ramp} onChange={(ramp) => set({ ramp })} />
+            </Section>
+
             <Section label="Typefaces">
               <Picker
                 label="Headings"
@@ -569,24 +578,16 @@ function Picker({
   onChange: (id: string) => void;
 }) {
   return (
-    <div className="flex h-10 items-center gap-3 rounded-xl border border-hairline bg-surface-1 px-3">
+    <label className="flex h-10 items-center gap-3 rounded-xl border border-hairline bg-surface-1 px-3">
       <span className="w-20 shrink-0 text-body text-secondary">{label}</span>
-      <div className="flex flex-1 gap-1">
-        {allFonts().map((f) => (
-          <button
-            key={f.id}
-            type="button"
-            onClick={() => onChange(f.id)}
-            style={{ fontFamily: f.stack }}
-            className={[
-              "h-7 flex-1 rounded-lg text-caption",
-              value === f.id ? "bg-surface-4 text-primary" : "text-tertiary hover:bg-white/[0.04]",
-            ].join(" ")}
-          >
-            {f.label}
-          </button>
-        ))}
-      </div>
-    </div>
+      <select
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        style={{ fontFamily: fontStack(value) }}
+        className="h-7 flex-1 rounded-lg bg-transparent text-caption text-primary outline-none"
+      >
+        <FontOptions />
+      </select>
+    </label>
   );
 }

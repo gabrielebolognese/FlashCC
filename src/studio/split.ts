@@ -24,7 +24,8 @@
  */
 
 import type { Doc, Layer, Slide } from "./model.js";
-import { lineCount, type Measure } from "./text.js";
+import { outsideMarks } from "./marks.js";
+import { layerLines, layerMeasure, lineCount, scriptOf, type Measure } from "./text.js";
 
 /**
  * How far down the ladder shrinking is allowed to go before splitting instead.
@@ -66,7 +67,8 @@ export const needsSplit = (text: string, spec: FitSpec, steps = MAX_SHRINK_STEPS
 /** Every index just past a sentence-ending punctuation run followed by space. */
 function sentenceBreaks(text: string): number[] {
   const out: number[] = [];
-  const re = /[.!?]["')\]]*\s+/g;
+  // CJK sentences end without a space after them (22.5).
+  const re = /[.!?؟]["')\]]*\s+|[。！？]+[」』）"']*/g;
   let m: RegExpExecArray | null;
   while ((m = re.exec(text)) !== null) out.push(m.index + m[0].length);
   return out;
@@ -81,6 +83,12 @@ const lineBreaks = (text: string): number[] => {
 const wordBreaks = (text: string): number[] => {
   const out: number[] = [];
   for (let i = 1; i < text.length - 1; i += 1) if (/\s/.test(text[i] ?? "")) out.push(i + 1);
+  // CJK has no spaces: any boundary between two CJK characters will do.
+  if (out.length === 0) {
+    for (let i = 1; i < text.length; i += 1) {
+      if (scriptOf(text[i - 1] ?? "") === "cjk" && scriptOf(text[i] ?? "") === "cjk") out.push(i);
+    }
+  }
   return out;
 };
 
@@ -93,7 +101,7 @@ const wordBreaks = (text: string): number[] => {
  */
 function bestBreak(text: string): number | null {
   for (const candidates of [sentenceBreaks(text), lineBreaks(text), wordBreaks(text)]) {
-    const usable = candidates.filter((i) => i > 0 && i < text.length);
+    const usable = outsideMarks(text, candidates).filter((i) => i > 0 && i < text.length);
     if (usable.length === 0) continue;
     const middle = text.length / 2;
     return usable.reduce((a, b) => (Math.abs(a - middle) <= Math.abs(b - middle) ? a : b));
@@ -154,12 +162,8 @@ export function mainText(slide: Slide): Layer | undefined {
   return texts.reduce((a, b) => ((a.fontSize ?? 0) >= (b.fontSize ?? 0) ? a : b));
 }
 
-export const measureOf = (l: Layer): Measure => ({
-  // The id, not fontStack(id): Measure.family is keyed against FAMILY_SCALE.
-  family: l.fontFamily,
-  letterSpacing: l.letterSpacing,
-  uppercase: l.uppercase,
-});
+/** See `layerMeasure`: one definition, so the four callers cannot drift apart again. */
+export const measureOf = layerMeasure;
 
 /**
  * Splits one slide into two, keeping everything else on both.
@@ -258,7 +262,7 @@ export function findOverflows(docs: readonly Doc[]): Overflow[] {
       for (const l of slide.layers) {
         if (l.kind !== "text" || !(l.text ?? "").trim() || !l.visible) continue;
         const size = l.fontSize ?? 0;
-        const lines = lineCount(l.text ?? "", size, l.w, measureOf(l));
+        const lines = layerLines(l, size, l.w);
         if (lines * size * (l.lineHeight ?? 1.2) > l.h + 1) {
           out.push({ docId: doc.id, docName: doc.name, slide: i + 1, layerId: l.id });
         }
