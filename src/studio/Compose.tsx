@@ -14,7 +14,7 @@ import { Fragment, useState } from "react";
 
 import { MAX_SLIDES } from "./compositions.js";
 import { THEMES } from "./presets.js";
-import { labelFor, repeatableOf, slotsFor, type Slot, type Structure } from "./structures.js";
+import { labelFor, repeatableOf, slotsFor, unitOf, type Slot, type Structure } from "./structures.js";
 import type { Finding } from "./ai.js";
 
 export type ComposeResult = {
@@ -128,22 +128,23 @@ export function Compose({
   const update = (key: string, text: string) =>
     setFields((fs) => fs.map((f) => (f.key === key ? { ...f, text } : f)));
 
+  // A pair framework (25.1) adds a whole pair: a myth never arrives without its fact.
+  const unit = unitOf(structure.slots);
+
   function addSlide() {
-    const rep = repeatableOf(structure);
-    if (!rep) return;
+    if (unit.length === 0) return;
     setFields((fs) => {
-      if (fs.length >= MAX_SLIDES) return fs;
+      if (fs.length + unit.length > MAX_SLIDES) return fs;
       const last = fs.map((f) => f.slot.repeatable === true).lastIndexOf(true);
       const at = last === -1 ? Math.max(0, fs.length - 1) : last + 1;
-      return [...fs.slice(0, at), mk(rep), ...fs.slice(at)];
+      return [...fs.slice(0, at), ...unit.map((u) => mk(u)), ...fs.slice(at)];
     });
   }
 
-  /** Insert a slide at an exact position, from the + between two boxes. */
+  /** Insert a slide (or a pair) at an exact position, from the + between two boxes. */
   function insertAt(at: number) {
-    const rep = repeatableOf(structure);
-    if (!rep) return;
-    setFields((fs) => (fs.length >= MAX_SLIDES ? fs : [...fs.slice(0, at), mk(rep), ...fs.slice(at)]));
+    if (unit.length === 0) return;
+    setFields((fs) => (fs.length + unit.length > MAX_SLIDES ? fs : [...fs.slice(0, at), ...unit.map((u) => mk(u)), ...fs.slice(at)]));
   }
 
   const remove = (key: string) =>
@@ -504,7 +505,7 @@ ${q}` : q);
               <Plus size={15} strokeWidth={2} />
               {fields.length >= MAX_SLIDES
                 ? `Maximum ${MAX_SLIDES} slides`
-                : `Add another ${repeatableOf(structure)?.label.toLowerCase() ?? "slide"}`}
+                : `Add another ${unit.map((u) => u.label.toLowerCase()).join(" and ") || "slide"}`}
             </button>
           </div>
         </div>

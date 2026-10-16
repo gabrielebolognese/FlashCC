@@ -71,7 +71,8 @@ export function deckIconStyle(doc: Doc): IconStyle | null {
       if (l.icon?.set === ICON_SET.outline) return "outline";
     }
   }
-  return null;
+  // No icon yet: the style pack's choice (25.6), when there was one.
+  return doc.iconStyle ?? null;
 }
 
 /**

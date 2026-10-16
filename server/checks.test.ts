@@ -1,4 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
+import { HONEST_BLANK } from "../src/studio/honesty.js";
 
 import {
   checkAlt,
@@ -311,5 +312,23 @@ describe("block fields answer to the brief (19.7)", () => {
     const slots = [{ id: "result", label: "Result", note: "", placeholder: "" }];
     const findings = checkDraft([{ role: "result", text: "It worked.", fields: ["4x", "watch time"] }], slots, "We tripled watch time, 3x.");
     expect(findings.map((f) => f.code)).toContain("measure-not-in-brief");
+  });
+});
+
+describe("the honesty rule (25.1)", () => {
+  it("accepts honest blanks in a row: the brief had no data, and that is the right answer", () => {
+    const slots = [
+      { id: "hook", label: "Hook", note: "n", placeholder: "p" },
+      { id: "number", label: "Number", note: "n", placeholder: "p", honest: true },
+      { id: "chart", label: "Chart", note: "n", placeholder: "p", honest: true },
+      { id: "cta", label: "CTA", note: "n", placeholder: "p" },
+    ];
+    const draft = [
+      { role: "hook", text: "Onboarding got simpler this spring." },
+      { role: "number", text: HONEST_BLANK },
+      { role: "chart", text: HONEST_BLANK },
+      { role: "cta", text: "Follow for the next one." },
+    ];
+    expect(checkDraft(draft, slots, "We simplified onboarding.").filter((f) => f.tier === "retry")).toEqual([]);
   });
 });

@@ -26,6 +26,8 @@ import { blockById, withDefaults, type Box, type BuildCtx, type Built, type Fiel
 import { marginLines } from "./compositions.js";
 import { makeSlide, type BlockRecord, type Doc, type Layer, type Slide } from "./model.js";
 import { safeBox, type Platform } from "./platforms.js";
+import { rampRange } from "./ramps.js";
+import { fitToBox, ladder } from "./text.js";
 
 const GAP = 40;
 
@@ -165,7 +167,14 @@ export function placeBlock(slide: Slide, blockId: string, fields: Fields, box: B
  * they put it; a part they restyled or retyped keeps its look. One call, so
  * the caller commits it as one undo step.
  */
-export function rebuildBlock(slide: Slide, instance: string, fields: Fields, ctx: Omit<BuildCtx, "instance">): Placed | null {
+export function rebuildBlock(
+  slide: Slide,
+  instance: string,
+  fields: Fields,
+  ctx: Omit<BuildCtx, "instance">,
+  /** A new box for the whole block (25.2's arrangements); otherwise it stays where it was moved to. */
+  to?: Box | undefined,
+): Placed | null {
   const record = (slide.blocks ?? []).find((b) => b.instance === instance) as InstanceRecord | undefined;
   const block = record ? blockById(record.block) : undefined;
   if (!record || !block) return null;
@@ -183,7 +192,7 @@ export function rebuildBlock(slide: Slide, instance: string, fields: Fields, ctx
   const [common = "0,0"] = [...counts.entries()].sort((a, b) => b[1] - a[1])[0] ?? [];
   const [dx, dy] = common.split(",").map(Number) as [number, number];
 
-  const box = { ...record.box, x: record.box.x + dx, y: record.box.y + dy };
+  const box = to ?? { ...record.box, x: record.box.x + dx, y: record.box.y + dy };
   const full = withDefaults(block, fields);
   const built = block.build(full, box, { ...ctx, instance });
 
@@ -308,4 +317,95 @@ export function insertSplit(
     }
   });
   return first ? { ...(first as Extract<Insert, { ok: true }>), doc: current } : { ok: false, reason: "no-room" };
+}
+
+/* ── arrangements of a block and its words (25.2) ─────────────────────────── */
+
+/**
+ * Where a slide's one block and its words go, for `L` on a slide that holds a
+ * block. Fixed order, like the composition rings. Each is a fraction of the
+ * margin box, so it works on any artboard; one the block's minimum size does
+ * not fit is skipped rather than squeezed.
+ */
+export const BLOCK_ARRANGEMENTS = ["block-top", "block-bottom", "heading-block", "block-centre", "block-large", "words-large"] as const;
+export type BlockArrangement = (typeof BLOCK_ARRANGEMENTS)[number];
+
+type Plan = { block: Box; words: Box | null; size: [number, number]; weight: number };
+
+function planFor(arrangement: BlockArrangement, area: Box): Plan {
+  const { x, y, w, h } = area;
+  const GAP = 40;
+  const part = (from: number, to: number): Box => ({ x, y: Math.round(y + h * from), w, h: Math.round(h * (to - from)) });
+  switch (arrangement) {
+    case "block-top":
+      return { block: part(0, 0.6), words: { ...part(0.6, 1), y: Math.round(y + h * 0.6) + GAP, h: Math.round(h * 0.4) - GAP }, size: [40, 24], weight: 400 };
+    case "block-bottom":
+      return { block: part(0.4, 1), words: { ...part(0, 0.4), h: Math.round(h * 0.4) - GAP }, size: [40, 24], weight: 400 };
+    case "heading-block":
+      return { block: part(0.36, 1), words: { ...part(0, 0.36), h: Math.round(h * 0.36) - GAP }, size: [60, 30], weight: 700 };
+    case "block-centre":
+      return { block: part(0.22, 0.82), words: { ...part(0, 0.22), h: Math.round(h * 0.22) - GAP / 2 }, size: [32, 22], weight: 500 };
+    case "block-large":
+      return { block: part(0, 0.8), words: { ...part(0.8, 1), y: Math.round(y + h * 0.8) + GAP / 2, h: Math.round(h * 0.2) - GAP / 2 }, size: [30, 22], weight: 400 };
+    case "words-large":
+      return { block: part(0.5, 1), words: { ...part(0, 0.5), h: Math.round(h * 0.5) - GAP }, size: [64, 30], weight: 700 };
+  }
+}
+
+/** The arrangements this block fits in, on this board. */
+export function arrangementsFor(blockId: string, board: { w: number; h: number }): BlockArrangement[] {
+  const block = blockById(blockId);
+  if (!block) return [];
+  const area = marginArea(board);
+  return BLOCK_ARRANGEMENTS.filter((a) => {
+    const p = planFor(a, area);
+    return p.block.w >= block.minBox.w && p.block.h >= block.minBox.h;
+  });
+}
+
+const marginArea = (board: { w: number; h: number }): Box => {
+  const m = marginLines(board.w, board.h);
+  return { x: m.x[0]!, y: m.y[0]!, w: m.x[1]! - m.x[0]!, h: m.y[1]! - m.y[0]! };
+};
+
+/**
+ * A slide with one block and at most one layer of words, rearranged. The block
+ * is rebuilt into its new box (19.8's rule: a part the user moved or restyled
+ * keeps what they did); the words are fitted into theirs, at the arrangement's
+ * size, never below its floor. Null when this slide is not that kind of slide.
+ */
+export function arrangeBlockSlide(
+  slide: Slide,
+  arrangement: BlockArrangement,
+  ctx: Omit<BuildCtx, "instance">,
+  words: Layer | undefined,
+): Slide | null {
+  const rec = slide.blocks?.length === 1 ? slide.blocks[0]! : undefined;
+  if (!rec) return null;
+  const plan = planFor(arrangement, marginArea(ctx.board));
+  const placed = rebuildBlock(slide, rec.instance, rec.fields, ctx, plan.block);
+  if (!placed) return null;
+  let out: Slide = { ...placed.slide, composition: arrangement };
+  if (words && plan.words && (words.text ?? "").trim()) {
+    const [max, min] = rampRange(ctx.theme.ramp, plan.weight >= 700 ? "subhead" : "body", plan.size);
+    const fitted = fitToBox(words.text ?? "", {
+      maxWidth: plan.words.w,
+      maxHeight: plan.words.h,
+      sizes: ladder(max, Math.max(min, Math.round(max * 0.6))),
+      lineHeight: words.lineHeight ?? 1.4,
+      family: words.fontFamily ?? ctx.theme.bodyFont ?? ctx.theme.displayFont ?? "sans",
+      weight: plan.weight,
+    });
+    const next: Layer = {
+      ...words,
+      x: plan.words.x,
+      y: plan.words.y,
+      w: plan.words.w,
+      h: Math.min(plan.words.h, fitted.height),
+      fontSize: fitted.fontSize,
+      fontWeight: plan.weight,
+    };
+    out = { ...out, layers: out.layers.map((l) => (l.id === words.id ? next : l)) };
+  }
+  return out;
 }

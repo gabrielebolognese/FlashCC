@@ -18,14 +18,23 @@ import {
   floorFor,
   labelFor,
   MAX_DRAFT_SLIDES,
+  shapeFor,
   slotsFor,
+  stepFor,
   type Structure,
 } from "./structures.js";
 
 type Phase =
   | { kind: "idle" }
   | { kind: "drafting" }
-  | { kind: "drafted"; texts: string[]; findings: Finding[]; fills: Record<string, SlotFill> }
+  | {
+      kind: "drafted";
+      texts: string[];
+      findings: Finding[];
+      fills: Record<string, SlotFill>;
+      /** The framework as it was asked for: the rhythm and count this draft was written to. */
+      asked: Structure;
+    }
   | { kind: "failed"; message: string };
 
 export function AiChat({
@@ -38,7 +47,7 @@ export function AiChat({
   structure: Structure;
   /** A brief carried in from a distilled source. Editable like any other. */
   initialBrief?: string | undefined;
-  onDrafted: (texts: string[], findings: Finding[], fills: Record<string, SlotFill>) => void;
+  onDrafted: (texts: string[], findings: Finding[], fills: Record<string, SlotFill>, asked: Structure) => void;
   onWriteMyself: () => void;
   onCancel: () => void;
 }) {
@@ -57,6 +66,15 @@ export function AiChat({
    * trust the second time it guesses wrong.
    */
   const [count, setCount] = useState(structure.slots.length);
+  /**
+   * The running order (25.1). "auto" until somebody picks one: then the brief's
+   * own words choose the order and, if the count was not touched either, a
+   * length inside the framework's range, so twenty briefs in one framework do
+   * not all come out the same shape. The same brief twice gets the same one.
+   */
+  const [rhythm, setRhythm] = useState<string>("auto");
+  const [countTouched, setCountTouched] = useState(false);
+  const step = stepFor(structure, rhythm === "auto" ? undefined : rhythm);
   const abort = useRef<AbortController | null>(null);
 
   // A short beat so the screen change is a transition rather than a flicker.
@@ -94,13 +112,16 @@ export function AiChat({
       // Resized BEFORE the call, never after. Generating the framework's
       // natural length and then asking for more would cost a second call and
       // produce slides written without knowing about each other.
-      const asked = { ...structure, slots: slotsFor(structure, count) };
+      const auto = shapeFor(structure, brief);
+      const order = rhythm === "auto" ? auto.rhythm : rhythm;
+      const asked = { ...structure, slots: slotsFor(structure, rhythm === "auto" && !countTouched ? auto.count : count, order) };
       const drafted = await draftSlides(brief, asked, controller.signal, voice);
       setPhase({
         kind: "drafted",
         texts: alignToSlots(drafted.slides, asked),
         findings: drafted.findings,
         fills: fillsFor(drafted.slides, asked),
+        asked,
       });
     } catch (error) {
       if (controller.signal.aborted) return;
@@ -141,12 +162,12 @@ export function AiChat({
             <Generating count={count} />
           ) : phase.kind === "drafted" ? (
             <Drafted
-              structure={structure}
+              structure={phase.asked}
               texts={phase.texts}
-              onUse={() => onDrafted(phase.texts, phase.findings, phase.fills)}
+              onUse={() => onDrafted(phase.texts, phase.findings, phase.fills, phase.asked)}
               onRedo={() => setPhase({ kind: "idle" })}
               onRevise={async (instruction) => {
-                const slots = slotsFor(structure, phase.texts.length);
+                const slots = phase.asked.slots;
                 const voice = contextVoice(listBrands(), undefined);
                 const out = await reviseDraft(phase.texts, instruction, slots, undefined, voice);
                 /*
@@ -158,7 +179,7 @@ export function AiChat({
                  * Findings are kept: they are about the brief, and a revision
                  * does not make an invented number any less invented.
                  */
-                setPhase({ kind: "drafted", texts: out.deck, findings: phase.findings, fills: phase.fills });
+                setPhase({ kind: "drafted", texts: out.deck, findings: phase.findings, fills: phase.fills, asked: phase.asked });
                 return { changed: out.changed, summary: out.summary };
               }}
             />
@@ -228,7 +249,10 @@ export function AiChat({
                       type="button"
                       aria-label="One fewer slide"
                       disabled={count <= floorFor(structure)}
-                      onClick={() => setCount((n) => Math.max(floorFor(structure), n - 1))}
+                      onClick={() => {
+                        setCountTouched(true);
+                        setCount((n) => Math.max(floorFor(structure), n - step));
+                      }}
                       className="grid h-full w-7 place-items-center rounded-l-lg text-tertiary hover:text-primary disabled:opacity-30"
                     >
                       <Minus size={13} strokeWidth={2.4} />
@@ -238,14 +262,21 @@ export function AiChat({
                       type="button"
                       aria-label="One more slide"
                       disabled={count >= MAX_DRAFT_SLIDES}
-                      onClick={() => setCount((n) => Math.min(MAX_DRAFT_SLIDES, n + 1))}
+                      onClick={() => {
+                        setCountTouched(true);
+                        setCount((n) => Math.min(MAX_DRAFT_SLIDES, n + step));
+                      }}
                       className="grid h-full w-7 place-items-center rounded-r-lg text-tertiary hover:text-primary disabled:opacity-30"
                     >
                       <Plus size={13} strokeWidth={2.4} />
                     </button>
                   </div>
 
-                  {count === structure.slots.length ? (
+                  {rhythm === "auto" && !countTouched ? (
+                    <span className="text-caption text-muted">
+                      or {structure.range ? `${structure.range[0]} to ${structure.range[1]}, ` : ""}picked from your brief
+                    </span>
+                  ) : count === structure.slots.length ? (
                     <span className="text-caption text-muted">
                       what {structure.name.toLowerCase()} is normally
                     </span>
@@ -259,6 +290,31 @@ export function AiChat({
                     </button>
                   )}
                 </div>
+
+                {structure.rhythms && structure.rhythms.length > 1 ? (
+                  <div className="mt-2 flex flex-wrap items-center gap-1.5 px-1">
+                    <span className="text-caption text-tertiary">Running order</span>
+                    {[{ id: "auto", label: "Picked from your brief", note: "Different briefs get different orders" }, ...structure.rhythms].map((r) => (
+                      <button
+                        key={r.id}
+                        type="button"
+                        title={r.note}
+                        aria-pressed={rhythm === r.id}
+                        onClick={() => {
+                          setRhythm(r.id);
+                          // A pair framework's count snaps to whole pairs of the order chosen.
+                          if (r.id !== "auto") setCount((n) => slotsFor(structure, n, r.id).length);
+                        }}
+                        className={[
+                          "h-7 rounded-lg border px-2 text-caption",
+                          rhythm === r.id ? "border-accent text-accent" : "border-hairline text-tertiary hover:text-primary",
+                        ].join(" ")}
+                      >
+                        {r.label}
+                      </button>
+                    ))}
+                  </div>
+                ) : null}
 
                 <button
                   type="button"

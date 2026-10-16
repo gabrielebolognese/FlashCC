@@ -106,7 +106,7 @@ describe("painting a texture", () => {
   it("goes on top of a solid colour", () => {
     const s = { ...makeSlide("#101010"), texture: textureFor("dots", 1, 0, 0.5, C, 1080, 1350) };
     const p = slidePaint(s);
-    expect(p.background).toBe("#101010");
+    expect(p.backgroundColor).toBe("#101010");
     expect(String(p.backgroundImage).startsWith("url('data:image/svg+xml,")).toBe(true);
     expect(p.backgroundSize).toBe("cover");
   });

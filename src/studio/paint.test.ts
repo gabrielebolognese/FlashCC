@@ -11,13 +11,13 @@ const withImage = (over: Partial<NonNullable<Slide["image"]>> = {}): Slide => ({
 
 describe("a slide with no picture", () => {
   it("paints a solid colour", () => {
-    expect(slidePaint(makeSlide("#ff0000"))).toEqual({ background: "#ff0000" });
+    expect(slidePaint(makeSlide("#ff0000"))).toEqual({ backgroundColor: "#ff0000" });
   });
 
   it("paints a gradient over the colour", () => {
     const slide = { ...makeSlide("#ff0000"), gradient: makeGradient(["#000000", "#ffffff"]) };
     const out = slidePaint(slide);
-    expect(out.background).toBe("#ff0000");
+    expect(out.backgroundColor).toBe("#ff0000");
     expect(out.backgroundImage).toContain("gradient");
   });
 
@@ -38,7 +38,7 @@ describe("a slide with a background picture", () => {
    * than letterboxed against nothing.
    */
   it("keeps the colour underneath", () => {
-    expect(slidePaint(withImage()).background).toBe("#101418");
+    expect(slidePaint(withImage()).backgroundColor).toBe("#101418");
   });
 
   it("covers by default and contains when asked", () => {

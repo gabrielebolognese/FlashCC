@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import { buildSlides } from "./compositions.js";
-import { STRUCTURES } from "./structures.js";
+import { shapeFor, slotsFor, STRUCTURES } from "./structures.js";
 import { STYLES, styleById } from "./styles.js";
 import { lineCount } from "./text.js";
 import type { Slide } from "./model.js";
@@ -137,7 +137,31 @@ describe("the sameness risk", () => {
     expect(rhythms.size).toBeGreaterThan(1);
   });
 
-  it("the four frameworks produce four different composition sequences", () => {
+  /**
+   * 25.1: Batch 4's test, per framework. Twenty briefs in one framework get
+   * their rhythm and count from their own words (`shapeFor`), and the decks
+   * they make must not all come out the same shape.
+   */
+  for (const structure of STRUCTURES) {
+    it(`${structure.name}: twenty briefs do not all come out the same shape`, () => {
+      const theme = styleById("ink").theme;
+      const shapes = new Set<string>();
+      for (let n = 0; n < 20; n += 1) {
+        const brief = `A carousel about topic ${n}: ${"some detail ".repeat(n % 4)}for ${structure.name}`;
+        const { rhythm, count } = shapeFor(structure, brief);
+        const slots = slotsFor(structure, count, rhythm);
+        const deck = buildSlides(
+          slots.map((s, i) => `${s.placeholder} ${i === 2 ? "and one more thought. ".repeat(n % 3) : ""}`.trim()),
+          theme,
+          slots.map((s) => s.id),
+        );
+        shapes.add(deck.map((s) => s.layers.map((l) => l.name).join("+")).join("|"));
+      }
+      expect(shapes.size).toBeGreaterThan(1);
+    });
+  }
+
+  it("the frameworks produce different composition sequences", () => {
     const theme = styleById("ink").theme;
     const sequences = STRUCTURES.map((structure) =>
       buildSlides(

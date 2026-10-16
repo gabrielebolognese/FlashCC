@@ -1,4 +1,4 @@
-import { ChevronLeft, ClipboardPaste, Download, History, Redo2, Send, Shuffle, Sparkles, Undo2, X } from "lucide-react";
+import { ChevronLeft, ClipboardPaste, Dices, Download, Heading, History, Megaphone, Redo2, Send, Shuffle, Sparkles, Undo2, X } from "lucide-react";
 import type { Studio as StudioState } from "./useStudio.js";
 import { brokenSpans, unspan } from "./spans.js";
 import { StripCanvas } from "./StripCanvas.js";
@@ -21,8 +21,15 @@ import { ReplaceDialog } from "./ReplaceDialog.js";
 import { FORMATS } from "./model.js";
 import { hasSafeZone, PLATFORMS, platformForSize, type PlatformId } from "./platforms.js";
 import { Shortcuts } from "./Shortcuts.js";
+import { HookFormulas } from "./HookFormulas.js";
+import { CtaPicker } from "./CtaPicker.js";
+import { PackPicker } from "./PackPicker.js";
+import { SaveTemplate } from "./SaveTemplate.js";
+import { applyPack, packIdOf, PACKS, type StylePack } from "./packs.js";
+import { deckFromTemplate, listTemplates, reapplyTemplate, type Template } from "./templates.js";
+import { platformById } from "./platforms.js";
 import { listDocs, loadDoc } from "./storage.js";
-import { stepLayout, typeSlide } from "./regenerate.js";
+import { shuffleRhythm, stepLayout, typeSlide } from "./regenerate.js";
 import type { Brand } from "./brand.js";
 
 import { Button } from "../ui/Button.js";
@@ -36,7 +43,7 @@ import { LayerView } from "./LayerView.js";
 import type { Doc, Layer } from "./model.js";
 import { Properties } from "./Properties.js";
 import { buildSlides } from "./compositions.js";
-import { applyBrand, listBrands, stampLogo, themeOf, voiceOf } from "./brand.js";
+import { applyBrand, identityOf, listBrands, stampLogo, themeOf, voiceOf } from "./brand.js";
 import { logoResolver } from "./library.js";
 import { BrandMenu } from "./BrandMenu.js";
 import { BlockPicker } from "./BlockPicker.js";
@@ -78,7 +85,18 @@ export function Studio({
   /** The filmstrip's "+" showing its line (24.5). */
   const [typingSlide, setTypingSlide] = useState(false);
   const [relaid, setRelaid] = useState<number | null>(null);
-  const [hooking, setHooking] = useState(false);
+  /** Hook variants, optionally in the shape of a formula (25.3). */
+  const [hooking, setHooking] = useState<false | { pattern?: string | undefined }>(false);
+  const [formulas, setFormulas] = useState(false);
+  const [packs, setPacks] = useState(false);
+  const [savingTemplate, setSavingTemplate] = useState(false);
+  const [note, setNote] = useState<string | null>(null);
+  useEffect(() => {
+    if (!note) return;
+    const t = window.setTimeout(() => setNote(null), 6000);
+    return () => window.clearTimeout(t);
+  }, [note]);
+  const [ctaOpen, setCtaOpen] = useState(false);
   /**
    * Which slide is being rewritten, or null. A number rather than a boolean,
    * because unlike the hook picker this can be opened on any slide.
@@ -106,6 +124,17 @@ export function Studio({
     const result = relaySlides(doc, ids, theme());
     if (result.replaced > 0) studio.replaceDoc(result.doc);
     setRelaid(result.replaced > 0 ? result.kept : -1);
+  }
+
+  function applyPackNow(p: StylePack) {
+    snapshot(doc, "brand", sessionPlan(), `Before ${p.name}`);
+    const platform = studio.safePlatform ? platformById(studio.safePlatform) : platformForSize(doc.width, doc.height);
+    studio.replaceDoc(applyPack(doc, p, identityOf(doc, listBrands()), platform, theme()), undefined, p.name);
+  }
+
+  function reapplyTemplateNow(t: Template) {
+    const platform = studio.safePlatform ? platformById(studio.safePlatform) : platformForSize(doc.width, doc.height);
+    studio.replaceDoc(reapplyTemplate(doc, t, { theme: theme(), identity: identityOf(doc, listBrands()), platform }), undefined, "Template");
   }
 
   function applyBrandNow(brand: Brand) {
@@ -165,7 +194,19 @@ export function Studio({
     redo: { run: studio.redo },
     rename: { run: () => setNaming(true) },
     "relay-deck": { run: relayDeck },
-    hooks: { run: () => setHooking(true) },
+    "shuffle-rhythm": { run: () => studio.replaceDoc(shuffleRhythm(doc, theme()).doc, undefined, "Shuffle rhythm") },
+    "style-packs": { run: () => setPacks(true) },
+    "save-template": { run: () => setSavingTemplate(true) },
+    "reapply-template": {
+      run: () => {
+        const t = listTemplates().find((x) => x.id === doc.template);
+        if (t) reapplyTemplateNow(t);
+      },
+      unavailable: listTemplates().some((x) => x.id === doc.template) ? null : "This deck was not made from a saved template.",
+    },
+    hooks: { run: () => setHooking({}) },
+    "hook-formulas": { run: () => setFormulas(true) },
+    cta: { run: () => setCtaOpen(true) },
     "paste-post": { run: () => setPasteOpen(true) },
     history: { run: () => setHistory(true) },
     review: { run: () => setSharing(true) },
@@ -188,11 +229,11 @@ export function Studio({
     },
     "next-layout": {
       run: () => studio.replaceDoc(stepLayout(doc, studio.index, 1, theme()).doc, undefined, "Layout"),
-      unavailable: slide && textsOfSlide(slide) ? null : "This slide has no words to lay out.",
+      unavailable: slide && (textsOfSlide(slide) || slide.blocks?.length === 1) ? null : "This slide has no words or block to lay out.",
     },
     "previous-layout": {
       run: () => studio.replaceDoc(stepLayout(doc, studio.index, -1, theme()).doc, undefined, "Layout"),
-      unavailable: slide && textsOfSlide(slide) ? null : "This slide has no words to lay out.",
+      unavailable: slide && (textsOfSlide(slide) || slide.blocks?.length === 1) ? null : "This slide has no words or block to lay out.",
     },
     "rewrite-slide": { run: () => setRewriting(studio.index) },
     tidy: { run: () => void studio.tidy() },
@@ -263,6 +304,13 @@ export function Studio({
       ...PLATFORMS.filter(hasSafeZone).map((p) =>
         entry("safe", p.id, p.label, () => studio.setSafePlatform(p.id as PlatformId), "overlay interface"),
       ),
+      ...PACKS.map((p) => entry("pack", p.id, p.name, () => applyPackNow(p), `${p.creator} ${p.note} style look`)),
+      ...listTemplates(doc.clientId ?? null).map((t) =>
+        entry("template", t.id, t.name, () => {
+          const made = deckFromTemplate(t, { theme: theme(), identity: identityOf(doc, listBrands()) });
+          if (onOpen) onOpen(doc.clientId ? { ...made, clientId: doc.clientId } : made);
+        }, "structure saved"),
+      ),
       ...listDocs()
         .filter((d) => d.id !== doc.id && !d.archived)
         .map((d) =>
@@ -298,7 +346,7 @@ export function Studio({
   const runnersRef = useRef(runners);
   runnersRef.current = runners;
   const modal =
-    palette || shortcuts || finding || pasteOpen || exporting !== null || sharing || history || hooking ||
+    palette || shortcuts || finding || pasteOpen || exporting !== null || sharing || history || hooking !== false || formulas || ctaOpen || packs || savingTemplate ||
     rewriting !== null || rewritingLayer !== null || studio.picker !== null || naming;
   const modalRef = useRef(modal);
   modalRef.current = modal;
@@ -368,6 +416,17 @@ export function Studio({
           <Shuffle size={14} strokeWidth={2} />
           Re-lay
         </button>
+        <button
+          type="button"
+          data-action="shuffle-rhythm"
+          title="Shuffle rhythm: the same words, the deck's layouts picked again from another starting point"
+          aria-label="Shuffle rhythm"
+          onClick={() => studio.replaceDoc(shuffleRhythm(doc, theme()).doc, undefined, "Shuffle rhythm")}
+          className="grid h-7 w-7 place-items-center rounded-md border border-hairline bg-surface-1 text-secondary hover:bg-surface-3 hover:text-primary"
+        >
+          <Dices size={14} strokeWidth={2} />
+        </button>
+        {note ? <span className="max-w-[320px] truncate text-caption text-tertiary">{note}</span> : null}
         {relaid === null ? null : (
           <span className="text-caption text-tertiary">
             {relaid < 0
@@ -388,11 +447,31 @@ export function Studio({
           type="button"
           data-action="hooks"
           title="Several ways to open the same carousel. Nothing else in the deck moves."
-          onClick={() => setHooking(true)}
+          onClick={() => setHooking({})}
           className="flex h-7 items-center gap-1.5 rounded-md border border-hairline bg-surface-1 px-2.5 text-body text-secondary hover:bg-surface-3 hover:text-primary"
         >
           <Sparkles size={14} strokeWidth={2} />
           Hooks
+        </button>
+        <button
+          type="button"
+          data-action="hook-formulas"
+          title="Fill-in-the-blank openings, by kind. No AI, nothing ranked."
+          onClick={() => setFormulas(true)}
+          className="flex h-7 items-center gap-1.5 rounded-md border border-hairline bg-surface-1 px-2.5 text-body text-secondary hover:bg-surface-3 hover:text-primary"
+        >
+          <Heading size={14} strokeWidth={2} />
+          Formulas
+        </button>
+        <button
+          type="button"
+          data-action="cta"
+          title="A call to action by goal, worded for the platform, on the last slide"
+          onClick={() => setCtaOpen(true)}
+          className="flex h-7 items-center gap-1.5 rounded-md border border-hairline bg-surface-1 px-2.5 text-body text-secondary hover:bg-surface-3 hover:text-primary"
+        >
+          <Megaphone size={14} strokeWidth={2} />
+          CTA
         </button>
 
         <BrandMenu brands={listBrands()} onApply={applyBrandNow} />
@@ -430,7 +509,7 @@ export function Studio({
         </Button>
       </header>
 
-      <Toolbar studio={studio} onFind={() => setFinding(true)} />
+      <Toolbar studio={studio} onFind={() => setFinding(true)} onPacks={() => setPacks(true)} onSaveTemplate={() => setSavingTemplate(true)} />
 
       <div className="flex min-h-0 flex-1">
         <div className="flex w-[212px] shrink-0 flex-col border-r border-hairline bg-surface-1">
@@ -454,6 +533,10 @@ export function Studio({
         studio={studio}
         onRewrite={(i) => setRewriting(i)}
         onRelay={relayPicked}
+        onLayout={(i, dir) => {
+          studio.replaceDoc(stepLayout(doc, i, dir, theme()).doc, undefined, "Layout");
+          studio.setSlideIndex(i);
+        }}
         onTypeSlide={(line) => {
           const r = typeSlide(doc, doc.slides.length, line, themeOf(doc, listBrands()));
           studio.replaceDoc(r.doc, undefined, "New slide");
@@ -559,9 +642,63 @@ export function Studio({
         />
       ) : null}
 
+      {packs ? (
+        <PackPicker
+          current={packIdOf(doc.styleId) ?? undefined}
+          onPick={(p) => {
+            applyPackNow(p);
+            setPacks(false);
+          }}
+          onClose={() => setPacks(false)}
+        />
+      ) : null}
+
+      {savingTemplate ? (
+        <SaveTemplate
+          doc={doc}
+          clientId={doc.clientId}
+          onSaved={(name) => {
+            setSavingTemplate(false);
+            setNote(`Saved "${name}" as a template. It is on the projects screen and in the palette.`);
+          }}
+          onClose={() => setSavingTemplate(false)}
+        />
+      ) : null}
+
+      {formulas ? (
+        <HookFormulas
+          current={deckTexts(doc)[0] ?? ""}
+          canAsk
+          onUse={(text) => {
+            studio.replaceDoc(restateSlide(doc, 0, text, themeOf(doc, listBrands())).doc, undefined, "Hook");
+            setFormulas(false);
+          }}
+          onAsk={(pattern) => {
+            setFormulas(false);
+            setHooking({ pattern });
+          }}
+          onClose={() => setFormulas(false)}
+        />
+      ) : null}
+
+      {ctaOpen ? (
+        <CtaPicker
+          platform={(studio.safePlatform ?? platformForSize(doc.width, doc.height)?.id ?? "linkedin") as PlatformId}
+          current={deckTexts(doc).at(-1) ?? ""}
+          onUse={(text) => {
+            const last = doc.slides.length - 1;
+            studio.replaceDoc(restateSlide(doc, last, text, themeOf(doc, listBrands())).doc, undefined, "Call to action");
+            studio.setSlideIndex(last);
+            setCtaOpen(false);
+          }}
+          onClose={() => setCtaOpen(false)}
+        />
+      ) : null}
+
       {hooking ? (
         <HookPicker
           doc={doc}
+          pattern={hooking.pattern}
           framework={STRUCTURES.find((f) => f.id === doc.framework)?.name}
           onPick={(text) => {
             // Back through the generator, not typed onto the layer: the box and

@@ -356,12 +356,153 @@ const CAPS: Composition = {
   },
 };
 
+/* ── the catalogue for cycling (25.2) ─────────────────────────────────────── */
+
+/**
+ * Five more for a headline and a body, so `L` has at least six real layouts
+ * for the commonest slide there is. They are not in the generation cycle, so
+ * nothing generated before Batch 25 changes; they are reached by cycling.
+ *
+ * Each falls back to a sensible single block when there is no body, so a
+ * headline-only slide cycled onto one still reads.
+ */
+
+/** Heading and body, both centred, the body a step quieter. */
+const CENTRED_PAIR: Composition = {
+  id: "centred-pair",
+  label: "Centred pair",
+  image: "above",
+  spacing: [16, 28, 56, 96],
+  build: (ctx, r) => {
+    const [head, rest] = lead(ctx.text);
+    const { theme } = ctx;
+    const GAP = 28;
+    const hf = fit(head, { w: r.w, h: r.h * (rest ? 0.42 : 1) }, range(theme, "subhead", [64, 30]), 1.15, display(theme, 700));
+    const bf = rest ? fit(rest, { w: r.w, h: r.h - hf.height - GAP }, range(theme, "body", [40, 22]), 1.45, body(theme, 400)) : null;
+    const total = hf.height + (bf ? GAP + bf.height : 0);
+    const y = clampY(centred(r, total), total, r.y, r.h);
+    return [
+      text(head, { x: r.x, y, w: r.w, h: hf.height }, theme.fg, { fontSize: hf.fontSize, fontWeight: 700, lineHeight: 1.15, align: "center", name: "Heading" }),
+      ...(bf && rest
+        ? [text(rest, { x: r.x, y: y + hf.height + GAP, w: r.w, h: bf.height }, theme.muted, { fontSize: bf.fontSize, fontWeight: 400, lineHeight: 1.45, align: "center", name: "Body" })]
+        : []),
+    ];
+  },
+};
+
+/** A vertical accent rule down the left of the heading and body. */
+const SIDE_RULE: Composition = {
+  id: "side-rule",
+  label: "Side rule",
+  image: "below",
+  spacing: [16, 28, 40, 96],
+  build: (ctx, r) => {
+    const [head, rest] = lead(ctx.text);
+    const { theme, decor } = ctx;
+    const INDENT = 48;
+    const GAP = 24;
+    const w = r.w - INDENT;
+    const hf = fit(head, { w, h: r.h * (rest ? 0.42 : 1) }, range(theme, "subhead", [58, 28]), 1.15, display(theme, 700));
+    const bf = rest ? fit(rest, { w, h: r.h - hf.height - GAP }, range(theme, "body", [38, 22]), 1.45, body(theme, 400)) : null;
+    const total = hf.height + (bf ? GAP + bf.height : 0);
+    const y = clampY(centred(r, total), total, r.y, r.h);
+    return [
+      ...(decor > 0 ? [rect({ x: r.x, y, w: Math.round(10 * decor), h: total }, theme.accent, { name: "Rule", radius: 5 })] : []),
+      text(head, { x: r.x + INDENT, y, w, h: hf.height }, theme.fg, { fontSize: hf.fontSize, fontWeight: 700, lineHeight: 1.15, name: "Heading" }),
+      ...(bf && rest
+        ? [text(rest, { x: r.x + INDENT, y: y + hf.height + GAP, w, h: bf.height }, theme.muted, { fontSize: bf.fontSize, fontWeight: 400, lineHeight: 1.45, name: "Body" })]
+        : []),
+    ];
+  },
+};
+
+/** The heading as a small tracked kicker, the body as the big line. */
+const KICKER: Composition = {
+  id: "kicker",
+  label: "Kicker",
+  image: "below",
+  spacing: [16, 32, 56, 96],
+  build: (ctx, r) => {
+    const [head, rest] = lead(ctx.text);
+    if (!rest) return UNDERLINE.build(ctx, r);
+    const { theme } = ctx;
+    const GAP = 32;
+    const km: Measure = { ...display(theme, 700), letterSpacing: 0.08, uppercase: true };
+    const kf = fit(head, { w: r.w, h: r.h * 0.25 }, range(theme, "body", [30, 22]), 1.3, km);
+    const bf = fit(rest, { w: r.w, h: r.h - kf.height - GAP }, range(theme, "headline", [60, 28]), 1.2, display(theme, 700));
+    const total = kf.height + GAP + bf.height;
+    const y = clampY(centred(r, total), total, r.y, r.h);
+    return [
+      text(head, { x: r.x, y, w: r.w, h: kf.height }, theme.accent, {
+        fontSize: kf.fontSize,
+        fontWeight: 700,
+        lineHeight: 1.3,
+        letterSpacing: 0.08,
+        uppercase: true,
+        name: "Kicker",
+      }),
+      text(rest, { x: r.x, y: y + kf.height + GAP, w: r.w, h: bf.height }, theme.fg, { fontSize: bf.fontSize, fontWeight: 700, lineHeight: 1.2, name: "Body" }),
+    ];
+  },
+};
+
+/** Heading at the top of the region, body at the bottom, a rule between. */
+const TOP_AND_BOTTOM: Composition = {
+  id: "top-bottom",
+  label: "Top and bottom",
+  image: "above",
+  spacing: [24, 40, 56, 96],
+  build: (ctx, r) => {
+    const [head, rest] = lead(ctx.text);
+    if (!rest) return STATEMENT.build(ctx, r);
+    const { theme, decor } = ctx;
+    const RULE = decor > 0 ? 40 : 0;
+    const hf = fit(head, { w: r.w, h: r.h * 0.4 }, range(theme, "subhead", [60, 30]), 1.15, display(theme, 700));
+    const bf = fit(rest, { w: r.w, h: r.h - hf.height - RULE - 40 }, range(theme, "body", [38, 22]), 1.45, body(theme, 400));
+    const bodyY = r.y + r.h - bf.height;
+    return [
+      text(head, { x: r.x, y: r.y, w: r.w, h: hf.height }, theme.fg, { fontSize: hf.fontSize, fontWeight: 700, lineHeight: 1.15, name: "Heading" }),
+      ...accent(decor, { x: r.x, y: bodyY - RULE, w: 96, h: 6 }, theme.accent, { name: "Rule", radius: 3 }),
+      text(rest, { x: r.x, y: bodyY, w: r.w, h: bf.height }, theme.muted, { fontSize: bf.fontSize, fontWeight: 400, lineHeight: 1.45, name: "Body" }),
+    ];
+  },
+};
+
+/** Heading and body on a quiet card. */
+const CARD: Composition = {
+  id: "card",
+  label: "Card",
+  image: "below",
+  spacing: [20, 32, 48, 96],
+  build: (ctx, r) => {
+    const [head, rest] = lead(ctx.text);
+    const { theme } = ctx;
+    const PAD = 48;
+    const GAP = 24;
+    const w = r.w - PAD * 2;
+    const hf = fit(head, { w, h: (r.h - PAD * 2) * (rest ? 0.42 : 1) }, range(theme, "subhead", [54, 28]), 1.15, display(theme, 700));
+    const bf = rest ? fit(rest, { w, h: r.h - PAD * 2 - hf.height - GAP }, range(theme, "body", [36, 22]), 1.45, body(theme, 400)) : null;
+    const inner = hf.height + (bf ? GAP + bf.height : 0);
+    const cardH = Math.min(r.h, inner + PAD * 2);
+    const y = clampY(centred(r, cardH), cardH, r.y, r.h);
+    return [
+      rect({ x: r.x, y, w: r.w, h: cardH }, theme.fg, { name: "Card", radius: 28, opacity: 0.07 }),
+      text(head, { x: r.x + PAD, y: y + PAD, w, h: hf.height }, theme.fg, { fontSize: hf.fontSize, fontWeight: 700, lineHeight: 1.15, name: "Heading" }),
+      ...(bf && rest
+        ? [text(rest, { x: r.x + PAD, y: y + PAD + hf.height + GAP, w, h: bf.height }, theme.muted, { fontSize: bf.fontSize, fontWeight: 400, lineHeight: 1.45, name: "Body" })]
+        : []),
+    ];
+  },
+};
+
+const EXTRA: Composition[] = [CENTRED_PAIR, SIDE_RULE, KICKER, TOP_AND_BOTTOM, CARD];
+
 /** The scale for a slide no composition built: every step any of them uses. */
 export const DEFAULT_SPACING = [16, 24, 32, 40, 56, 64, 96];
 
 /** The spacing steps a slide was built from, or the default scale. */
 export function spacingFor(composition: string | undefined): number[] {
-  const all = [TITLE, UNDERLINE, HEADING_BODY, STATEMENT, NUMBERED, QUOTE, BLOCK, CAPS];
+  const all = [TITLE, UNDERLINE, HEADING_BODY, STATEMENT, NUMBERED, QUOTE, BLOCK, CAPS, ...EXTRA];
   return all.find((c) => c.id === composition)?.spacing ?? DEFAULT_SPACING;
 }
 
@@ -386,13 +527,37 @@ const CYCLE: Composition[] = [HEADING_BODY, STATEMENT, NUMBERED, QUOTE, UNDERLIN
  * as many times as there are entries comes back to where it started, and
  * `Shift+L` walks the same ring backwards.
  */
-const RING: Composition[] = [TITLE, ...CYCLE, BLOCK];
+const RING: Composition[] = [TITLE, ...CYCLE, BLOCK, ...EXTRA];
 
-/** The composition after (or before) `id` in the ring. An unknown id starts at the top. */
-export function stepComposition(id: string | undefined, dir: 1 | -1 = 1): string {
-  const at = RING.findIndex((c) => c.id === id);
-  const next = at < 0 ? (dir === 1 ? 0 : RING.length - 1) : (at + dir + RING.length) % RING.length;
-  return RING[next]!.id;
+/**
+ * What a slide's words are (25.2): a headline alone, or a headline and a body.
+ * `L` only steps through layouts that suit it, so a one-line slide never lands
+ * on a layout built around a body it does not have.
+ */
+export type ContentShape = "head" | "body";
+
+export const shapeOfText = (text: string): ContentShape => (lead(text.trim())[1] ? "body" : "head");
+
+/**
+ * The rings, per shape. Fixed order, so `L` pressed as many times as there are
+ * entries comes back to the start, and `Shift+L` walks the same ring back.
+ */
+export function ringFor(shape: ContentShape | undefined): string[] {
+  const ids =
+    shape === "head"
+      ? ["title", "underline", "statement", "caps", "quote", "block", "centred-pair", "side-rule", "card"]
+      : shape === "body"
+        ? ["heading-body", "centred-pair", "side-rule", "kicker", "top-bottom", "card", "numbered", "quote", "statement", "underline", "caps", "block"]
+        : RING.map((c) => c.id);
+  return ids;
+}
+
+/** The composition after (or before) `id` in the ring for this shape. An id not in it starts at the top. */
+export function stepComposition(id: string | undefined, dir: 1 | -1 = 1, shape?: ContentShape): string {
+  const ring = ringFor(shape);
+  const at = ring.indexOf(id ?? "");
+  const next = at < 0 ? (dir === 1 ? 0 : ring.length - 1) : (at + dir + ring.length) % ring.length;
+  return ring[next]!;
 }
 
 /**
@@ -400,8 +565,8 @@ export function stepComposition(id: string | undefined, dir: 1 | -1 = 1): string
  * deck's own seed: what a slide typed into existence (24.5) is laid out with.
  * Never the title or the colour block, which belong to the first and the last.
  */
-export const cycleCompositionAt = (index: number, texts: readonly string[]): string =>
-  CYCLE[(Math.max(1, index) - 1 + seedOf(texts.filter((t) => t.trim()))) % CYCLE.length]!.id;
+export const cycleCompositionAt = (index: number, texts: readonly string[], shift = 0): string =>
+  CYCLE[(Math.max(1, index) - 1 + seedOf(texts.filter((t) => t.trim())) + shift) % CYCLE.length]!.id;
 
 /**
  * Roles that always get the same treatment, whatever their position. The hook is the
@@ -535,6 +700,8 @@ export type BuildOptions = {
    * user's choice, so it is honoured over the role and the position.
    */
   compositions?: (string | undefined)[] | undefined;
+  /** Shuffle rhythm (25.2): the cycle starts this far from where the words put it. */
+  seedShift?: number | undefined;
 };
 
 export type SlotFillSpec = { id: string; fields: Record<string, string> };
@@ -658,7 +825,7 @@ function layout(entries: Entry[], theme: Theme, options: BuildOptions): Slide[] 
   });
   if (kept.length === 0) return [makeSlide(theme.bg, "Slide 1")];
 
-  const seed = seedOf(kept.map((k) => k.text));
+  const seed = seedOf(kept.map((k) => k.text)) + (options.seedShift ?? 0);
 
   return kept.map((k, i) => {
     if (k.fill) {

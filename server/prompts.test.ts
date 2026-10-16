@@ -688,3 +688,11 @@ describe("emphasis marks from a model (22.3)", () => {
     }
   });
 });
+
+describe("a hook formula as a hint (25.3)", () => {
+  it("asks for every opening in that shape, and says nothing about one when none is given", () => {
+    const base = { hook: "x", deck: ["x", "y"], count: 5 };
+    expect(assembleHooks({ ...base, pattern: "Stop [doing the common thing]." }).user).toContain('in this shape, filling each [blank] from what the deck actually says: "Stop [doing the common thing]."');
+    expect(assembleHooks(base).user).not.toContain("in this shape");
+  });
+});

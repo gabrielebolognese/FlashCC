@@ -341,6 +341,18 @@ export type Doc = {
   framework?: string | undefined;
   styleId?: string | undefined;
   /**
+   * Shuffle rhythm (25.2): how far the deck's composition cycle has been moved
+   * from where its words put it. Read by generation only, never at render.
+   */
+  rhythmShift?: number | undefined;
+  /**
+   * The icon style a style pack chose (25.6), for a deck with no icon yet.
+   * Once it has one, the icons on it decide (21.1's one style per deck).
+   */
+  iconStyle?: "outline" | "filled" | undefined;
+  /** The saved template this deck was made from (25.5). A record, never a link: editing the template does not reach it. */
+  template?: string | undefined;
+  /**
    * Which series this is part of, and where in it.
    *
    * On the document rather than in a table of its own: a series is two fields,

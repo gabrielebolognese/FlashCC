@@ -213,6 +213,7 @@ type HookRequest = {
   framework?: string;
   count?: number;
   voice?: Voice;
+  pattern?: string;
 };
 
 const MAX_HOOKS = 8;
@@ -235,6 +236,7 @@ export async function hooks(req: IncomingMessage, res: ServerResponse): Promise<
     count,
     ...(body.framework ? { framework: body.framework } : {}),
     ...(body.voice ? { voice: body.voice } : {}),
+    ...(typeof body.pattern === "string" && body.pattern.trim() ? { pattern: body.pattern } : {}),
   });
 
   const response = await callModel("hooks", MODELS.hooks, () =>

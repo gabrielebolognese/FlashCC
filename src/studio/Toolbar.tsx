@@ -1,4 +1,4 @@
-import { AlignLeft, Circle, GalleryHorizontal, LayoutGrid, Minus, MousePointer2, ScanLine, Search, Sparkle, Square, Triangle, Type } from "lucide-react";
+import { AlignLeft, BookmarkPlus, Circle, GalleryHorizontal, LayoutGrid, Minus, MousePointer2, Palette, ScanLine, Search, Sparkle, Square, Triangle, Type } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 
 import type { ActionId } from "./actions.js";
@@ -25,7 +25,19 @@ const TOOLS: { id: Tool; icon: typeof Type; label: string; key: string; action: 
  * the shortest path from the canvas, and the eye already goes to the top of a
  * document. Single-letter shortcuts still do the same job.
  */
-export function Toolbar({ studio, onFind }: { studio: Studio; onFind?: (() => void) | undefined }) {
+export function Toolbar({
+  studio,
+  onFind,
+  onPacks,
+  onSaveTemplate,
+}: {
+  studio: Studio;
+  onFind?: (() => void) | undefined;
+  /** Style packs (25.6). */
+  onPacks?: (() => void) | undefined;
+  /** Save as template (25.5). */
+  onSaveTemplate?: (() => void) | undefined;
+}) {
   const [iconOpen, setIconOpen] = useState(false);
   const [safeOpen, setSafeOpen] = useState(false);
   const wrap = useRef<HTMLDivElement>(null);
@@ -228,6 +240,30 @@ export function Toolbar({ studio, onFind }: { studio: Studio; onFind?: (() => vo
         ) : null}
       </div>
 
+      {onPacks ? (
+        <button
+          type="button"
+          data-action="style-packs"
+          title="Style packs: a whole look in one choice"
+          aria-label="Style packs"
+          onClick={onPacks}
+          className="grid h-8 w-8 place-items-center rounded-lg text-tertiary hover:bg-white/[0.06] hover:text-primary"
+        >
+          <Palette size={15} strokeWidth={2} />
+        </button>
+      ) : null}
+      {onSaveTemplate ? (
+        <button
+          type="button"
+          data-action="save-template"
+          title="Save as template: this deck's structure, for the next one"
+          aria-label="Save as template"
+          onClick={onSaveTemplate}
+          className="grid h-8 w-8 place-items-center rounded-lg text-tertiary hover:bg-white/[0.06] hover:text-primary"
+        >
+          <BookmarkPlus size={15} strokeWidth={2} />
+        </button>
+      ) : null}
       {onFind ? (
         <button
           type="button"

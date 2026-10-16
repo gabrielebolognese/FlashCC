@@ -23,6 +23,7 @@
  * Nothing here judges whether the writing is good. Every rule is a defect
  * anybody would recognise as a defect.
  */
+import { isHonestBlank } from "../src/studio/honesty.js";
 import { limitMarks, stripMarks } from "../src/studio/marks.js";
 import { BODY_CHARS, HOOK_CHARS, MAX_ALT_CHARS, plainText, type SlotSpec } from "./prompts.js";
 
@@ -174,6 +175,9 @@ export function checkDraft(
   // in a row saying the same thing is the oldest generation bug in this
   // codebase and the one a reader notices first.
   for (let i = 1; i < texts.length; i += 1) {
+    // Two honest blanks in a row (25.1) are the brief having no data, which is
+    // the right answer. Retrying them would push the model to invent some.
+    if (isHonestBlank(texts[i] ?? "")) continue;
     const a = letters(texts[i - 1] ?? "");
     const b = letters(texts[i] ?? "");
     if (a && a === b) {

@@ -2,7 +2,15 @@ import { ArrowRight, HelpCircle, X } from "lucide-react";
 import { useEffect, useState } from "react";
 
 import { StepGuide } from "./StepGuide.js";
-import { DEFAULT_STRUCTURE, STRUCTURES, type Structure } from "./structures.js";
+import { DEFAULT_STRUCTURE, STRUCTURES, type FrameworkFamily, type Structure } from "./structures.js";
+
+/** By what the carousel is for (25.1). Never by a claimed performance number. */
+const FAMILIES: { id: FrameworkFamily; note: string }[] = [
+  { id: "Teach", note: "Explain, list, correct a belief" },
+  { id: "Prove", note: "Show a result, a transformation, a finding" },
+  { id: "Persuade", note: "Take a position, compare, decide" },
+  { id: "Engage", note: "Ask, answer, quote" },
+];
 
 /** A square preview of the shape, drawn from the framework's own slot count. */
 function ShapeMark({ slots, accent }: { slots: number; accent: string }) {
@@ -67,44 +75,55 @@ export function Frameworks({
                 can always change and reorder slides however you want, in any framework.
               </p>
               <p>
-                Every carousel is one of four shapes, and each one opens differently. Or start
-                from an empty one.
+                Sixteen shapes, grouped by what the post is for. Each one opens differently, and each
+                comes in two or three running orders, so two decks in one framework do not come out
+                the same.
               </p>
             </StepGuide>
 
             <div className="min-w-0 flex-1">
-              <div className="fcc-rise grid grid-cols-1 gap-5 sm:grid-cols-2">
-                {STRUCTURES.map((s, i) => (
-                  <div
-                    key={s.id}
-                    className="group flex flex-col justify-between rounded-3xl border border-hairline bg-gradient-to-b from-surface-2 to-surface-1 p-6 shadow-overlay transition-[border-color,transform] duration-standard ease-out hover:-translate-y-0.5 hover:border-accent-dim"
-                    // Sized by the grid cell rather than the viewport. The old
-                    // `min(30vw, 34vh)` assumed the cards owned the whole width,
-                    // which stopped being true once the guide took a column.
-                    style={{ minHeight: 264, animationDelay: `${i * 60}ms` }}
-                  >
-                    <div className="min-h-0">
-                      <ShapeMark slots={s.slots.length} accent="var(--accent)" />
-                      <div className="mt-5 text-[17px] font-semibold leading-6 tracking-[-0.2px] text-primary">
-                        {s.name}
-                      </div>
-                      <div className="mt-1.5 font-mono text-[10px] uppercase leading-4 tracking-[0.4px] text-accent">
-                        {s.shape}
-                      </div>
-                      <p className="mt-3 text-body leading-[19px] text-tertiary">{s.description}</p>
+              {FAMILIES.map((fam) => {
+                const members = STRUCTURES.filter((st) => (st.family ?? "Teach") === fam.id);
+                if (members.length === 0) return null;
+                return (
+                  <section key={fam.id} className="mb-8">
+                    <div className="mb-3 flex items-baseline gap-3">
+                      <h2 className="text-title text-primary">{fam.id}</h2>
+                      <span className="text-caption text-muted">{fam.note}</span>
                     </div>
+                    <div className="fcc-rise grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3">
+                      {members.map((s, i) => (
+                        <div
+                          key={s.id}
+                          className="group flex flex-col justify-between rounded-3xl border border-hairline bg-gradient-to-b from-surface-2 to-surface-1 p-5 shadow-overlay transition-[border-color,transform] duration-standard ease-out hover:-translate-y-0.5 hover:border-accent-dim"
+                          style={{ minHeight: 236, animationDelay: `${i * 40}ms` }}
+                        >
+                          <div className="min-h-0">
+                            <ShapeMark slots={s.slots.length} accent="var(--accent)" />
+                            <div className="mt-4 text-[16px] font-semibold leading-6 tracking-[-0.2px] text-primary">{s.name}</div>
+                            <div className="mt-1 font-mono text-[10px] uppercase leading-4 tracking-[0.4px] text-accent">{s.shape}</div>
+                            <p className="mt-2 text-body leading-[19px] text-tertiary">{s.description}</p>
+                            {s.range ? (
+                              <p className="mt-2 text-caption text-muted">
+                                {s.range[0]} to {s.range[1]} slides · {s.rhythms?.length ?? 1} running orders
+                              </p>
+                            ) : null}
+                          </div>
 
-                    <button
-                      type="button"
-                      onClick={() => onPick(s)}
-                      className="mt-5 flex h-10 w-full shrink-0 items-center justify-center gap-2 rounded-2xl border border-hairline bg-surface-3 text-body-strong text-secondary transition-colors duration-instant ease-out group-hover:bg-[color:var(--accent)] group-hover:text-[color:var(--on-accent)]"
-                    >
-                      Start writing
-                      <ArrowRight size={15} strokeWidth={2.5} />
-                    </button>
-                  </div>
-                ))}
-              </div>
+                          <button
+                            type="button"
+                            onClick={() => onPick(s)}
+                            className="mt-4 flex h-9 w-full shrink-0 items-center justify-center gap-2 rounded-2xl border border-hairline bg-surface-3 text-body-strong text-secondary transition-colors duration-instant ease-out group-hover:bg-[color:var(--accent)] group-hover:text-[color:var(--on-accent)]"
+                          >
+                            Start writing
+                            <ArrowRight size={15} strokeWidth={2.5} />
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                  </section>
+                );
+              })}
 
               {/* The escape hatch. Choosing wrong here is the expensive mistake, so
                   not choosing has to lead somewhere rather than stall. */}

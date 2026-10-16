@@ -16,6 +16,7 @@ import { furnishWith } from "./furniture.js";
 import { ALL_CLIENTS, belongsTo, listClients, UNASSIGNED, type Client } from "./clients.js";
 import { logoResolver } from "./library.js";
 import { PublishBatch } from "./PublishBatch.js";
+import { KitShelf, TemplateShelf } from "./Starters.js";
 import { ReplaceDialog } from "./ReplaceDialog.js";
 import { sessionPlan } from "./session.js";
 import { retentionDays, snapshot } from "./versions.js";
@@ -129,6 +130,14 @@ export function Projects({
    * the "toggle back and forth" complaint in miniature. Sentinels are not
    * clients, so the roll-up and the unassigned view both produce unassigned work.
    */
+  /** A deck a template or a kit made (25.5, 25.7): owned by the client on screen, saved, opened. */
+  function make(made: Doc) {
+    const real = client !== ALL_CLIENTS && client !== UNASSIGNED;
+    const doc = real ? { ...made, clientId: client } : made;
+    saveDoc(doc);
+    onOpen(doc);
+  }
+
   function create(presetId: string) {
     const preset = PRESETS.find((p) => p.id === presetId) ?? PRESETS[0]!;
     const base = buildDoc(preset, theme, preset.id === "blank" ? "Untitled" : preset.name);
@@ -202,6 +211,9 @@ export function Projects({
           </span>
         </span>
       </button>
+
+      <TemplateShelf client={client === ALL_CLIENTS || client === UNASSIGNED ? null : client} onMake={make} />
+      <KitShelf onMake={make} />
 
       <div className="mt-9 flex items-center gap-3">
         <span className="text-overline uppercase text-tertiary">Start from a layout</span>

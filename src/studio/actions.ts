@@ -42,7 +42,13 @@ export const ACTIONS = {
   redo: { label: "Redo", group: "Deck", keys: "⇧⌘Z" },
   rename: { label: "Rename this carousel", group: "Deck" },
   "relay-deck": { label: "Re-lay the deck", group: "Deck", also: "regenerate layout" },
+  "shuffle-rhythm": { label: "Shuffle rhythm", group: "Deck", also: "layouts cycle regular same vary" },
+  "style-packs": { label: "Style packs", group: "Deck", also: "look theme colours fonts preset" },
+  "save-template": { label: "Save as template", group: "Deck", also: "structure reuse" },
+  "reapply-template": { label: "Re-apply this deck's template", group: "Deck", also: "template update" },
   hooks: { label: "Hook variants", group: "Deck", also: "first slide opening" },
+  "hook-formulas": { label: "Hook formulas", group: "Deck", also: "opening template fill blank first slide" },
+  cta: { label: "Call to action", group: "Deck", also: "cta last slide follow save share comment keyword dm link" },
   "paste-post": { label: "Paste a post as slides", group: "Deck" },
   history: { label: "Version history", group: "Deck", also: "restore snapshot" },
   review: { label: "Send for review", group: "Deck", also: "share link client approval" },
@@ -107,6 +113,8 @@ export const FAMILIES = {
   export: "Export for",
   safe: "Show safe areas for",
   open: "Open project",
+  pack: "Apply style pack",
+  template: "New deck from template",
 } as const;
 
 export type FamilyId = keyof typeof FAMILIES;

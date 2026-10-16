@@ -5,7 +5,9 @@ import {
   MAX_DRAFT_SLIDES,
   MIN_DRAFT_SLIDES,
   repeatableOf,
+  shapeFor,
   slotsFor,
+  stepFor,
   STRUCTURES,
 } from "./structures.js";
 
@@ -13,8 +15,11 @@ import {
  * The bug this fixes: the slot list WAS the slide count, so a brief asking for
  * sixteen slides got a prompt listing eight slots and came back with eight.
  */
+/** Frameworks built in pairs (a myth and its fact) step by the pair; see below. */
+const paired = (s: (typeof STRUCTURES)[number]) => (s.rhythms?.[0]?.unit.length ?? 1) > 1;
+
 describe("asking a framework for a different number of slides", () => {
-  for (const structure of STRUCTURES) {
+  for (const structure of STRUCTURES.filter((s) => !paired(s))) {
     describe(structure.name, () => {
       const natural = structure.slots.length;
 
@@ -121,6 +126,73 @@ describe("fitting a screen to a draft that is longer than its framework", () => 
     for (const slot of slotsFor(structure, 16)) {
       expect(slot.id).toBeTruthy();
       expect(slot.label).toBeTruthy();
+    }
+  });
+});
+
+describe("a framework built in pairs (25.1)", () => {
+  for (const structure of STRUCTURES.filter(paired)) {
+    describe(structure.name, () => {
+      it("never ends on half a pair, and lands within one slide of the count asked for", () => {
+        for (const want of [5, 6, 7, 10, 13]) {
+          const out = slotsFor(structure, want);
+          expect(Math.abs(out.length - want)).toBeLessThanOrEqual(1);
+          const unit = structure.rhythms![0]!.unit.map((u) => u.id);
+          const middle = out.slice(structure.rhythms![0]!.open.length, out.length - structure.rhythms![0]!.close.length);
+          middle.forEach((s, i) => expect(s.id).toBe(unit[i % unit.length]));
+        }
+      });
+
+      it("steps by the pair, and its floor is an opening, one pair and a close", () => {
+        expect(stepFor(structure)).toBe(2);
+        expect(slotsFor(structure, 1)).toHaveLength(floorFor(structure));
+      });
+    });
+  }
+});
+
+describe("rhythms (25.1)", () => {
+  it("every framework has two or three, each opening and closing like the framework", () => {
+    for (const s of STRUCTURES) {
+      expect(s.rhythms?.length, s.name).toBeGreaterThanOrEqual(2);
+      expect(s.rhythms?.length, s.name).toBeLessThanOrEqual(3);
+      for (const r of s.rhythms!) {
+        const out = slotsFor(s, s.slots.length, r.id);
+        expect(out[0]?.id, `${s.name} ${r.id}`).toBe("hook");
+        expect(out.at(-1)?.id, `${s.name} ${r.id}`).toBe("cta");
+      }
+    }
+  });
+
+  it("the first rhythm of the four original frameworks is exactly their running order", () => {
+    for (const id of ["problem", "showcase", "educational", "story"]) {
+      const s = STRUCTURES.find((x) => x.id === id)!;
+      expect(slotsFor(s, s.slots.length).map((x) => x.id)).toEqual(s.slots.map((x) => x.id));
+    }
+  });
+
+  it("every framework has a slide-count range around its natural length", () => {
+    for (const s of STRUCTURES) {
+      const [lo, hi] = s.range!;
+      expect(lo, s.name).toBeLessThanOrEqual(s.slots.length);
+      expect(hi, s.name).toBeGreaterThanOrEqual(s.slots.length);
+    }
+  });
+
+  it("a brief gets a rhythm and a count from its own words, inside the range", () => {
+    for (const s of STRUCTURES) {
+      const shapes = new Set<string>();
+      for (let n = 0; n < 20; n += 1) {
+        const brief = `Brief number ${n} about ${s.name}, with its own words ${"x".repeat(n)}`;
+        const a = shapeFor(s, brief);
+        expect(shapeFor(s, brief)).toEqual(a);
+        const [lo, hi] = s.range!;
+        expect(a.count, s.name).toBeGreaterThanOrEqual(lo - 1);
+        expect(a.count, s.name).toBeLessThanOrEqual(hi + 1);
+        shapes.add(`${a.rhythm}/${a.count}`);
+      }
+      // Twenty briefs, more than one shape: the sameness constraint.
+      expect(shapes.size, s.name).toBeGreaterThan(1);
     }
   });
 });

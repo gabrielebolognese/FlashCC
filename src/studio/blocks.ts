@@ -370,6 +370,7 @@ export const COLUMN_PRESETS: Record<string, [string, string]> = {
   "Before / After": ["Before", "After"],
   "Us / Them": ["Us", "Them"],
   "Old way / New way": ["Old way", "New way"],
+  "Mistake / Fix": ["Mistake", "Fix"],
 };
 
 const COMPARE: Block = {

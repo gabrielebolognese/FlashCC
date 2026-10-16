@@ -37,7 +37,10 @@ const scrimOf = (image: SlideImage): number => {
 export const DEFAULT_SCRIM = 0.35;
 
 export const slidePaint = (slide: Slide | undefined): CSSProperties => {
-  if (!slide) return { background: undefined };
+  // backgroundColor, never the `background` shorthand: the shorthand beside
+  // backgroundImage makes React warn (and misorder) when a slide gains or
+  // loses a picture, a gradient or a texture between renders.
+  if (!slide) return { backgroundColor: undefined };
   const base = basePaint(slide);
   const texture = slide.texture?.src;
   if (!texture) return base;
@@ -78,7 +81,7 @@ function basePaint(slide: Slide): CSSProperties {
       // Stays underneath: it is what shows through a `contain` fit, so a
       // portrait picture on a square artboard is framed rather than letterboxed
       // against nothing.
-      background: slide.background,
+      backgroundColor: slide.background,
       backgroundImage: images.join(", "),
       backgroundSize: images.map(() => (contain ? "contain" : "cover")).join(", "),
       // The focal point for the picture; the scrim is flat, so its position is moot.
@@ -88,8 +91,8 @@ function basePaint(slide: Slide): CSSProperties {
   }
 
   return slide.gradient
-    ? { background: slide.background, backgroundImage: gradientCss(slide.gradient) }
-    : { background: slide.background };
+    ? { backgroundColor: slide.background, backgroundImage: gradientCss(slide.gradient) }
+    : { backgroundColor: slide.background };
 }
 
 export const layerPaint = (layer: Layer): CSSProperties =>

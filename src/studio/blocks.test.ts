@@ -288,10 +288,24 @@ import { STRUCTURES } from "./structures.js";
 describe("a framework slot that asks for a block (19.7)", () => {
   const showcase = STRUCTURES.find((s) => s.id === "showcase")!;
 
-  it("is chosen by the structure: only result slots ask, and only for a big number", () => {
-    const asking = STRUCTURES.flatMap((s) => s.slots.filter((x) => x.block).map((x) => `${s.id}.${x.id}:${x.block!.id}`));
+  it("is chosen by the structure: every block a slot asks for exists, and asks only for fields it has", () => {
+    const asking = STRUCTURES.flatMap((s) =>
+      [...s.slots, ...(s.rhythms ?? []).flatMap((r) => [...r.open, ...r.unit, ...r.close])].filter((x) => x.block),
+    );
     expect(asking.length).toBeGreaterThan(0);
-    for (const a of asking) expect(a).toMatch(/\.result:stat$/);
+    for (const slot of asking) {
+      const block = blockById(slot.block!.id);
+      expect(block, slot.block!.id).toBeDefined();
+      const keys = block!.fields.map((f) => f.key);
+      for (const f of slot.block!.fields) expect(keys, `${slot.block!.id}.${f.key}`).toContain(f.key);
+      for (const k of Object.keys(slot.block!.fixed ?? {})) expect(keys, `${slot.block!.id}.${k}`).toContain(k);
+      // The model is asked for words, never for a choice field: those are the framework's.
+      for (const f of slot.block!.fields) expect(block!.fields.find((x) => x.key === f.key)!.kind).not.toBe("choice");
+    }
+    // The result slots of the original four are still a big number.
+    for (const id of ["showcase", "story"]) {
+      expect(STRUCTURES.find((s) => s.id === id)!.slots.find((x) => x.id === "result")!.block!.id).toBe("stat");
+    }
   });
 
   it("lines the model's fields up by slot, and ignores empty ones", () => {

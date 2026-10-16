@@ -8,7 +8,7 @@
 import { buildSlides, type BuildOptions } from "./compositions.js";
 import { makeDoc, type Doc } from "./model.js";
 import type { Theme } from "./presets.js";
-import { STRUCTURES } from "./structures.js";
+import { CORE_IDS, STRUCTURES } from "./structures.js";
 
 export const EXAMPLES_GROUP = "Examples";
 
@@ -18,7 +18,9 @@ export function buildFrameworkSamples(theme: Theme, options: BuildOptions = {}):
     "#ffffff", "#000000", "#e5545a", "#3dbe7a", "#4c86d6", "#db2777",
   ];
 
-  return STRUCTURES.map((structure) => ({
+  // The four the product started with: sixteen worked examples would bury a
+  // new account's own work under ones it did not make.
+  return STRUCTURES.filter((s) => (CORE_IDS as readonly string[]).includes(s.id)).map((structure) => ({
     ...makeDoc(structure.name),
     // Examples count too: they are real carousels a person may post.
     framework: structure.id,

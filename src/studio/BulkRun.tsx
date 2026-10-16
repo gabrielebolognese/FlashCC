@@ -84,7 +84,7 @@ import {
 } from "./run.js";
 import { makeSeries, type SeriesMember } from "./series.js";
 import { loadDoc, saveDoc } from "./storage.js";
-import { STRUCTURES, slotsFor, type Structure } from "./structures.js";
+import { shapeFor, STRUCTURES, slotsFor, type Structure } from "./structures.js";
 import { withStyleImage, type Style } from "./styles.js";
 
 /** Read once, quickly, standing up. One idea per line. */
@@ -330,9 +330,11 @@ export function BulkRun({
         // which is what every run did before the question existed.
         // `askedSlots` above is this same call's length, which is what the recap
         // showed. One expression, so the promise and the request cannot diverge.
+        // Each brief gets its own running order (25.1): a batch of twenty in
+        // one framework is exactly where "every post is the same shape" shows.
         const asked = {
           ...structure,
-          slots: slotsFor(structure, slidesFor(length, structure.slots.length)),
+          slots: slotsFor(structure, slidesFor(length, structure.slots.length), shapeFor(structure, brief).rhythm),
         };
         const drafted = await draftSlides(brief, asked, AbortSignal.timeout(DRAFT_MS), voice);
         const texts = alignToSlots(drafted.slides, asked);

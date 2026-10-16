@@ -45,6 +45,8 @@ export async function draftHooks(
   count: number = HOOK_COUNT,
   signal?: AbortSignal,
   voice?: Voice,
+  /** A hook formula (25.3) the openings should follow. */
+  pattern?: string,
 ): Promise<HookVariant[]> {
   const res = await fetch("/api/hooks", {
     method: "POST",
@@ -55,6 +57,7 @@ export async function draftHooks(
       deck: [...deck],
       ...(structure ? { framework: structure.name } : {}),
       ...(hasVoice(voice) ? { voice } : {}),
+      ...(pattern ? { pattern } : {}),
       count,
     }),
   });

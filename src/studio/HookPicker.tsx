@@ -30,11 +30,14 @@ type Phase =
 export function HookPicker({
   doc,
   framework,
+  pattern,
   onPick,
   onClose,
 }: {
   doc: Doc;
   framework?: string | undefined;
+  /** A hook formula (25.3) the variants are written in. */
+  pattern?: string | undefined;
   onPick: (text: string) => void;
   onClose: () => void;
 }) {
@@ -52,7 +55,7 @@ export function HookPicker({
 
     // The deck already names its brand, so the voice is a lookup rather than
     // a guess. See contextVoice for the harder case.
-    draftHooks(current, texts, undefined, HOOK_COUNT, controller.signal, voiceOf(doc, listBrands()))
+    draftHooks(current, texts, undefined, HOOK_COUNT, controller.signal, voiceOf(doc, listBrands()), pattern)
       .then((variants) => {
         if (controller.signal.aborted) return;
         const kept = distinctHooks(variants, current);
@@ -87,6 +90,7 @@ export function HookPicker({
         <header className="flex h-14 shrink-0 items-center gap-2 border-b border-hairline px-5">
           <span className="text-title text-primary">Another way in</span>
           {framework ? <Chip>{framework}</Chip> : null}
+          {pattern ? <Chip>{pattern}</Chip> : null}
           <div className="flex-1" />
           <button
             type="button"

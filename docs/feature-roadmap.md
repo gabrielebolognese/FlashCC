@@ -4011,7 +4011,7 @@ its position, never the colour block a generated last slide gets.
 
 ## Batch 25, The preset system
 
-**Status:** next
+**Status:** done
 **Size:** large, mostly content and tests rather than new machinery.
 **Why here:** this is where "many presets" is delivered, and it comes after Batches
 19 to 24 on purpose. A preset is only as good as the pieces it can assemble: a
@@ -4159,11 +4159,58 @@ is a preset of presets and it runs once.
 - **No performance claims on any preset.** Nothing is ranked.
 - **No live template inheritance.** See 25.5.
 
+### Built as
+
+All seven. Both unknowns are answered. The four frameworks were Problem → Solution, Showcase /
+Portfolio, Educational / Value and Story / Case Study, each eight slots (Story nine) with one
+repeatable slot. `compositions.ts` held eight compositions, none chosen by content shape: every
+one accepted any text.
+
+**25.1.** Sixteen, read as the four plus twelve, because four of the table's rows are the original
+four under other names (Mistakes and fixes, Case study, Step by step, Story). Every framework has a
+range, two or three rhythms (open, a repeated unit, close; a unit can be a pair) and a family for
+the picker. A brief picks its own rhythm and count inside the range, so twenty briefs do not come
+out one shape: Batch 4's test now runs per framework. The honesty rule is a shared string the model
+returns instead of a result it was not given; building it found that the duplicate-slide check
+would have retried three honest blanks in a row and pushed the model to invent. The done-when is
+half met: the structural half (every framework, every rhythm, three briefs, zero structural
+failures through the production checks) is a test; the live eval needs a key this environment did
+not have, and has not been run (D40).
+
+**25.2** as specified. Five compositions added for cycling (not to the generation cycle, so no
+existing deck changes), rings per content shape (nine for a headline, twelve for a headline and
+body), six arrangements for a slide holding a block, arrows on each filmstrip thumbnail, and
+Shuffle rhythm, remembered on the deck. The done-when is a test across three styles and two
+platforms. Found on the way: reading a slide's words back put the numbered layout's "03" first,
+so an outline of a numbered slide had the numeral as its headline.
+
+**25.3** as specified: thirty formulas in five kinds, by hand or as a hint to `/api/hooks`.
+
+**25.4** as specified: ten goals, worded per platform, onto the last slide the caption already
+reads. The pre-flight now flags any unfilled `[blank]`.
+
+**25.5** as specified, done-when as a test: seven slides in, seven slides out with the same
+composition per position, and the deck untouched by a later change to the template.
+
+**25.6.** Thirteen packs across eight kinds of creator. The landmine turned out not to be one: the
+full matrix (every framework, every pack, every destination, 1,456 decks) runs in under two
+seconds with zero safe-zone warnings and zero overflows, so it runs on every commit instead of a
+sample.
+
+**25.7** as specified: a kit per kind of creator, on the projects screen until Batch 33's
+onboarding.
+
+Verified in the browser: the sixteen in the picker, the running-order choice when drafting, a kit
+deck, the layout arrows, Shuffle rhythm, a pack, a formula on the cover, a keyword CTA in
+LinkedIn's words, Save as template and the template on the shelf and in the palette. Also fixed:
+a React warning, older than this batch, from mixing the `background` shorthand with
+`backgroundImage` in slide paint.
+
 ---
 
 ## Batch 26, Motion export
 
-**Status:** queued
+**Status:** next
 **Size:** large. The first server job in FlashCC that cannot answer inside one request.
 **Why here:** the same carousel is routinely re-posted as a short video for Reels,
 TikTok, Shorts and LinkedIn video, because video formats reach people who never see

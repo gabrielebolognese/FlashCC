@@ -18,7 +18,7 @@ is still current.
 | --- | --- |
 | **Orientation** | [1 What it is](#1-what-it-is) · [2 Running it](#2-running-it) · [3 The invariants](#3-the-invariants) |
 | **The canvas** | [4 Data model](#4-the-data-model) · [5 Canvas](#5-the-canvas) · [6 Text](#6-text-measurement-and-fitting) · [6b Type](#6b-type-pairs-ramps-emphasis-effects-scripts) · [7 Colour](#7-colour-and-contrast) · [8 Gradients](#8-gradients) · [9 Format change](#9-changing-format-reflow) · [9b Spans](#9b-designs-across-slides-spans-and-strip-view) · [9c Writing](#9c-writing-outline-mode-typed-slides-find-and-replace-batch-24) |
-| **Making a deck** | [10 Frameworks](#10-the-four-frameworks) · [11 Generation](#11-generation) · [11b Blocks and furniture](#11b-blocks-and-deck-furniture) · [12 Styles](#12-styles-and-themes) · [13 Onboarding](#13-onboarding) · [14 AI drafting](#14-ai-drafting) · [15 Bulk and long form](#15-bulk-create-and-long-form-ingest) · [16 Media, fonts and assets](#16-media-and-fonts) · [16b Imagery](#16b-imagery-icons-and-backgrounds) · [17 Screen flow](#17-screen-flow) |
+| **Making a deck** | [10 Frameworks](#10-the-frameworks) · [10b The sixteen](#10b-the-twelve-added-in-batch-25-and-what-every-framework-now-carries) · [11 Generation](#11-generation) · [11b Blocks and furniture](#11b-blocks-and-deck-furniture) · [12 Styles](#12-styles-and-themes) · [12b Presets](#12b-presets-hooks-calls-to-action-templates-packs-kits-batch-25) · [13 Onboarding](#13-onboarding) · [14 AI drafting](#14-ai-drafting) · [15 Bulk and long form](#15-bulk-create-and-long-form-ingest) · [16 Media, fonts and assets](#16-media-and-fonts) · [16b Imagery](#16b-imagery-icons-and-backgrounds) · [17 Screen flow](#17-screen-flow) |
 | **The product** | [17b Clients and review](#17b-clients-and-review) · [18 Pipeline, calendar and series](#18-the-pipeline) · [19 Analytics](#19-analytics) · [19b History](#19b-version-history) · [20 Library](#20-the-library) · [21 Export](#21-export) |
 | **Infrastructure** | [22 Persistence](#22-persistence) · [23 Sync](#23-sync) · [24 Auth](#24-auth) · [25 Billing](#25-billing) · [26 Database](#26-database) · [27 Design tokens](#27-design-tokens) · [28 Testing](#28-testing) |
 | **Reality check** | [29 Known defects](#29-known-defects) |
@@ -298,12 +298,30 @@ far more often than drawing a rectangle. The line and triangle tools have no key
 | `Enter` | Edit text (exactly one text layer selected) |
 | Arrows | Nudge 1px, **10px with Shift** |
 
-`L` steps through a fixed ring of every composition (`stepComposition`: title, the six of the
-cycle, colour block), so pressing it eight times comes back to the start and `Shift+L` walks it
-backwards. The words, the slide's id and every layer of the user's that is not its words stay; the
-slide's own copy layers are laid out afresh even if moved (keeping a moved headline beside the
-re-laid one would print it twice). A slide with no composition recorded steps from the one the
-deck's cycle gives its position. This is the minimum of 25.2, which owns the catalogue.
+`L` steps through a fixed ring of the layouts that suit **what is on the slide** (25.2,
+`ringFor`): a headline alone (nine: title, underline, statement, caps, quote, block, centred pair,
+side rule, card), a headline and a body (twelve: heading and body, centred pair, side rule, kicker,
+top and bottom, card, numbered, quote, statement, underline, caps, block), or a block (below).
+Pressing it as many times as the ring is long comes back to the start; `Shift+L` walks it back.
+The words, the slide's id and every layer of the user's that is not its words stay; the slide's
+own copy layers are laid out afresh even if moved (keeping a moved headline beside the re-laid one
+would print it twice). A slide with no composition recorded steps from the one the deck's cycle
+gives its position. The arrows beside each filmstrip thumbnail do the same.
+
+**A slide holding one block** cycles six arrangements of the block and its words
+(`BLOCK_ARRANGEMENTS` in `blockplace.ts`: block on top, block below, heading then block, block
+centred under a caption, block large, words large), each a fraction of the margin box; one the
+block's minimum size does not fit is skipped. The block is rebuilt into its new box with 19.8's
+rule, and keeps its instance.
+
+**Shuffle rhythm** (the dice in the header) re-runs the deck's composition cycle from the next
+offset: the words and hand edits stay, the cover stays the title and the close the colour block.
+The offset is stored as `Doc.rhythmShift`, so a later Re-lay keeps the rhythm rather than snapping
+back.
+
+The 25.2 done-when is `layouts.test.ts`: a headline-and-body slide cycles through at least six
+distinct layouts in three styles, with no overflow and nothing in the safe zone on LinkedIn and
+Instagram.
 
 ### The command palette and the action registry (24.2, `actions.ts`, `CommandPalette.tsx`)
 
@@ -762,10 +780,12 @@ context, each with a tick.
   saved, and the dialog keeps an Undo per project and an Undo all. On Free, version history keeps
   nothing (§19b), so those buttons are the way back and the dialog says so.
 
-## 10. The four frameworks
+## 10. The frameworks
 
-`structures.ts`. The product's core IP. Every framework has 8 slots except Story, which has 9. Slot
-1 is always `hook`; the last is always `cta`.
+`structures.ts`. The product's core IP. Since Batch 25 there are **sixteen**: the four below, and
+twelve more (see [10b](#10b-the-twelve-added-in-batch-25-and-what-every-framework-now-carries)).
+The four original ones have 8 slots except Story, which has 9. Slot 1 is always `hook`; the last
+is always `cta`, at every length and in every running order (tested).
 
 Slots carry `id`, `label`, `note` (one line, beside the box), `detail` (hover), `placeholder`,
 `examples[]` and `repeatable?`. **`id` is not unique**, three `point` slots per framework, which
@@ -830,6 +850,52 @@ every framework has a repeatable slot.
 
 ---
 
+## 10b. The twelve added in Batch 25, and what every framework now carries
+
+The roadmap's table names sixteen; four of its rows are the original four under other names
+(Mistakes and fixes is Problem → Solution, Case study is the Showcase, Step by step is the
+Educational, Story is the Story), so twelve were added: **Myth versus fact, Before and after,
+Comparison, Named model, Checklist, FAQ, Tool stack, Hot take, Lessons learned, Data breakdown,
+Quote set, Question.** They are built in `MORE_STRUCTURES()` at the end of `structures.ts`.
+
+Every framework now carries:
+
+| Field | What it is |
+| --- | --- |
+| `family` | Teach, Prove, Persuade or Engage: how the picker groups them. Never a performance claim |
+| `range` | the slide counts it is drafted at by default. Asking for another still gets it |
+| `rhythms` | two or three running orders, each `open` + `unit` repeated + `close`. The first is `slots` |
+
+**Rhythms are the sameness fix.** Twenty briefs in one framework get their running order and their
+count from their own words (`shapeFor`, a hash of the brief, inside the range), so they do not all
+come out one shape; the same brief twice gets the same shape. AiChat offers "Picked from your
+brief" (the default) or a named order, and a bulk run picks per brief. The first rhythm of each
+original framework is exactly its old running order, so nothing drafted before changes. Each
+framework has Batch 4's test (twenty briefs, more than one shape), and the four still produce
+distinct composition sequences.
+
+**Pairs.** A rhythm whose unit is two slots (a myth and its fact) steps by the pair: `slotsFor`
+lands within one slide of the count asked for and never ends on half a pair, the drafting stepper
+moves by two, `floorFor` is an opening, one pair and a close, and Compose's "add" adds a whole
+pair (`unitOf`).
+
+**Block slots set by the framework.** A slot may name fields the framework fixes (`SlotBlock.fixed`:
+the Myth / Fact column headings, a bar chart, a browser frame) that the model never sees. A block
+with no words to ask for (Tool stack's screen frame) is placed from those alone.
+
+**The honesty rule.** A slot that reports a result, a figure or somebody's words is `honest`: Case
+study's and Story's result, Before and after's after, Hot take's number, Data breakdown's number,
+context and chart, the Quote set's quotes and source. When the brief does not contain it, the model
+is told to return exactly `HONEST_BLANK` ("[Add the real one: the brief did not give it]",
+`honesty.ts`, shared with the server) instead of a plausible one. The checks accept it (and accept
+several in a row, which the duplicate check used to retry, pushing the model to invent); the
+pre-flight flags it on a slide, so it cannot ship.
+
+**The eval.** `npm run eval:draft` now drafts every framework from three briefs, the third with no
+result in it to exercise the honesty rule. It costs money and needs a key, so it is not in
+`npm test`; `server/frameworks.test.ts` is its structural half with no key: every framework, every
+rhythm, all three briefs, assembled and checked through the production checks with zero retries.
+
 ## 11. Generation
 
 `buildSlides(texts, theme, roles?, options?) → Slide[]`. Runs once and returns plain layers.
@@ -892,6 +958,22 @@ Resolved sequences:
 | `underline` | below | 70→30, w700 | `Text`, `Underline` |
 | `caps` | below | 56→22, uppercase, tracked 0.06 | `Text` |
 | `block` | above | 68→26, centred, text in `theme.bg` | `Block` (full-bleed 0→1080), `Text` |
+
+Batch 25 added five for cycling (25.2), not in the generation cycle, so nothing generated before
+changes; they are reached with `L`:
+
+| id | Band | Layers |
+| --- | --- | --- |
+| `centred-pair` | above | `Heading`, `Body`, both centred |
+| `side-rule` | below | `Rule` (vertical accent), `Heading`, `Body` |
+| `kicker` | below | `Kicker` (the heading, small, tracked, accent), `Body` (big) |
+| `top-bottom` | above | `Heading` at the top, `Rule`, `Body` anchored at the bottom |
+| `card` | below | `Card` (fg at 7%), `Heading`, `Body` |
+
+Each falls back sensibly with no body (`kicker` to `underline`, `top-bottom` to `statement`).
+**Reading words back** (`copyLayers`) puts a `Kicker` first whatever its size, and leaves out the
+numbered composition's numeral: before Batch 25 an outline of a numbered slide read "03" as its
+headline.
 
 Notes that matter: `heading-body` **silently delegates to `underline`** when the text has no
 sentence break, so a slide whose composition "is" heading-body can render as a single underlined
@@ -1052,6 +1134,64 @@ the line.
 Brands are the first thing in the product that genuinely *is* Pro rather than advertised as Pro.
 
 ---
+
+## 12b. Presets: hooks, calls to action, templates, packs, kits (Batch 25)
+
+Nothing here is ranked, and nothing claims a performance number.
+
+### Hook formulas (`hooks.ts`, `HookFormulas.tsx`, 25.3)
+
+Thirty fill-in-the-blank openings in five kinds (curiosity, contrarian, result, list, story):
+`Stop [doing the common thing].`, `[Number] [things] nobody tells you about [topic].` Two uses.
+By hand, with no model: fill the blanks and it goes on the cover through `restateSlide`. Or as a
+hint: "Write variants in this shape" sends the formula to `/api/hooks` (`pattern`, at most 160
+characters), which writes every variant in that shape. A blank left empty stays visible.
+
+### Calls to action by goal (`ctas.ts`, `CtaPicker.tsx`, 25.4)
+
+Follow, save, share, comment, comment a keyword, DM a keyword, link, newsletter, book a call,
+part 2 tomorrow, each worded per platform: LinkedIn reposts and puts links in the comments,
+Instagram shares and puts them in the bio. The chosen line replaces the last slide, which is what
+`PostSheet` sends the caption route as the CTA, so the slide and the caption agree by construction.
+
+**Unfilled blanks.** The pre-flight now flags any `[blank]` left in a slide's words (a formula or a
+CTA nobody finished) as `placeholder-text`.
+
+### Saved templates (`templates.ts`, `SaveTemplate.tsx`, `Starters.tsx`, 25.5)
+
+**Save as template** (toolbar) captures a deck's structure: the slide count, the composition per
+position, each slide's background, gradient and texture, block placements (fields only with
+example text), designs across slides and the user's drawn shapes, the brand or pack, the furniture
+set and its identity. Not the words unless "keep as example text" is ticked, and never a picture's
+file. Templates belong to a client and appear on the projects screen and in the palette.
+
+`deckFromTemplate` runs once: the template's count and compositions (pinned per position,
+`BuildOptions.compositions`), laid out with new words (or placeholders), then dressed. The deck
+records `Doc.template` and nothing else, so editing the template later never reaches it.
+**Re-apply template** (palette) is the explicit way in: by position, each slide takes the
+template's composition, background and texture; words and hand edits stay; furniture is
+restamped.
+
+### Style packs (`packs.ts`, `PackPicker.tsx`, 25.6)
+
+Thirteen packs across eight kinds of creator (education, SaaS and product, agency, finance,
+fitness, food, coaching, personal brand). A pack is palette roles, a font pair, a type ramp, a
+texture, a furniture set and an icon style. `applyPack` runs once through the brand machinery (a
+layer recoloured by hand keeps its colour), stamps the texture and the furniture, and records
+`styleId: "pack:<id>"` (which `themeOf` resolves) and `Doc.iconStyle` (which `deckIconStyle` uses
+until the deck has an icon).
+
+**The matrix.** Every framework in every pack on every destination, **1,456 decks**, laid out,
+reflowed, fitted to the safe area and pre-flighted, with zero safe-zone warnings and zero overflows
+(`packs.test.ts`). The roadmap planned a sample per commit and the full run nightly, for speed;
+measured, the full matrix takes under two seconds, so it runs on every commit.
+
+### Starter kits (`kits.ts`, `Starters.tsx`, 25.7)
+
+One per kind of creator: a pack, three frameworks that suit it, a hook kind and a CTA goal.
+`deckFromKit` makes an ordinary deck once (the first framework's example copy, the CTA in the
+platform's words, dressed in the pack); nothing remembers the kit. On the projects screen now;
+Batch 33's onboarding will offer them first.
 
 ## 13. Onboarding
 
@@ -2942,7 +3082,7 @@ all disabled under `prefers-reduced-motion`.
 
 ## 28. Testing
 
-1,638 tests across 83 files (as of Batch 24). They are design guards, not coverage theatre, several encode an argument
+1,861 tests across 89 files (as of Batch 25). They are design guards, not coverage theatre, several encode an argument
 that would otherwise be lost:
 
 - **mean vs median**, five posts and one at 100k, proving a mean baseline would switch outlier
@@ -3283,6 +3423,24 @@ that spans a mark boundary (`fast** and`) matches the characters as stored.
 
 Only the words on the slides (and a block's fields). A renamed product in a caption or in alt text
 is still a manual edit, in the post sheet and the export dialog.
+
+### D40, The live framework eval has not been run for the twelve new frameworks
+
+`npm run eval:draft` needs an Anthropic key, and this environment has none. The structural half
+runs in `npm test` (every framework, every rhythm, three briefs, the production checks); the
+model's actual copy for the twelve has not been read by a person yet.
+
+### D41, A pair framework cannot hit an odd count exactly
+
+Myth versus fact, and any rhythm built in pairs, lands within one slide of the count asked for,
+never on half a pair. Bulk runs promise the count they ask for, so for a pair framework the recap
+can be one off.
+
+### D42, Starter kit and template decks start with placeholder words
+
+A deck from a kit uses the framework's example copy, and one from a template without example text
+uses placeholders. The pre-flight flags what is left; there is no "from a brief" path straight from
+a template yet (draft, then Re-apply template, does it).
 
 ### D20, Smaller things
 

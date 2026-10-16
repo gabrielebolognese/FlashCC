@@ -19,6 +19,7 @@
  */
 
 import { brokenSpans, isSpanning } from "./spans.js";
+import { HONEST_BLANK } from "./honesty.js";
 import { missingFurniture, pieceLabel } from "./furniture.js";
 import type { Doc, Layer } from "./model.js";
 import { safeBox, shapeOf, type Platform } from "./platforms.js";
@@ -38,6 +39,9 @@ export type Finding = {
 
 /** Placeholder copy the generator leaves behind; shipping it is always a mistake. */
 const PLACEHOLDERS = [
+  // The honesty rule (25.1): a result the brief did not give, left for the
+  // person to fill rather than invented. It must never ship as it is.
+  HONEST_BLANK.toLowerCase(),
   "type something",
   "your hook goes here",
   "the point",
@@ -235,7 +239,8 @@ export function preflight(doc: Doc, platform: Platform): Finding[] {
           });
         }
 
-        if (PLACEHOLDERS.includes(stripMarks(l.text ?? "").trim().toLowerCase())) {
+        const plain = stripMarks(l.text ?? "").trim();
+        if (PLACEHOLDERS.includes(plain.toLowerCase())) {
           add({
             severity: "warn",
             code: "placeholder-text",
@@ -243,6 +248,18 @@ export function preflight(doc: Doc, platform: Platform): Finding[] {
             layerId: l.id,
             message: `"${l.name}" still says "${l.text}".`,
           });
+        } else {
+          // A formula or a call to action with a blank nobody filled (25.3, 25.4).
+          const blank = plain.match(/\[[a-z][a-z0-9 ,.'-]{0,40}\]/i);
+          if (blank) {
+            add({
+              severity: "warn",
+              code: "placeholder-text",
+              slide: n,
+              layerId: l.id,
+              message: `"${l.name}" still has a blank to fill: ${blank[0]}.`,
+            });
+          }
         }
       }
 

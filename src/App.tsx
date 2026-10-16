@@ -329,10 +329,12 @@ function Screens() {
             ...(screen.quotes ? { quotes: screen.quotes } : {}),
           })
         }
-        onDrafted={(texts, findings, fills) =>
+        onDrafted={(texts, findings, fills, asked) =>
           setScreen({
             view: "compose",
-            structure: screen.structure,
+            // As it was asked for: the running order and the count this draft
+            // was written to, so Compose labels each box with its own slot.
+            structure: asked,
             theme: screen.theme,
             texts,
             ...(Object.keys(fills).length > 0 ? { fills } : {}),

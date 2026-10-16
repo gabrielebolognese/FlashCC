@@ -1,7 +1,7 @@
 import { ArrowRight, LayoutTemplate, PenLine } from "lucide-react";
 import { useEffect, useState } from "react";
 
-import { STRUCTURES } from "./structures.js";
+import { CORE_IDS } from "./structures.js";
 
 const LINE = "Ready to create your first carousel?";
 const SPEED = 42;
@@ -103,7 +103,7 @@ export function FirstRun({
           </button>
 
           <p style={{ ["--i" as string]: 2 }} className="mt-1 text-caption leading-[17px] text-muted">
-            {STRUCTURES.length} finished examples, one per framework, in the style you just
+            {CORE_IDS.length} finished examples, one per core framework, in the style you just
             picked. Open, take apart, keep or delete.
           </p>
 

@@ -1,4 +1,4 @@
-import { Copy, LayoutTemplate, Plus, Trash2, Wand2, X } from "lucide-react";
+import { ChevronLeft, ChevronRight, Copy, LayoutTemplate, Plus, Trash2, Wand2, X } from "lucide-react";
 import { useRef, useState } from "react";
 
 import { slidePaint } from "./paint.js";
@@ -17,6 +17,7 @@ export function Filmstrip({
   studio,
   onRewrite,
   onRelay,
+  onLayout,
   onTypeSlide,
   typing = false,
   setTyping,
@@ -34,6 +35,8 @@ export function Filmstrip({
   onRewrite?: ((index: number) => void) | undefined;
   /** Lays the picked slides out again. Absent hides the action. */
   onRelay?: ((ids: string[]) => void) | undefined;
+  /** The previous or next layout for one slide (25.2), the arrows beside it. */
+  onLayout?: ((index: number, dir: 1 | -1) => void) | undefined;
 }) {
   const { doc, index, slideSelection, setSlideSelection } = studio;
   const [from, setFrom] = useState<number | null>(null);
@@ -175,6 +178,12 @@ export function Filmstrip({
                     one for a single item would be a new interaction to teach.
                     The hover cluster is the gesture people already use on these
                     thumbnails, so it goes in the cluster. */}
+                {onLayout ? (
+                  <>
+                    <MiniButton icon={ChevronLeft} label="Previous layout (Shift+L)" action="previous-layout" onClick={() => onLayout(i, -1)} />
+                    <MiniButton icon={ChevronRight} label="Next layout (L)" action="next-layout" onClick={() => onLayout(i, 1)} />
+                  </>
+                ) : null}
                 {onRewrite ? (
                   <MiniButton icon={Wand2} label="Rewrite" action="rewrite-slide" onClick={() => onRewrite(i)} />
                 ) : null}

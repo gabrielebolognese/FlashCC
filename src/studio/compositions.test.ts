@@ -172,7 +172,8 @@ describe("role-driven compositions", () => {
 describe("structures", () => {
   it("gives every slot a note, a placeholder and examples", () => {
     for (const s of STRUCTURES) {
-      for (const slot of s.slots) {
+      // Every rhythm's slots too (25.1), not only the natural order's.
+      for (const slot of [...s.slots, ...(s.rhythms ?? []).flatMap((r) => [...r.open, ...r.unit, ...r.close])]) {
         // the note is a punchline, not a paragraph, it has to fit on one line
         expect(slot.note.length, `${s.name}/${slot.label}`).toBeGreaterThan(10);
         expect(slot.note.length, `${s.name}/${slot.label} too long`).toBeLessThanOrEqual(46);

@@ -91,6 +91,16 @@ const BRIEFS = [
     text: "Cutting on the beat makes edits feel mechanical. Attention resets when the frame changes, not when the snare hits. Cut on movement instead: a hand leaving frame, a head turning, a door closing.",
   },
   { id: "thin", text: "Cut on movement, not on the beat." },
+  /*
+   * The honesty brief (25.1): a story with no result in it. Case study, Data
+   * breakdown, Before and after, Quote set and Hot take all have slots that
+   * report a result, a figure or somebody's words, and the right answer for
+   * every one of them here is the honest blank, not a plausible number.
+   */
+  {
+    id: "no-result",
+    text: "We rebuilt our onboarding this spring: one screen instead of five, and a checklist instead of a tour. Customers seem to like it more.",
+  },
 ];
 
 const Schema = z.object({

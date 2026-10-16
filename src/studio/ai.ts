@@ -20,9 +20,15 @@ export function fillsFor(drafted: readonly DraftedSlide[], structure: Structure)
   const out: Record<string, SlotFill> = {};
   for (const slot of structure.slots) {
     if (!slot.block || out[slot.id]) continue;
+    // A block with no words to ask for (a screen frame) is the framework's
+    // choice alone, so it is placed from its fixed fields.
+    if (slot.block.fields.length === 0) {
+      out[slot.id] = { id: slot.block.id, fields: { ...slot.block.fixed } };
+      continue;
+    }
     const hit = drafted.find((d) => d.role === slot.id && (d.fields ?? []).some((f) => f.trim()));
     if (!hit) continue;
-    const fields: Record<string, string> = {};
+    const fields: Record<string, string> = { ...slot.block.fixed };
     slot.block.fields.forEach((f, i) => (fields[f.key] = (hit.fields?.[i] ?? "").trim()));
     out[slot.id] = { id: slot.block.id, fields };
   }
@@ -77,7 +83,9 @@ export async function draftSlides(
           label: s.label,
           note: s.detail,
           placeholder: s.placeholder,
-          ...(s.block ? { block: s.block } : {}),
+          // The fixed fields stay here: the framework sets them, the model never sees them.
+          ...(s.block ? { block: { id: s.block.id, label: s.block.label, fields: s.block.fields } } : {}),
+          ...(s.honest ? { honest: true } : {}),
         })),
       },
     }),

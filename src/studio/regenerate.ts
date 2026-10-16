@@ -12,7 +12,8 @@
  * original colour silently loses its protection.
  */
 
-import { buildSlides, cycleCompositionAt, stepComposition, type BuildOptions } from "./compositions.js";
+import { arrangeBlockSlide, arrangementsFor, type BlockArrangement } from "./blockplace.js";
+import { buildSlides, cycleCompositionAt, shapeOfText, stepComposition, type BuildOptions } from "./compositions.js";
 import { hasMarks } from "./marks.js";
 import type { Doc, Layer, Slide } from "./model.js";
 import type { Theme } from "./presets.js";
@@ -42,7 +43,9 @@ function fillsOf(doc: Doc): BuildOptions["fillsAt"] {
 
 const withFills = (doc: Doc, options: BuildOptions): BuildOptions => {
   const fillsAt = fillsOf(doc);
-  return fillsAt ? { ...options, fillsAt } : options;
+  // A shuffled rhythm (25.2) is kept by every later re-lay, until shuffled again.
+  const shifted = doc.rhythmShift && options.seedShift === undefined ? { ...options, seedShift: doc.rhythmShift } : options;
+  return fillsAt ? { ...shifted, fillsAt } : shifted;
 };
 
 /**
@@ -52,11 +55,20 @@ const withFills = (doc: Doc, options: BuildOptions): BuildOptions => {
  */
 export function copyLayers(slide: Slide): Layer[] {
   const texts = slide.layers.filter(
-    (l) => l.kind === "text" && (l.text ?? "").trim() !== "" && !l.block && !l.furniture && !l.furnitureOptOut,
+    (l) =>
+      l.kind === "text" &&
+      (l.text ?? "").trim() !== "" &&
+      !l.block &&
+      !l.furniture &&
+      !l.furnitureOptOut &&
+      // The numbered composition's "03" is decoration it draws, not words.
+      !(l.name === "Number" && /^\d+$/.test((l.text ?? "").trim())),
   );
   // Biggest first, then the rest, which reassembles "heading. body" the way
-  // the splitter produced it. Stable, so equal sizes keep their order.
-  return [...texts].sort((a, b) => (b.fontSize ?? 0) - (a.fontSize ?? 0));
+  // the splitter produced it. Stable, so equal sizes keep their order. A
+  // kicker (25.2) is the heading set small, so it leads whatever its size.
+  const rank = (l: Layer) => (l.name === "Kicker" ? 1 : 0);
+  return [...texts].sort((a, b) => rank(b) - rank(a) || (b.fontSize ?? 0) - (a.fontSize ?? 0));
 }
 
 /** One slide's copy, as generation reads it back. */
@@ -293,6 +305,7 @@ export function restateMany(doc: Doc, plan: readonly Restatement[], theme: Theme
     undefined,
     {
       images: bands,
+      ...(doc.rhythmShift ? { seedShift: doc.rhythmShift } : {}),
       ...options,
       split: false,
       ...(fillsAt.some(Boolean) ? { fillsAt } : {}),
@@ -396,12 +409,29 @@ export function writeCopy(slide: Slide, text: string): Slide {
  */
 export function stepLayout(doc: Doc, index: number, dir: 1 | -1, theme: Theme): RestateResult {
   const slide = doc.slides[index];
-  if (!slide || !slideCopy(slide)) return { doc, rebuilt: [], written: [] };
+  if (!slide) return { doc, rebuilt: [], written: [] };
+
+  // A slide holding one block (25.2): the block and its words are rearranged,
+  // never re-laid as text, which would lose the block.
+  const rec = slide.blocks?.length === 1 ? slide.blocks[0] : undefined;
+  const copy = copyLayers(slide);
+  if (rec && copy.length <= 1) {
+    const board = { w: doc.width, h: doc.height };
+    const ring = arrangementsFor(rec.block, board);
+    if (ring.length === 0) return { doc, rebuilt: [], written: [] };
+    const at = ring.indexOf(slide.composition as BlockArrangement);
+    const next = ring[at < 0 ? (dir === 1 ? 0 : ring.length - 1) : (at + dir + ring.length) % ring.length]!;
+    const out = arrangeBlockSlide(slide, next, { theme, board }, copy[0]);
+    if (!out) return { doc, rebuilt: [], written: [] };
+    return { doc: { ...doc, slides: doc.slides.map((s, i) => (i === index ? out : s)) }, rebuilt: [index], written: [] };
+  }
+
+  if (!slideCopy(slide)) return { doc, rebuilt: [], written: [] };
   // A slide no generator laid out (a template's, a typed one before Batch 24)
   // has no composition recorded: it steps from the one the deck's cycle gives
   // its position, not from the top of the ring.
   const current = slide.composition ?? (index === 0 ? "title" : cycleCompositionAt(index, textsOf(doc)));
-  const composition = stepComposition(current, dir);
+  const composition = stepComposition(current, dir, shapeOfText(slideCopy(slide)));
   return restateMany(
     doc,
     doc.slides.map((s, i) => ({ from: i, text: slideCopy(s), changed: i === index, composition: i === index ? composition : undefined })),
@@ -419,6 +449,19 @@ export function typeSlide(doc: Doc, at: number, line: string, theme: Theme): Res
   const where = Math.max(0, Math.min(at, doc.slides.length));
   const plan: Restatement[] = doc.slides.map((s, i) => ({ from: i, text: texts[i] ?? "", changed: false }));
   const next = [...texts.slice(0, where), line, ...texts.slice(where)];
-  plan.splice(where, 0, { from: null, text: line.trim(), changed: true, composition: cycleCompositionAt(where, next) });
+  plan.splice(where, 0, { from: null, text: line.trim(), changed: true, composition: cycleCompositionAt(where, next, doc.rhythmShift ?? 0) });
   return restateMany(doc, plan, theme);
+}
+
+/**
+ * Shuffle rhythm (25.2): the deck's composition cycle run again from a
+ * different offset, for when the whole deck looks too regular. The words stay,
+ * hand-edited layers stay; every slide's layout is re-picked, the cycle
+ * starting one step further on each press. Remembered on the deck, so a later
+ * Re-lay keeps the rhythm rather than snapping back.
+ */
+export function shuffleRhythm(doc: Doc, theme: Theme): MergeResult {
+  const shift = (doc.rhythmShift ?? 0) + 1;
+  const result = regenerate(doc, theme, { seedShift: shift });
+  return { ...result, doc: { ...result.doc, rhythmShift: shift } };
 }

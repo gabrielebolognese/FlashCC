@@ -15,6 +15,7 @@
  * meant so it can be given the equivalent colour from somewhere else.
  */
 
+import { packById, packIdOf, packTheme } from "./packs.js";
 import type { Asset, LogoRole } from "./assets.js";
 import type { Plan } from "./cloud.js";
 import { luminance } from "./colour.js";
@@ -346,6 +347,9 @@ export function applyBrand(doc: Doc, brand: Brand, fromTheme?: Theme): ApplyResu
  * not pass them gets the background-only fallback, which is correct but blunt.
  */
 export function themeOf(doc: Doc, brands: readonly Brand[] = []): Theme {
+  // A style pack (25.6): its own theme, with the pair's faces and its ramp.
+  const pack = packById(packIdOf(doc.styleId) ?? undefined);
+  if (pack) return packTheme(pack);
   if (doc.styleId) {
     const brandId = brandIdOf(doc.styleId);
     if (brandId !== null) {

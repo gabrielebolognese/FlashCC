@@ -25,6 +25,8 @@
  * case and is discussed where it is built.
  */
 
+import { HONEST_BLANK } from "../src/studio/honesty.js";
+
 /* ── shapes ───────────────────────────────────────────────────────────────── */
 
 /**
@@ -40,6 +42,8 @@ export type SlotSpec = {
   note: string;
   placeholder: string;
   block?: SlotBlock | undefined;
+  /** The honesty rule (25.1): a result, a figure or a quote, never invented. */
+  honest?: boolean | undefined;
 };
 
 export type Structure = { name: string; shape: string; slots: SlotSpec[] };
@@ -231,11 +235,17 @@ export type DraftInput = {
 export const slotLines = (slots: readonly SlotSpec[]): string =>
   slots
     .map((s, i) => {
-      const line = `${i + 1}. id="${s.id}", ${s.label}: ${s.note}. e.g. "${s.placeholder}"`;
-      if (!s.block) return line;
-      // Words only: what each field SAYS, never how it looks.
-      const asks = s.block.fields.map((f, n) => `${n + 1}) ${f.key}: ${f.note}`).join("; ");
-      return `${line}\n   This slot is shown as a ${s.block.label}. Also return "fields" with exactly ${s.block.fields.length} values, in this order: ${asks}. Only use figures the brief gives.`;
+      let line = `${i + 1}. id="${s.id}", ${s.label}: ${s.note}. e.g. "${s.placeholder}"`;
+      // Words only: what each field SAYS, never how it looks. A block with no
+      // words to ask for (a screen frame) is placed by the framework alone.
+      if (s.block && s.block.fields.length > 0) {
+        const asks = s.block.fields.map((f, n) => `${n + 1}) ${f.key}: ${f.note}`).join("; ");
+        line += `\n   This slot is shown as a ${s.block.label}. Also return "fields" with exactly ${s.block.fields.length} values, in this order: ${asks}. Only use figures the brief gives.`;
+      }
+      if (s.honest) {
+        line += `\n   If the brief does not contain what this slot reports, return exactly "${HONEST_BLANK}" as its text and no fields. Never write a plausible one.`;
+      }
+      return line;
     })
     .join("\n");
 
@@ -285,7 +295,15 @@ export type HookInput = {
   framework?: string | undefined;
   count: number;
   voice?: Voice | undefined;
+  /**
+   * A hook formula (25.3) as a hint: "Stop [doing the common thing]." Every
+   * opening comes back in that shape, the blanks filled from the deck.
+   */
+  pattern?: string | undefined;
 };
+
+/** The longest formula accepted as a hint. The library's longest is under 80. */
+export const MAX_PATTERN_CHARS = 160;
 
 export function assembleHooks(input: HookInput): Assembled {
   const voice = voiceBlock(input.voice);
@@ -305,6 +323,12 @@ export function assembleHooks(input: HookInput): Assembled {
     "",
     `The carousel, slide by slide:\n${deck}`,
     "",
+    ...(input.pattern?.trim()
+      ? [
+          "",
+          `Write every opening in this shape, filling each [blank] from what the deck actually says: "${clip(input.pattern.trim(), MAX_PATTERN_CHARS)}". Keep the shape; vary the words. Name the angle by how each one fills it.`,
+        ]
+      : []),
     `Write ${input.count} alternative openings.`,
   ].join("\n");
 

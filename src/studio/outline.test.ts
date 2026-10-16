@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { buildSlides, cycleCompositionAt, stepComposition } from "./compositions.js";
+import { buildSlides, cycleCompositionAt, ringFor, shapeOfText, stepComposition } from "./compositions.js";
 import { insertBlock } from "./blockplace.js";
 import { makeDoc, makeLayer, type Doc, type Layer } from "./model.js";
 import { applyOutline, blockLine, parseBlockLine, parseOutline, planOutline, toOutline } from "./outline.js";
@@ -202,12 +202,15 @@ describe("the next layout, L (24.3)", () => {
     let doc = deck();
     const start = doc.slides[1]!.composition;
     const seen: string[] = [];
-    for (let k = 0; k < 8; k += 1) {
+    // The ring for a headline-and-body slide (25.2), which this one is.
+    const n = ringFor(shapeOfText(textsOf(doc)[1]!)).length;
+    expect(ringFor(shapeOfText(textsOf(doc)[1]!))).toContain(start);
+    for (let k = 0; k < n; k += 1) {
       doc = stepLayout(doc, 1, 1, THEME).doc;
       seen.push(doc.slides[1]!.composition!);
     }
     expect(seen.at(-1)).toBe(start);
-    expect(new Set(seen).size).toBe(8);
+    expect(new Set(seen).size).toBe(n);
     for (let k = 0; k < 3; k += 1) doc = stepLayout(doc, 1, -1, THEME).doc;
     for (let k = 0; k < 3; k += 1) doc = stepLayout(doc, 1, 1, THEME).doc;
     expect(doc.slides[1]!.composition).toBe(start);
@@ -253,6 +256,6 @@ describe("L on a slide no generator laid out", () => {
     const bare = { ...doc, slides: doc.slides.map((s) => ({ ...s, composition: undefined })) };
     const r = stepLayout(bare, 2, 1, THEME);
     expect(r.doc.slides[2]!.composition).not.toBe("title");
-    expect(r.doc.slides[2]!.composition).toBe(stepComposition(cycleCompositionAt(2, textsOf(bare)), 1));
+    expect(r.doc.slides[2]!.composition).toBe(stepComposition(cycleCompositionAt(2, textsOf(bare)), 1, shapeOfText(textsOf(bare)[2]!)));
   });
 });

@@ -3,7 +3,7 @@ import { describe, expect, it } from "vitest";
 import { contrast } from "./colour.js";
 import { decorScale, DEFAULT_PREFS, styleFromPrefs, wantsImages, type Prefs } from "./onboarding.js";
 import { buildFrameworkSamples, EXAMPLES_GROUP } from "./samples.js";
-import { STRUCTURES } from "./structures.js";
+import { CORE_IDS, STRUCTURES } from "./structures.js";
 
 const H = 1350;
 const prefs = (patch: Partial<Prefs> = {}): Prefs => ({ ...DEFAULT_PREFS, ...patch });
@@ -13,8 +13,9 @@ const samplesFor = (p: Prefs) => buildFrameworkSamples(styleFromPrefs(p).theme, 
 describe("framework samples", () => {
   it("makes exactly one per framework, named after it", () => {
     const docs = samplesFor(prefs());
-    expect(docs).toHaveLength(STRUCTURES.length);
-    expect(docs.map((d) => d.name)).toEqual(STRUCTURES.map((s) => s.name));
+    const core = STRUCTURES.filter((s) => (CORE_IDS as readonly string[]).includes(s.id));
+    expect(docs).toHaveLength(core.length);
+    expect(docs.map((d) => d.name)).toEqual(core.map((s) => s.name));
   });
 
   it("gives each one a slide per slot", () => {

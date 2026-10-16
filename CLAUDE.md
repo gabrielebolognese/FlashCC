@@ -5,8 +5,9 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 ## Project context
 
 **FlashCC** (Carousel Creator) drafts a carousel from a brief and lets the user arrange it on a
-canvas. Four frameworks (problem-solve, showcase, educational, story), each with its own per-slot
-guidance in `src/studio/structures.ts`.
+canvas. Sixteen frameworks (the original four, problem-solve, showcase, educational, story, and
+twelve added in Batch 25), each with its own per-slot guidance, slide-count range and two or three
+running orders in `src/studio/structures.ts`.
 
 **AI drafting is part of the product**, this reversed an earlier "no AI" position, so ignore that
 line if you find it anywhere else. `server/` holds the API key: `prompts.ts` assembles every word (pure, golden-tested),
@@ -191,6 +192,25 @@ Invariants worth keeping:
   T, R, O and L are Tidy, Rewrite, Outline and Layout; the drawing tools are on Shift.
 - Words changed outside the two edit funnels go through `retouched` + `markEdited`
   (`regenerate.ts`), so a quote stops being verbatim and furniture is handed over, as typing does.
+
+## Presets (Batch 25)
+
+- **Every preset runs once and leaves plain layers**: frameworks, layouts, hook formulas, CTAs,
+  style packs, templates, kits. A deck made from a template records `Doc.template` and nothing
+  else; editing a template never reaches its decks, Re-apply template is the explicit way.
+- **Nothing is ranked.** No preset carries a score, a "top converting" label or an order by
+  claimed performance. Hooks are listed by kind, packs by kind of creator.
+- **The honesty rule**: a slot reporting a result, a figure or a quote is `honest`, and the model
+  returns `HONEST_BLANK` (`honesty.ts`, shared with the server) rather than inventing one. The
+  checks accept it, the pre-flight flags it. A new framework's result slots must be `honest`.
+- **A new framework needs** a `range`, two or three `rhythms` that open on `hook` and close on
+  `cta`, and passes `server/frameworks.test.ts` and its sameness test. A new style pack must pass
+  the full pack matrix (`packs.test.ts`): every framework, every destination, no overflow and no
+  safe-zone warning.
+- A new composition for cycling goes in `ringFor`'s rings, not in the generation `CYCLE`, unless
+  changing what existing decks generate is the point.
+- `slidePaint` uses `backgroundColor`, never the `background` shorthand next to
+  `backgroundImage` (React warns and misorders when one replaces the other).
 
 ## Pictures
 
