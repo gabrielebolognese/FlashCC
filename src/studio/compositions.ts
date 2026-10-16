@@ -124,6 +124,15 @@ type Composition = {
   label: string;
   /** Where this composition wants its picture. */
   image: ImagePlacement;
+  /**
+   * The gaps this composition is built from, smallest first (18.4).
+   *
+   * Read off the build below rather than invented: the air under a rule, the
+   * gap between a heading and its body, `BAND_GAP` to the picture, and `MX`.
+   * Tidy and the equal-gap tool snap to these, because equal gaps of 37px look
+   * accidental and equal gaps of 40px look designed.
+   */
+  spacing: number[];
   build: (c: Ctx, region: Region) => Layer[];
 };
 
@@ -131,6 +140,7 @@ const TITLE: Composition = {
   id: "title",
   label: "Title",
   image: "above",
+  spacing: [24, 36, 56, 96],
   build: ({ text: t, theme, decor }, r) => {
     const LH = 1.06;
     const RULE = decor > 0 ? 56 : 0; // rule + the air under it
@@ -158,6 +168,7 @@ const UNDERLINE: Composition = {
   id: "underline",
   label: "Underlined",
   image: "below",
+  spacing: [16, 28, 56, 96],
   build: ({ text: t, theme, decor }, r) => {
     const LH = 1.15;
     const RULE = decor > 0 ? 32 : 0;
@@ -181,6 +192,7 @@ const HEADING_BODY: Composition = {
   id: "heading-body",
   label: "Heading + body",
   image: "above",
+  spacing: [16, 32, 56, 96],
   build: (ctx, r) => {
     const [head, rest] = lead(ctx.text);
     if (!rest) return UNDERLINE.build(ctx, r);
@@ -213,6 +225,7 @@ const STATEMENT: Composition = {
   id: "statement",
   label: "Statement",
   image: "below",
+  spacing: [24, 40, 56, 96],
   build: ({ text: t, theme }, r) => {
     const LH = 1.18;
     const f = fit(t, { w: r.w, h: r.h }, [76, 30], LH, display(theme));
@@ -232,6 +245,7 @@ const NUMBERED: Composition = {
   id: "numbered",
   label: "Numbered",
   image: "below",
+  spacing: [24, 36, 56, 96],
   build: ({ text: t, index, theme, decor }, r) => {
     const LH = 1.4;
     const numH = 110;
@@ -265,6 +279,7 @@ const QUOTE: Composition = {
   id: "quote",
   label: "Quote",
   image: "above",
+  spacing: [24, 44, 56, 96],
   build: ({ text: t, theme, decor }, r) => {
     const LH = 1.25;
     const INDENT = 44;
@@ -289,6 +304,7 @@ const BLOCK: Composition = {
   id: "block",
   label: "Colour block",
   image: "above",
+  spacing: [28, 56, 64, 96],
   build: ({ text: t, theme }, r) => {
     const LH = 1.2;
     const MIN_PAD = 28;
@@ -313,6 +329,7 @@ const CAPS: Composition = {
   id: "caps",
   label: "Caps",
   image: "below",
+  spacing: [24, 40, 56, 96],
   build: ({ text: t, theme }, r) => {
     const LH = 1.3;
     // Measured uppercased and tracked out, since that is what actually renders.
@@ -331,6 +348,28 @@ const CAPS: Composition = {
     ];
   },
 };
+
+/** The scale for a slide no composition built: every step any of them uses. */
+export const DEFAULT_SPACING = [16, 24, 32, 40, 56, 64, 96];
+
+/** The spacing steps a slide was built from, or the default scale. */
+export function spacingFor(composition: string | undefined): number[] {
+  const all = [TITLE, UNDERLINE, HEADING_BODY, STATEMENT, NUMBERED, QUOTE, BLOCK, CAPS];
+  return all.find((c) => c.id === composition)?.spacing ?? DEFAULT_SPACING;
+}
+
+/**
+ * The margins every composition lays out inside, on a board of this size.
+ *
+ * Proportional, because that is what `reflow.ts` does to them: a deck moved to
+ * 1080x1920 keeps its 96px sides and its top margin scales with the height.
+ * Snapping (18.1) offers these as lines.
+ */
+export function marginLines(w: number, h: number): { x: number[]; y: number[] } {
+  const mx = (MX * w) / W;
+  const my = (MY * h) / H;
+  return { x: [mx, w - mx], y: [my, h - my] };
+}
 
 /** The rotation. Consecutive slides never share a composition. */
 const CYCLE: Composition[] = [HEADING_BODY, STATEMENT, NUMBERED, QUOTE, UNDERLINE, CAPS];
@@ -561,6 +600,7 @@ function layout(
     // ends up dragged over the other later.
     return {
       ...makeSlide(theme.bg, comp.id === "title" ? "Hook" : `Slide ${i + 1}`),
+      composition: comp.id,
       ...(theme.bgGradient ? { gradient: theme.bgGradient } : {}),
       layers: images ? [imagePlaceholder(image, theme), ...built] : built,
     };

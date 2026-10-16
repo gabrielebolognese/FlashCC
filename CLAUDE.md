@@ -63,6 +63,11 @@ Layer { kind, x, y, w, h, rotation, opacity, visible, locked, fill, stroke, ...t
 Coordinates are **artboard pixels**, not fractions. A layer at x=540 is at x=540.
 Changing the canvas size is a canvas resize: layers keep their positions.
 
+Two tags ride on that model and are never read at render: `Layer.groupId`, which makes layers
+select and move together (a tag, not a container, one level only), and `Slide.composition`, stamped
+at generation so Tidy can use the spacing steps the slide was built from. The layout tools in
+`tidy.ts` and `slideset.ts` compute coordinates once and forget they ran.
+
 Invariants worth keeping:
 
 1. **Nothing is derived.** What is stored is what renders. A layer a preset created and

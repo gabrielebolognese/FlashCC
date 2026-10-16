@@ -1,7 +1,8 @@
-import { Copy, Plus, Trash2, Wand2 } from "lucide-react";
-import { useState } from "react";
+import { Copy, LayoutTemplate, Plus, Trash2, Wand2, X } from "lucide-react";
+import { useRef, useState } from "react";
 
 import { slidePaint } from "./paint.js";
+import { rangeSelect, toggleSelect } from "./slideset.js";
 import { LayerView } from "./LayerView.js";
 import type { Studio } from "./useStudio.js";
 
@@ -14,23 +15,70 @@ const THUMB_H = 96;
 export function Filmstrip({
   studio,
   onRewrite,
+  onRelay,
 }: {
   studio: Studio;
   /** Absent when there is nothing to open, which keeps the button out of the DOM. */
   onRewrite?: ((index: number) => void) | undefined;
+  /** Lays the picked slides out again. Absent hides the action. */
+  onRelay?: ((ids: string[]) => void) | undefined;
 }) {
-  const { doc, index } = studio;
+  const { doc, index, slideSelection, setSlideSelection } = studio;
   const [from, setFrom] = useState<number | null>(null);
   const [over, setOver] = useState<number | null>(null);
+  /** Where a shift-click range starts: the last slide clicked without shift. */
+  const anchor = useRef<string | null>(null);
+
+  const picked = slideSelection.length > 1 ? slideSelection : [];
+
+  /**
+   * Plain click: this slide, and the set is cleared. Shift: a range from the
+   * anchor. Cmd or Ctrl: in or out of the set. The canvas always shows the
+   * slide clicked last, so the set never hides what is being edited.
+   */
+  const click = (i: number, e: React.MouseEvent) => {
+    const id = doc.slides[i]?.id;
+    if (!id) return;
+    const current = doc.slides[index]?.id ?? id;
+    if (e.shiftKey) {
+      setSlideSelection(rangeSelect(doc.slides, anchor.current ?? current, id));
+    } else if (e.metaKey || e.ctrlKey) {
+      const base = slideSelection.length > 0 ? slideSelection : [current];
+      setSlideSelection(toggleSelect(base, id));
+      anchor.current = id;
+    } else {
+      setSlideSelection([]);
+      anchor.current = id;
+    }
+    studio.setSlideIndex(i);
+    studio.setSelection([]);
+  };
 
   const scale = THUMB_H / doc.height;
   const thumbW = doc.width * scale;
 
   return (
     <footer className="flex h-[136px] shrink-0 flex-col border-t border-hairline bg-surface-1">
-      <div className="flex h-7 shrink-0 items-center justify-between px-4">
+      <div className="flex h-7 shrink-0 items-center justify-between gap-2 px-4">
         <span className="text-overline uppercase text-tertiary">Slides</span>
-        <span className="text-caption text-muted">{doc.slides.length}</span>
+        {picked.length > 0 ? (
+          <div className="flex items-center gap-1">
+            <span className="mr-1 text-caption text-accent">{picked.length} picked</span>
+            <SetButton icon={Copy} label="Duplicate" onClick={() => studio.duplicateSlides(picked)} />
+            {onRelay ? (
+              <SetButton icon={LayoutTemplate} label="Re-lay" onClick={() => onRelay(picked)} />
+            ) : null}
+            {picked.length < doc.slides.length ? (
+              <SetButton icon={Trash2} label="Delete" danger onClick={() => studio.deleteSlides(picked)} />
+            ) : null}
+            <SetButton icon={X} label="Clear" onClick={() => setSlideSelection([])} />
+          </div>
+        ) : (
+          <span className="text-caption text-muted">
+            {doc.slides.length}
+            <span className="ml-2 hidden lg:inline">Shift-click or {"\u2318"}/Ctrl-click to pick several</span>
+          </span>
+        )}
       </div>
 
       <div className="scroll-quiet flex flex-1 items-start gap-1 overflow-x-auto px-3 pb-3">
@@ -60,22 +108,30 @@ export function Filmstrip({
               }}
               onDrop={(e) => {
                 e.preventDefault();
-                if (from !== null && from !== i) studio.moveSlide(from, i);
+                const dragged = from !== null ? doc.slides[from]?.id : undefined;
+                // Dragging a picked slide drags the whole set, as a block.
+                if (dragged && picked.includes(dragged)) studio.moveSlides(picked, s.id);
+                else if (from !== null && from !== i) studio.moveSlide(from, i);
                 setFrom(null);
                 setOver(null);
               }}
             >
               <button
                 type="button"
-                onClick={() => {
-                  studio.setSlideIndex(i);
-                  studio.setSelection([]);
-                }}
+                onClick={(e) => click(i, e)}
                 aria-label={`Slide ${i + 1}`}
+                aria-pressed={picked.includes(s.id)}
                 className={[
                   "block overflow-hidden rounded-xl border-2",
-                  i === index ? "border-accent" : "border-hairline hover:border-surface-5",
-                  from === i ? "opacity-40" : "",
+                  i === index
+                    ? "border-accent"
+                    : picked.includes(s.id)
+                      ? "border-accent-dim"
+                      : "border-hairline hover:border-surface-5",
+                  from === i ||
+                  (from !== null && picked.includes(doc.slides[from]?.id ?? "") && picked.includes(s.id))
+                    ? "opacity-40"
+                    : "",
                 ].join(" ")}
                 style={{ width: thumbW, height: THUMB_H, ...slidePaint(s) }}
               >
@@ -92,7 +148,9 @@ export function Filmstrip({
               <span
                 className={[
                   "pointer-events-none absolute left-1.5 top-1.5 grid h-4 min-w-4 place-items-center rounded-md px-1 text-[9px] font-semibold",
-                  i === index ? "bg-accent text-[color:var(--on-accent)]" : "bg-black/50 text-white/80",
+                  i === index || picked.includes(s.id)
+                    ? "bg-accent text-[color:var(--on-accent)]"
+                    : "bg-black/50 text-white/80",
                 ].join(" ")}
               >
                 {i + 1}
@@ -156,6 +214,34 @@ function MiniButton({
       ].join(" ")}
     >
       <Icon size={10} strokeWidth={2} />
+    </button>
+  );
+}
+
+/** The actions on a picked set, in the strip's header where the count is. */
+function SetButton({
+  icon: Icon,
+  label,
+  onClick,
+  danger = false,
+}: {
+  icon: typeof Copy;
+  label: string;
+  onClick: () => void;
+  danger?: boolean;
+}) {
+  return (
+    <button
+      type="button"
+      title={label}
+      onClick={onClick}
+      className={[
+        "flex h-7 items-center gap-1 rounded-md px-1.5 text-caption text-tertiary hover:bg-white/[0.06]",
+        danger ? "hover:text-danger" : "hover:text-primary",
+      ].join(" ")}
+    >
+      <Icon size={11} strokeWidth={2} />
+      {label}
     </button>
   );
 }

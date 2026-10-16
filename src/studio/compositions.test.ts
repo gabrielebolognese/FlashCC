@@ -1,6 +1,14 @@
 import { describe, expect, it } from "vitest";
 
-import { bandsFor, buildSlides, compositionFor, MAX_SLIDES } from "./compositions.js";
+import {
+  bandsFor,
+  buildSlides,
+  compositionFor,
+  DEFAULT_SPACING,
+  marginLines,
+  MAX_SLIDES,
+  spacingFor,
+} from "./compositions.js";
 import { THEMES } from "./presets.js";
 import { insertionIndex, labelFor, repeatableOf, STRUCTURES } from "./structures.js";
 
@@ -267,5 +275,28 @@ describe("image bands", () => {
         }
       }
     }
+  });
+});
+
+/* ── Batch 18.4 ───────────────────────────────────────────────────────── */
+
+describe("spacing scales", () => {
+  it("stamps each built slide with the composition that laid it out", () => {
+    const slides = buildSlides(["Hook", "A point\nWith a body.", "Another", "Follow"], theme);
+    expect(slides[0]!.composition).toBe("title");
+    for (const s of slides) expect(spacingFor(s.composition)).not.toBe(DEFAULT_SPACING);
+  });
+
+  it("gives every composition its own ascending scale", () => {
+    for (const id of ["title", "underline", "heading-body", "statement", "numbered", "quote", "block", "caps"]) {
+      const scale = spacingFor(id);
+      expect(scale, id).not.toBe(DEFAULT_SPACING);
+      expect([...scale].sort((a, b) => a - b), id).toEqual(scale);
+    }
+  });
+
+  it("reports the margins proportionally, the way reflow moves them", () => {
+    expect(marginLines(1080, 1350)).toEqual({ x: [96, 984], y: [140, 1210] });
+    expect(marginLines(1080, 1920).y[0]).toBeCloseTo(199.1, 1);
   });
 });

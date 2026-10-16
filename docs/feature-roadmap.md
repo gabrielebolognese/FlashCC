@@ -2814,7 +2814,7 @@ Pinterest have no chrome, and an overlay toggle that shades nothing reads as bro
 
 ## Batch 18, Layout tools that act once
 
-**Status:** next
+**Status:** done
 **Size:** medium
 **Why here:** "Post-generation editing is the stated churn path" is the strongest
 line in the first half's caveats, and the most common hand edit after generation is
@@ -2941,11 +2941,62 @@ and the stamped furniture in Batch 20 should be locked by default.
 - **No rulers with user guides.** Smart guides cover the need, and user guides are
   state that nobody asks to keep.
 
+### Built as
+
+All six. The Unknowns, resolved against the repo first: **snapping already existed** (artboard
+edges and centre, and other layers, Alt to turn it off), **multi-select within a slide already
+existed**, **`locked` already existed** with a toggle in the layers list, and there was **no
+grouping and no multi-slide selection**. So 18.1 and 18.6 were extensions, not new systems.
+
+**18.1** adds the compositions' margins (`marginLines`, proportional, the way reflow moves them)
+and the active platform's safe-box edges as snap lines, equal-spacing markers (`spacingSnap`),
+and snapping while resizing (`snapResize`, only the dragged edges). Checked in a real browser: a
+headline dropped at y 84 on a LinkedIn deck lands at 80, the safe-zone edge, and with Alt held it
+stays at 84.
+
+**18.2** is `tidy.ts`: align six ways, distribute, equal gap, match width, and Tidy slide. Tidy
+works in **rows**, not layers: things side by side stay side by side and text stays on its colour
+block, which a layer-by-layer stack would have broken. Ambiguity is a **partial** overlap, neither
+box containing the other; text sitting inside a block is containment, not ambiguity. The stack
+keeps its vertical centre, because every composition centres it. One decision the plan did not
+make: **Match width re-measures text** at the new width, the way reflow does, so a narrowed box
+gets taller rather than overflowing.
+
+**18.3, "same stamped role" turned out to mean the layer's name plus its kind.** Batch 11 found
+roles are not stored, and that is still true. But the compositions stamp every layer with a name
+(Title, Heading, Body, Number), and that name is the role in every way that matters here. A
+separate `role` field would have brought back the semantic document the rewrite removed, so the
+name is used and the kind guards it. A slide with no counterpart, or two, is skipped and named.
+Overflow is reported by slide, with a link to each, and nothing is shrunk.
+
+**18.4** gives every composition a `spacing` list read off its own build (the air under a rule,
+the heading-to-body gap, `BAND_GAP`, `MX`), and stamps each built slide with
+`Slide.composition` so Tidy knows whose steps to use. Hand-made slides get `DEFAULT_SPACING`.
+
+**18.5** is `slideset.ts` plus a picked set in the filmstrip header: Duplicate, Re-lay, Delete,
+Clear, and dragging a picked slide moves the set. "Apply layout" from the plan became **Re-lay
+the picked slides** (`relaySlides`), since the only layout action that exists today is Re-lay;
+it refuses, and says so, when the copy would split into more slides. "Match" on a set lives in
+the properties panel, where Match is: with several slides picked it reads "Match on N picked
+slides", which is the plan's "this slide range only". Checked in a browser: picking 2 to 4 and
+duplicating puts the copies straight after 4 and clears the set.
+
+**18.6** is `Layer.groupId` and `Cmd+G` / `Cmd+Shift+G`. The canvas selects the whole group; **the
+layers list selects one member**, which is how to reach a layer inside a group, and the list
+marks grouped and locked layers so the difference is visible. Duplicated groups get a group of
+their own, or one click would select both copies.
+
+### Also fixed, not in the plan
+
+**Defect D13 from `docs/reference.md`:** the marquee selected locked layers, and once selected a
+locked layer could be moved and deleted. The marquee and `Cmd+A` now skip them, which is what
+18.6 needed lock to mean.
+
 ---
 
 ## Batch 19, The block library
 
-**Status:** queued
+**Status:** next
 **Size:** large. Many small pieces, each with its own tests.
 **Why here:** this is the batch that makes "create everything" true. Today a slide
 is headline, body, shapes and images. Every carousel that needs a chart, a
@@ -4761,7 +4812,7 @@ that define the category. And **nothing is ranked, scored or graded**, because
 the ranking complaint in the research corpus is not about cost, it is about a
 machine asserting which of your sentences is better.
 
-**Batches 1 to 17 are done.** Batches 18 to 33 are the rest of the second half
+**Batches 1 to 18 are done.** Batches 19 to 33 are the rest of the second half
 of the plan and are not built yet. The suggested build order is at the end of
 this document.
 
@@ -4774,7 +4825,7 @@ and `09-gates.sql`.
 
 ## Suggested order and where this stands
 
-**Batch 17 is built. The rest of 17 to 33 is not.** The numbering groups them by theme; the build
+**Batches 17 and 18 are built. The rest of 17 to 33 is not.** The numbering groups them by theme; the build
 order below is by damage-to-effort and dependency, the same logic that put export
 first in the first half.
 

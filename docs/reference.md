@@ -176,11 +176,18 @@ are single-shot.
 Hit testing runs **topmost first** and requires `visible && !locked`. Shift toggles membership.
 Clicking an already-selected layer preserves the whole selection, so multi-drag works.
 
+**A click selects the whole group** (Batch 18.6). `groupId` is a shared tag on the layers, not a
+container: `studio.groupOf(id)` returns every layer carrying the tag, and the canvas, the marquee
+and Shift-click all go through it. The layers list is the exception, on purpose: a click there
+selects that one layer, which is how to reach a member of a group. `Cmd+G` groups,
+`Cmd+Shift+G` ungroups, duplicated groups get a fresh tag (`regroupCopies`), and there is one level
+only.
+
 | Mode | Behaviour |
 | --- | --- |
 | `move` | Snaps unless **Alt** is held; positions rounded |
-| `resize` | **Shift** constrains aspect. No snapping. Every selected layer re-derives from its captured origin rect |
-| `marquee` | Selects everything intersecting, **including locked layers**, unlike click |
+| `resize` | **Shift** constrains aspect. Snaps the dragged edges only, unless Alt or Shift is held. Every selected layer re-derives from its captured origin rect |
+| `marquee` | Selects everything intersecting that is visible and **not locked**, plus the rest of any group it touches |
 | `draw` | Normalised, clamped to ≥4 |
 | `pan` | Space held, or middle mouse button |
 
@@ -188,12 +195,50 @@ Clicking an already-selected layer preserves the whole selection, so multi-drag 
 
 `SNAP_PX = 6` screen pixels, divided by zoom before reaching `geometry.snap`.
 
-Targets per axis: artboard `0`, midpoint and full extent, plus every other rect's start, mid and
-end. Moving edges are the moving box's start, mid and end. Tolerance is strict `<`, so exactly-at-
-tolerance does not snap.
+Targets per axis: artboard `0`, midpoint and full extent, plus every other visible rect's start, mid
+and end, plus (Batch 18.1) the compositions' margins from `marginLines` and the edges of the
+active platform's safe box. The active platform is the overlay's when one is showing, otherwise
+`platformForSize`. Moving edges are the moving box's start, mid and end. Tolerance is strict `<`,
+so exactly-at-tolerance does not snap.
+
+**Equal spacing** (`spacingSnap`): on an axis no line claimed, a box whose gaps to its nearest
+neighbours either side are within twice the tolerance moves to make them equal, and both gaps are
+drawn as markers. **Resizing** snaps through `snapResize`, which moves only the edges the handle
+moves. Nothing about any of it is stored: snapping is a property of the drag.
 
 **Guides only appear when a correction is actually applied.** A box already perfectly aligned
 produces `dx = 0` and therefore no visible guide.
+
+### Layout tools that act once (`tidy.ts`, `slideset.ts`, Batch 18)
+
+Every tool computes new coordinates from the layers as they are and hands them to
+`studio.applyMoves`, which goes through `updateEach`: one undo step, `handEdited` set, nothing
+stored about having run.
+
+| Tool | Where | What it does |
+| --- | --- | --- |
+| Align, six ways | Properties, any selection | To the selection's bounds, or to the artboard when there is one thing. Groups move as one unit |
+| Distribute | Properties, 3+ units | Equal gaps between, the outer two fixed |
+| Equal gap | Properties, 2+ units | Top to bottom, the gap snapped to the slide's spacing scale |
+| Match width | Properties, 2+ layers | To the widest; text is re-measured at the new width. Grouped layers are left alone |
+| Tidy slide | Properties, nothing selected | Rows top to bottom (layers overlapping vertically are one row), every gap the scale step nearest their average, the stack's centre kept. Never reorders, never resizes. A row with a partial overlap is left exactly where it is and named. Backgrounds, locked and hidden layers are skipped |
+| Match on every slide | Properties, one layer | Copies x, y, w, h and type size onto the layer with the same **kind and name** on the other slides, or only the slides picked in the filmstrip. Skips a slide with none or two, and reports text that now overflows by slide number instead of shrinking it |
+
+**The name is the stamped role.** Compositions stamp every layer with one (Title, Heading, Body,
+Number) and there is no separate role field, because adding one would bring back the semantic
+document the Photoshop-model rewrite removed.
+
+**Spacing scales** (18.4): each composition declares `spacing`, read off its own build, and every
+built slide is stamped with `Slide.composition`. `spacingFor` returns that composition's steps,
+or `DEFAULT_SPACING` for a hand-made slide.
+
+**Several slides** (18.5): `studio.slideSelection` holds slide **ids**. Shift-click picks a range
+from the last plain click, `Cmd`/`Ctrl`-click toggles one. The filmstrip header then offers
+Duplicate (copies land after the last picked slide, in order), Re-lay (`relaySlides`: the deck is
+rebuilt and only the picked slides taken, ids and hand edits kept, refused when the copy would
+split into more slides), Delete (never the whole deck) and Clear. Dragging a picked slide moves
+the set as a block (`moveSet`). Anything that changes the slide count clears the set; a reorder
+keeps it, because it holds ids. Rewrite stays single-slide, as Batch 11 decided.
 
 ### Keyboard
 
@@ -203,7 +248,8 @@ Window-level, skipped while typing (`INPUT`, `TEXTAREA`, `contentEditable`).
 | --- | --- |
 | `Space` | Pan (checked before the typing guard) |
 | `Cmd+Z` / `Shift+Cmd+Z` | Undo / redo |
-| `Cmd+D` / `Cmd+A` | Duplicate / select all on slide |
+| `Cmd+D` / `Cmd+A` | Duplicate / select all on slide (locked layers excluded) |
+| `Cmd+G` / `Shift+Cmd+G` | Group / ungroup |
 | `Cmd+]` / `Cmd+[` | Forward / backward |
 | `Delete` / `Backspace` | Remove selection |
 | `Escape` | Clear editing, clear selection, tool → select |
@@ -2464,6 +2510,10 @@ is not drawn and not grabbable where it is. Nothing in the code acknowledges thi
 
 Click filters `visible && !locked`; marquee filters only `visible`. Once selected, a locked layer
 can be moved, nudged, resized and deleted. `locked` is consulted nowhere else.
+
+**Fixed in Batch 18:** the marquee and `Cmd+A` skip locked layers, and Tidy slide leaves them
+where they are. A locked layer is still selectable, and editable, from the layers list, which is
+what 18.6 asked lock to mean.
 
 ### D14, Pasting slides ignores the document's style
 

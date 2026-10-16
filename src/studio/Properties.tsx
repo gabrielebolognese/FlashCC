@@ -1,7 +1,19 @@
 import {
   AlignCenter,
+  AlignCenterHorizontal,
+  AlignCenterVertical,
+  AlignEndHorizontal,
+  AlignEndVertical,
+  AlignHorizontalSpaceAround,
   AlignLeft,
   AlignRight,
+  AlignStartHorizontal,
+  AlignStartVertical,
+  AlignVerticalSpaceAround,
+  Group,
+  Rows3,
+  StretchHorizontal,
+  Ungroup,
   ArrowDown,
   ArrowDownToLine,
   ArrowUp,
@@ -12,7 +24,7 @@ import {
   Underline,
   Wand2,
 } from "lucide-react";
-import type { ReactNode } from "react";
+import { useState, type ReactNode } from "react";
 
 import { IconButton } from "../ui/IconButton.js";
 import { GradientEditor } from "./GradientEditor.js";
@@ -20,6 +32,7 @@ import { averageColour, makeGradient, type Gradient } from "./gradient.js";
 import { brandIdOf } from "./brand.js";
 import { FORMATS, allFonts, type Layer, type MediaItem, type SlideImage } from "./model.js";
 import { DEFAULT_SCRIM } from "./paint.js";
+import { unitsOf } from "./tidy.js";
 import type { Studio } from "./useStudio.js";
 
 /** Properties for the current selection. Nothing selected → the slide itself. */
@@ -71,6 +84,7 @@ export function Properties({
             ))}
           </div>
         </Field>
+        <TidyField key={slide?.id} studio={studio} />
         <p className="mt-4 border-t border-hairline pt-3 text-caption leading-[16px] text-muted">
           Pick a tool on the left, then drag on the canvas to draw. Click anything to select it.
         </p>
@@ -110,6 +124,10 @@ export function Properties({
           <Arrange icon={ArrowDownToLine} label="Send to back" onClick={() => studio.reorder("back")} />
         </div>
       </Field>
+
+      <LayoutTools studio={studio} />
+
+      {one && doc.slides.length > 1 ? <MatchField key={one.id} studio={studio} layer={one} /> : null}
 
       {/*
         The roadmap said this goes "under the text field". There is no text field
@@ -540,4 +558,164 @@ function shift(hex: string): string {
   const light = (r! * 299 + g! * 587 + b! * 114) / 1000 > 128;
   const to = (v: number) => Math.round(light ? v * 0.45 : v + (255 - v) * 0.55);
   return `#${((to(r!) << 16) | (to(g!) << 8) | to(b!)).toString(16).padStart(6, "0")}`;
+}
+
+/**
+ * Align, distribute, equal gap, match width, group (18.2, 18.6).
+ *
+ * Each control appears only when it means something for this selection: one
+ * thing aligns to the artboard, two can share a gap, three can be distributed.
+ * A greyed-out button that cannot do anything is still a button to read past.
+ */
+function LayoutTools({ studio }: { studio: Studio }) {
+  const { selected, selection, slide } = studio;
+  const units = unitsOf(slide?.layers ?? [], selection).length;
+  const grouped = selected.some((l) => l.groupId);
+  const [note, setNote] = useState("");
+
+  return (
+    <>
+      <Field label={units === 1 ? "Align to the slide" : "Align"}>
+        <div className="flex gap-1">
+          <Arrange icon={AlignStartVertical} label="Align left" onClick={() => studio.alignSelected("left")} />
+          <Arrange icon={AlignCenterVertical} label="Align centres" onClick={() => studio.alignSelected("hcenter")} />
+          <Arrange icon={AlignEndVertical} label="Align right" onClick={() => studio.alignSelected("right")} />
+          <Arrange icon={AlignStartHorizontal} label="Align top" onClick={() => studio.alignSelected("top")} />
+          <Arrange icon={AlignCenterHorizontal} label="Align middles" onClick={() => studio.alignSelected("vcenter")} />
+          <Arrange icon={AlignEndHorizontal} label="Align bottom" onClick={() => studio.alignSelected("bottom")} />
+        </div>
+      </Field>
+
+      {units >= 2 ? (
+        <Field label="Space">
+          <div className="flex gap-1">
+            {units >= 3 ? (
+              <>
+                <Arrange
+                  icon={AlignHorizontalSpaceAround}
+                  label="Distribute horizontally"
+                  onClick={() => studio.distributeSelected("x")}
+                />
+                <Arrange
+                  icon={AlignVerticalSpaceAround}
+                  label="Distribute vertically"
+                  onClick={() => studio.distributeSelected("y")}
+                />
+              </>
+            ) : null}
+            <Arrange
+              icon={Rows3}
+              label="Equal gap, top to bottom, from the spacing scale"
+              onClick={() => setNote(`Gaps set to ${studio.equalGapSelected("y")}px.`)}
+            />
+            <Arrange
+              icon={StretchHorizontal}
+              label="Match width to the widest"
+              onClick={() => studio.matchWidthSelected()}
+            />
+          </div>
+          {note ? <p className="mt-1.5 text-caption leading-4 text-muted">{note}</p> : null}
+        </Field>
+      ) : null}
+
+      {selection.length >= 2 || grouped ? (
+        <Field label="Group">
+          <div className="flex gap-1">
+            {selection.length >= 2 && !(grouped && units === 1) ? (
+              <Arrange icon={Group} label="Group (Cmd+G)" onClick={studio.groupSelected} />
+            ) : null}
+            {grouped ? (
+              <Arrange icon={Ungroup} label="Ungroup (Cmd+Shift+G)" onClick={studio.ungroupSelected} />
+            ) : null}
+          </div>
+        </Field>
+      ) : null}
+    </>
+  );
+}
+
+/**
+ * Tidy slide (18.2), with nothing selected. Says what it did, including what
+ * it refused to guess about, because a tool that silently skips two layers
+ * reads as a tool that is broken.
+ */
+function TidyField({ studio }: { studio: Studio }) {
+  const [note, setNote] = useState("");
+  const names = (ids: string[]) =>
+    (studio.slide?.layers ?? []).filter((l) => ids.includes(l.id)).map((l) => `"${l.name}"`);
+
+  return (
+    <Field label="Tidy">
+      <button
+        type="button"
+        onClick={() => {
+          const r = studio.tidy();
+          const parts = [
+            r.moves.size > 0 ? `Gaps set to ${r.gap}px.` : "Already tidy.",
+            r.pinned.length > 0
+              ? `${names(r.pinned).join(" and ")} overlap, so they stayed where they were.`
+              : "",
+          ];
+          setNote(parts.filter(Boolean).join(" "));
+        }}
+        className="flex h-7 w-full items-center justify-center gap-1.5 rounded-md border border-hairline text-caption text-secondary hover:border-accent-dim hover:text-accent"
+      >
+        <Rows3 size={13} strokeWidth={2} />
+        Tidy slide
+      </button>
+      <p className="mt-1.5 text-caption leading-4 text-muted">
+        {note || "Equal gaps top to bottom, from this slide's own spacing. Order and sizes stay."}
+      </p>
+    </Field>
+  );
+}
+
+/**
+ * Match on every slide (18.3): this layer's position, size and type size, onto
+ * the layer with the same name on the others. Or only onto the slides picked in
+ * the filmstrip, when several are.
+ */
+function MatchField({ studio, layer }: { studio: Studio; layer: Layer }) {
+  const [result, setResult] = useState<{ matched: number[]; skipped: number[]; overflow: number[] } | null>(
+    null,
+  );
+  const scoped = studio.slideSelection.length > 1;
+
+  return (
+    <Field label="Match">
+      <button
+        type="button"
+        onClick={() => setResult(studio.matchOnSlides(layer.id))}
+        className="flex h-7 w-full items-center justify-center gap-1.5 rounded-md border border-hairline text-caption text-secondary hover:border-accent-dim hover:text-accent"
+      >
+        {scoped ? `Match on ${studio.slideSelection.length} picked slides` : "Match on every slide"}
+      </button>
+      {result ? (
+        <div className="mt-1.5 text-caption leading-4 text-muted">
+          {result.matched.length === 0
+            ? `No other slide has a "${layer.name}".`
+            : `Matched on ${result.matched.length} slide${result.matched.length === 1 ? "" : "s"}.`}
+          {result.overflow.length > 0 ? (
+            <div className="mt-1 text-danger">
+              {result.overflow.length} now overflow:{" "}
+              {result.overflow.map((n) => (
+                <button
+                  key={n}
+                  type="button"
+                  onClick={() => studio.setSlideIndex(n - 1)}
+                  className="mr-1 underline"
+                >
+                  slide {n}
+                </button>
+              ))}
+            </div>
+          ) : null}
+        </div>
+      ) : (
+        <p className="mt-1.5 text-caption leading-4 text-muted">
+          Copies the numbers once. Nothing follows later edits.
+        </p>
+      )}
+    </Field>
+  );
 }

@@ -1,4 +1,4 @@
-import { Eye, EyeOff, Image, Lock, Minus, Square, Type, Unlock } from "lucide-react";
+import { Eye, EyeOff, Group, Image, Lock, Minus, Square, Type, Unlock } from "lucide-react";
 import { useState } from "react";
 
 import type { Layer } from "./model.js";
@@ -117,6 +117,20 @@ function LayerRow({
           {layer.kind === "text" ? layer.text?.slice(0, 24) || layer.name : layer.name}
         </span>
       )}
+      {/* Clicking here selects this one layer even inside a group, the way to
+          reach a member; the canvas selects the whole group. The mark says
+          which is which. */}
+      {layer.groupId ? (
+        <span title="Grouped" className="shrink-0 text-muted">
+          <Group size={11} />
+        </span>
+      ) : null}
+      {/* Locked layers are skipped by the canvas and stay editable from here. */}
+      {layer.locked ? (
+        <span title="Locked: not selectable on the canvas" className="shrink-0 text-muted group-hover:hidden">
+          <Lock size={11} />
+        </span>
+      ) : null}
       <button
         type="button"
         onClick={(e) => {

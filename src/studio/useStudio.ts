@@ -4,6 +4,7 @@ import {
   cloneLayer,
   makeLayer,
   makeSlide,
+  uid,
   type Doc,
   type Layer,
   type MediaItem,
@@ -18,7 +19,25 @@ import { reflowDoc } from "./reflow.js";
 import { fitToSafeArea } from "./safearea.js";
 import { markEdited } from "./regenerate.js";
 import { isUnnamed, nameFromDoc } from "./search.js";
+import { deleteSet, duplicateSet, inDeckOrder, moveSet } from "./slideset.js";
 import { saveDoc } from "./storage.js";
+import { spacingFor } from "./compositions.js";
+import {
+  align as alignLayers,
+  distribute as distributeLayers,
+  equalGap as equalGapLayers,
+  group as groupLayers,
+  matchAcross,
+  matchWidth as matchWidthLayers,
+  regroupCopies,
+  tidySlide as tidyLayers,
+  ungroup as ungroupLayers,
+  withGroups,
+  type Edge,
+  type MatchResult,
+  type Moves,
+  type TidyResult,
+} from "./tidy.js";
 
 const LIMIT = 120;
 
@@ -37,6 +56,12 @@ export function useStudio(initial: Doc) {
   // NOT part of Doc, it is a view setting, not something about the artwork, and
   // it must never reach the export path.
   const [safePlatform, setSafePlatform] = useState<PlatformId | null>(null);
+  /**
+   * Slides picked in the filmstrip (18.5). IDS, not indexes, so a reorder does
+   * not change what is selected. Separate from `index`, the slide on the
+   * canvas: the canvas always shows one slide, the filmstrip can hold several.
+   */
+  const [slideSelection, setSlideSelection] = useState<string[]>([]);
 
   const past = useRef<Doc[]>([]);
   const future = useRef<Doc[]>([]);
@@ -151,7 +176,11 @@ export function useStudio(initial: Doc) {
 
   const duplicateSelected = useCallback(() => {
     if (!slide || selection.length === 0) return;
-    const copies = slide.layers.filter((l) => selection.includes(l.id)).map((l) => cloneLayer(l));
+    // Copies of a group form a group of their own, see regroupCopies.
+    const copies = regroupCopies(
+      slide.layers.filter((l) => selection.includes(l.id)).map((l) => cloneLayer(l)),
+      () => uid("g"),
+    );
     patchSlide(index, (s) => ({ ...s, layers: [...s.layers, ...copies] }));
     setSelection(copies.map((c) => c.id));
   }, [index, patchSlide, selection, slide]);
@@ -204,6 +233,8 @@ export function useStudio(initial: Doc) {
       commit({ ...doc, slides: [...doc.slides.slice(0, at), s, ...doc.slides.slice(at)] });
       setSlideIndex(at);
       setSelection([]);
+      // The count changed, so the filmstrip's picked set is cleared (18.5).
+      setSlideSelection([]);
     },
     [commit, doc, slide],
   );
@@ -216,10 +247,14 @@ export function useStudio(initial: Doc) {
         ...src,
         id: `${src.id}_c${Date.now().toString(36)}`,
         name: `${src.name} copy`,
-        layers: src.layers.map((l) => cloneLayer(l, 0, 0)),
+        layers: regroupCopies(
+          src.layers.map((l) => cloneLayer(l, 0, 0)),
+          () => uid("g"),
+        ),
       };
       commit({ ...doc, slides: [...doc.slides.slice(0, i + 1), copy, ...doc.slides.slice(i + 1)] });
       setSlideIndex(i + 1);
+      setSlideSelection([]);
     },
     [commit, doc],
   );
@@ -230,6 +265,7 @@ export function useStudio(initial: Doc) {
       commit({ ...doc, slides: doc.slides.filter((_, n) => n !== i) });
       setSlideIndex(Math.max(0, i - 1));
       setSelection([]);
+      setSlideSelection([]);
     },
     [commit, doc],
   );
@@ -363,6 +399,133 @@ export function useStudio(initial: Doc) {
 
   const replaceDoc = useCallback((next: Doc) => commit(next), [commit]);
 
+  /* ── layout tools that act once (Batch 18) ─────────────────────────── */
+
+  /**
+   * Every arranging tool ends here: a set of new coordinates, applied through
+   * `updateEach`, so it flags `handEdited` and is one undo step like any edit.
+   */
+  const applyMoves = useCallback(
+    (moves: Moves) => {
+      if (moves.size === 0) return;
+      updateEach((l) => ({ ...l, ...moves.get(l.id) }), [...moves.keys()]);
+    },
+    [updateEach],
+  );
+
+  const board = useMemo(() => ({ w: doc.width, h: doc.height }), [doc.width, doc.height]);
+  const scale = spacingFor(slide?.composition);
+
+  const alignSelected = useCallback(
+    (edge: Edge) => applyMoves(alignLayers(slide?.layers ?? [], selection, edge, board)),
+    [applyMoves, board, selection, slide],
+  );
+
+  const distributeSelected = useCallback(
+    (axis: "x" | "y") => applyMoves(distributeLayers(slide?.layers ?? [], selection, axis)),
+    [applyMoves, selection, slide],
+  );
+
+  const equalGapSelected = useCallback(
+    (axis: "x" | "y") => {
+      const result = equalGapLayers(slide?.layers ?? [], selection, axis, scale);
+      applyMoves(result.moves);
+      return result.gap;
+    },
+    [applyMoves, scale, selection, slide],
+  );
+
+  const matchWidthSelected = useCallback(
+    () => applyMoves(matchWidthLayers(slide?.layers ?? [], selection)),
+    [applyMoves, selection, slide],
+  );
+
+  /** Tidy slide: nothing selected, the whole slide re-spaced on its scale. */
+  const tidy = useCallback((): TidyResult => {
+    const result = tidyLayers(slide ?? { id: "", name: "", background: "", layers: [] }, board, scale);
+    applyMoves(result.moves);
+    return result;
+  }, [applyMoves, board, scale, slide]);
+
+  const groupSelected = useCallback(() => {
+    if (!slide || selection.length < 2) return;
+    setLayers(groupLayers(slide.layers, selection, uid("g")));
+  }, [selection, setLayers, slide]);
+
+  const ungroupSelected = useCallback(() => {
+    if (!slide) return;
+    setLayers(ungroupLayers(slide.layers, selection));
+  }, [selection, setLayers, slide]);
+
+  /** Selecting any member of a group selects the group. */
+  const withGroupsOf = useCallback(
+    (ids: string[]) => withGroups(slide?.layers ?? [], ids),
+    [slide],
+  );
+
+  /** One layer's unit: itself, or every layer in its group. */
+  const groupOf = useCallback((id: string) => withGroupsOf([id]), [withGroupsOf]);
+
+  /**
+   * Match on every slide (18.3), or on the slides picked in the filmstrip when
+   * more than this one is picked: "this slide range only".
+   */
+  const matchOnSlides = useCallback(
+    (layerId: string): MatchResult => {
+      const only = slideSelection.length > 1 ? slideSelection : undefined;
+      const result = matchAcross(doc, index, layerId, only);
+      if (result.doc !== doc) commit(result.doc);
+      return result;
+    },
+    [commit, doc, index, slideSelection],
+  );
+
+  /* ── several slides (18.5) ─────────────────────────────────────────── */
+
+  /** Anything that changes the slide count clears the selection afterwards. */
+  const duplicateSlides = useCallback(
+    (ids: string[]) => {
+      const set = inDeckOrder(doc.slides, ids);
+      if (set.length === 0) return;
+      const slides = duplicateSet(doc.slides, set, (src) => ({
+        ...src,
+        id: uid("s"),
+        name: `${src.name} copy`,
+        layers: regroupCopies(
+          src.layers.map((l) => cloneLayer(l, 0, 0)),
+          () => uid("g"),
+        ),
+      }));
+      commit({ ...doc, slides });
+      setSlideSelection([]);
+    },
+    [commit, doc],
+  );
+
+  const deleteSlides = useCallback(
+    (ids: string[]) => {
+      const slides = deleteSet(doc.slides, ids);
+      if (slides.length === doc.slides.length) return;
+      commit({ ...doc, slides });
+      setSlideIndex((i) => Math.min(i, slides.length - 1));
+      setSlideSelection([]);
+      setSelection([]);
+    },
+    [commit, doc],
+  );
+
+  /** A reorder keeps the selection: it holds ids, so it is still right. */
+  const moveSlides = useCallback(
+    (ids: string[], target: string) => {
+      const slides = moveSet(doc.slides, ids, target);
+      commit({ ...doc, slides });
+      const current = doc.slides[index]?.id;
+      const at = slides.findIndex((s) => s.id === current);
+      if (at >= 0) setSlideIndex(at);
+    },
+    [commit, doc, index],
+  );
+
   const selected = useMemo(
     () => (slide ? slide.layers.filter((l) => selection.includes(l.id)) : []),
     [slide, selection],
@@ -382,6 +545,21 @@ export function useStudio(initial: Doc) {
     setEditingId,
     safePlatform,
     setSafePlatform,
+    slideSelection,
+    setSlideSelection,
+    withGroupsOf,
+    groupOf,
+    alignSelected,
+    distributeSelected,
+    equalGapSelected,
+    matchWidthSelected,
+    tidy,
+    groupSelected,
+    ungroupSelected,
+    matchOnSlides,
+    duplicateSlides,
+    deleteSlides,
+    moveSlides,
     undo,
     redo,
     canUndo: past.current.length > 0,

@@ -22,7 +22,7 @@ import { HistoryPanel } from "./HistoryPanel.js";
 import { sessionPlan } from "./session.js";
 import { ShareDialog } from "./ShareDialog.js";
 import { snapshot } from "./versions.js";
-import { regenerate, restateSlide } from "./regenerate.js";
+import { regenerate, relaySlides, restateSlide } from "./regenerate.js";
 import { RewritePicker } from "./RewritePicker.js";
 import { rebuildsOnRewrite, slideTextWith, slotAt } from "./rewrite.js";
 import { deckTexts } from "./transcript.js";
@@ -103,7 +103,11 @@ export function Studio({ initial, onHome }: { initial: Doc; onHome: () => void }
         </button>
         {relaid === null ? null : (
           <span className="text-caption text-tertiary">
-            {relaid > 0 ? `kept ${relaid} of your edits` : "re-laid"}
+            {relaid < 0
+              ? "not re-laid: the copy would split into more slides, so Re-lay the whole deck"
+              : relaid > 0
+                ? `kept ${relaid} of your edits`
+                : "re-laid"}
           </span>
         )}
 
@@ -180,7 +184,17 @@ export function Studio({ initial, onHome }: { initial: Doc; onHome: () => void }
         <Properties studio={studio} onRewrite={(l) => setRewritingLayer(l)} />
       </div>
 
-      <Filmstrip studio={studio} onRewrite={(i) => setRewriting(i)} />
+      <Filmstrip
+        studio={studio}
+        onRewrite={(i) => setRewriting(i)}
+        onRelay={(ids) => {
+          // Only the picked slides change; the deck is rebuilt to get their
+          // compositions right and the rest is left exactly as it was.
+          const result = relaySlides(doc, ids, themeOf(doc, listBrands()));
+          if (result.replaced > 0) studio.replaceDoc(result.doc);
+          setRelaid(result.replaced > 0 ? result.kept : -1);
+        }}
+      />
 
       {pasteOpen ? (
         <div className="absolute inset-0 z-modal grid place-items-center" style={{ background: "rgba(0,0,0,.6)", backdropFilter: "blur(4px)" }}>

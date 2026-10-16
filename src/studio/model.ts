@@ -39,6 +39,14 @@ export type Layer = {
   handEdited?: boolean | undefined;
 
   fill: string;
+  /**
+   * Layers sharing one of these select and move together (18.6).
+   *
+   * A tag, not a container: no transform of its own, no nested coordinates,
+   * nothing reflow, render or export has to know about. One level only.
+   */
+  groupId?: string | undefined;
+
   /** Painted instead of `fill` when set. Works on text as well as shapes. */
   gradient?: Gradient | undefined;
   stroke: string | null;
@@ -139,6 +147,15 @@ export type Slide = {
    * dragged a thumbnail.
    */
   alt?: string | undefined;
+  /**
+   * The composition that laid this slide out, stamped once at generation.
+   *
+   * A stamp, not a binding: nothing re-reads the composition at render. It is
+   * here so Tidy (18.2) can use the spacing steps this slide was built from
+   * rather than an arbitrary pixel average. Absent on hand-made slides, which
+   * get the default scale.
+   */
+  composition?: string | undefined;
   layers: Layer[];
 };
 

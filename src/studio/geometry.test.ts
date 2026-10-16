@@ -1,6 +1,16 @@
 import { describe, expect, it } from "vitest";
 
-import { bounds, contains, intersects, normalize, resize, snap, type Rect } from "./geometry.js";
+import {
+  bounds,
+  contains,
+  intersects,
+  normalize,
+  resize,
+  snap,
+  snapResize,
+  spacingSnap,
+  type Rect,
+} from "./geometry.js";
 import { makeLayer, type Layer } from "./model.js";
 
 const L = (x: number, y: number, w: number, h: number): Layer =>
@@ -105,5 +115,62 @@ describe("snap", () => {
     const twice = snap(settled, [], board, 8);
     expect(twice.dx).toBe(0);
     expect(twice.dy).toBe(0);
+  });
+});
+
+/* ── Batch 18.1 ───────────────────────────────────────────────────────── */
+
+describe("snap to lines that are not layers", () => {
+  const board = { w: 1080, h: 1350 };
+
+  /** 18.1's done-when: a headline dragged near the safe-zone edge lands on it. */
+  it("snaps to a safe-zone edge passed in as a target", () => {
+    // LinkedIn's safe box starts 80px down; drop a headline at 84.
+    const s = snap({ x: 300, y: 84, w: 400, h: 100 }, [], board, 8, { x: [], y: [80, 1270] });
+    expect(s.dy).toBe(-4);
+    expect(s.guides).toContainEqual({ axis: "y", at: 80 });
+  });
+
+  it("snaps to the composition margins", () => {
+    const s = snap({ x: 99, y: 600, w: 300, h: 50 }, [], board, 8, { x: [96, 984], y: [] });
+    expect(s.dx).toBe(-3);
+  });
+});
+
+describe("snapResize", () => {
+  const board = { w: 1080, h: 1350 };
+
+  it("moves only the edge being dragged", () => {
+    const r = snapResize({ x: 100, y: 100, w: 880, h: 50 }, "e", [], board, 8, { x: [984], y: [] });
+    expect(r.rect).toEqual({ x: 100, y: 100, w: 884, h: 50 });
+  });
+
+  it("pulls the left edge without moving the right one", () => {
+    const r = snapResize({ x: 92, y: 100, w: 300, h: 50 }, "w", [], board, 8, { x: [96], y: [] });
+    expect(r.rect.x).toBe(96);
+    expect(r.rect.x + r.rect.w).toBe(392);
+  });
+});
+
+describe("spacingSnap", () => {
+  it("evens out the gaps either side of a box, and draws both", () => {
+    const left = { x: 0, y: 0, w: 100, h: 100 };
+    const right = { x: 400, y: 0, w: 100, h: 100 };
+    // Gaps 98 and 102: within tolerance, so it settles at 100 and 100.
+    const s = spacingSnap({ x: 198, y: 0, w: 100, h: 100 }, [left, right], 4);
+    expect(s.dx).toBe(2);
+    expect(s.gaps).toHaveLength(2);
+    expect(s.gaps.map((g) => g.to - g.from)).toEqual([100, 100]);
+  });
+
+  it("does nothing when the gaps are clearly different", () => {
+    const s = spacingSnap({ x: 150, y: 0, w: 100, h: 100 }, [{ x: 0, y: 0, w: 100, h: 100 }, { x: 400, y: 0, w: 100, h: 100 }], 4);
+    expect(s.dx).toBe(0);
+    expect(s.gaps).toEqual([]);
+  });
+
+  it("only measures neighbours it lines up with", () => {
+    const s = spacingSnap({ x: 198, y: 0, w: 100, h: 100 }, [{ x: 0, y: 500, w: 100, h: 100 }, { x: 400, y: 0, w: 100, h: 100 }], 4);
+    expect(s.gaps).toEqual([]);
   });
 });

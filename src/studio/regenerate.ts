@@ -126,3 +126,38 @@ export const handEditedCount = (doc: Doc): number =>
 
 /** Marks a layer as the user's. Called from every editor mutation. */
 export const markEdited = (l: Layer): Layer => (l.handEdited ? l : { ...l, handEdited: true });
+
+/**
+ * Re-lay only some slides (18.5's "apply layout" on a filmstrip selection).
+ *
+ * The whole deck is rebuilt and the chosen slides taken from it, for the reason
+ * `restateSlide` gives: a composition depends on the index, the total and the
+ * deck's seed. Each taken slide keeps its id, its alt text and its hand-edited
+ * layers, so the selection still points at it afterwards.
+ *
+ * When the rebuild would change the slide count (copy long enough to split),
+ * there is no slide-for-slide answer, so nothing changes and `replaced` is 0.
+ */
+export function relaySlides(doc: Doc, ids: readonly string[], theme: Theme): MergeResult {
+  const fresh = buildSlides(textsOf(doc), theme);
+  if (fresh.length !== doc.slides.length) return { doc, replaced: 0, kept: 0 };
+
+  let replaced = 0;
+  let kept = 0;
+  const slides = doc.slides.map((old, i) => {
+    const rebuilt = fresh[i];
+    if (!rebuilt || !ids.includes(old.id)) return old;
+    const mine = old.layers.filter((l) => l.handEdited);
+    replaced += rebuilt.layers.length;
+    kept += mine.length;
+    return {
+      ...rebuilt,
+      id: old.id,
+      name: old.name,
+      ...(old.alt ? { alt: old.alt } : {}),
+      layers: [...rebuilt.layers, ...mine],
+    };
+  });
+
+  return { doc: replaced > 0 ? { ...doc, slides } : doc, replaced, kept };
+}

@@ -10,12 +10,17 @@ import {
   rectOf,
   resize,
   snap,
+  snapResize,
+  spacingSnap,
+  type Gap,
   type Guide,
   type Handle,
   type Rect,
+  type Targets,
 } from "./geometry.js";
+import { marginLines } from "./compositions.js";
 import { slidePaint } from "./paint.js";
-import { platformById } from "./platforms.js";
+import { platformById, platformForSize, safeBox } from "./platforms.js";
 import { SafeZones } from "./SafeZones.js";
 import { LayerView } from "./LayerView.js";
 import { MEDIA_DRAG_TYPE } from "./MediaPool.js";
@@ -41,6 +46,7 @@ export function Canvas({ studio }: { studio: Studio }) {
   const [pan, setPan] = useState({ x: 0, y: 0 });
   const [drag, setDrag] = useState<Drag>(null);
   const [guides, setGuides] = useState<Guide[]>([]);
+  const [gaps, setGaps] = useState<Gap[]>([]);
   const [spaceDown, setSpaceDown] = useState(false);
   const [dropTarget, setDropTarget] = useState<string | null>(null);
 
@@ -52,6 +58,22 @@ export function Canvas({ studio }: { studio: Studio }) {
   const layers = slide?.layers ?? [];
   const selectedLayers = layers.filter((l) => selection.includes(l.id));
   const box = bounds(selectedLayers);
+
+  /**
+   * Lines worth snapping to that are not layers (18.1): the compositions'
+   * margins and the active platform's safe-zone edges. The overlay's platform
+   * when one is showing, else whichever platform this artboard belongs to.
+   * Snapping is a property of the drag; none of this is stored.
+   */
+  const targets = ((): Targets => {
+    const m = marginLines(doc.width, doc.height);
+    const platform = studio.safePlatform
+      ? platformById(studio.safePlatform)
+      : platformForSize(doc.width, doc.height);
+    if (!platform) return m;
+    const safe = safeBox(platform, doc.width, doc.height);
+    return { x: [...m.x, safe.x, safe.x + safe.w], y: [...m.y, safe.y, safe.y + safe.h] };
+  })();
 
   /* ── zoom to fit ─────────────────────────────────────────────────────── */
   const fit = useCallback(() => {
@@ -110,7 +132,13 @@ export function Canvas({ studio }: { studio: Studio }) {
       }
       if (mod && e.key.toLowerCase() === "a") {
         e.preventDefault();
-        setSelection(layers.map((l) => l.id));
+        // Locked means unselectable on the canvas, select-all included.
+        setSelection(layers.filter((l) => !l.locked).map((l) => l.id));
+        return;
+      }
+      if (mod && e.key.toLowerCase() === "g") {
+        e.preventDefault();
+        e.shiftKey ? studio.ungroupSelected() : studio.groupSelected();
         return;
       }
       if (mod && e.key === "]") {
@@ -260,13 +288,15 @@ export function Canvas({ studio }: { studio: Studio }) {
     const hit = [...layers].reverse().find((l) => l.visible && !l.locked && contains(rectOf(l), p.x, p.y));
 
     if (hit) {
+      // A group member stands for its group, in and out of the selection.
+      const unit = studio.groupOf(hit.id);
       const next = e.shiftKey
         ? selection.includes(hit.id)
-          ? selection.filter((id) => id !== hit.id)
-          : [...selection, hit.id]
+          ? selection.filter((id) => !unit.includes(id))
+          : [...selection, ...unit]
         : selection.includes(hit.id)
           ? selection
-          : [hit.id];
+          : unit;
       setSelection(next);
       const origin = new Map<string, Rect>();
       for (const l of layers) if (next.includes(l.id)) origin.set(l.id, rectOf(l));
@@ -308,14 +338,25 @@ export function Canvas({ studio }: { studio: Studio }) {
       );
       let sx = 0;
       let sy = 0;
+      // Alt turns every kind of snapping off for this drag.
       if (movingBox && !e.altKey) {
-        const others = layers.filter((l) => !selection.includes(l.id)).map(rectOf);
-        const s = snap(movingBox, others, { w: doc.width, h: doc.height }, SNAP_PX / zoom);
-        sx = s.dx;
-        sy = s.dy;
+        const others = layers.filter((l) => l.visible && !selection.includes(l.id)).map(rectOf);
+        const tol = SNAP_PX / zoom;
+        const s = snap(movingBox, others, { w: doc.width, h: doc.height }, tol, targets);
+        // Equal spacing only on an axis no line already claimed: an edge
+        // lining up is the stronger signal, and two pulls would fight.
+        const sp = spacingSnap(
+          { ...movingBox, x: movingBox.x + s.dx, y: movingBox.y + s.dy },
+          others,
+          tol,
+        );
+        sx = s.dx !== 0 ? s.dx : sp.dx;
+        sy = s.dy !== 0 ? s.dy : sp.dy;
         setGuides(s.guides);
+        setGaps(sp.gaps.filter((g) => (g.axis === "x" ? s.dx === 0 : s.dy === 0)));
       } else {
         setGuides([]);
+        setGaps([]);
       }
       studio.updateEach(
         (l) => {
@@ -329,7 +370,17 @@ export function Canvas({ studio }: { studio: Studio }) {
     }
 
     if (drag.mode === "resize") {
-      const next = resize(drag.box, drag.handle, dx, dy, e.shiftKey);
+      let next = resize(drag.box, drag.handle, dx, dy, e.shiftKey);
+      // Constrained resizes keep their ratio; snapping one edge would break it.
+      if (!e.altKey && !e.shiftKey) {
+        const others = layers.filter((l) => l.visible && !selection.includes(l.id)).map(rectOf);
+        const artboard = { w: doc.width, h: doc.height };
+        const s = snapResize(next, drag.handle, others, artboard, SNAP_PX / zoom, targets);
+        next = s.rect;
+        setGuides(s.guides);
+      } else {
+        setGuides([]);
+      }
       const kx = drag.box.w === 0 ? 1 : next.w / drag.box.w;
       const ky = drag.box.h === 0 ? 1 : next.h / drag.box.h;
       studio.updateEach(
@@ -357,7 +408,11 @@ export function Canvas({ studio }: { studio: Studio }) {
     if (drag.mode === "marquee") {
       const rect = normalize({ x: drag.startX, y: drag.startY, w: dx, h: dy });
       setDrag({ ...drag, rect });
-      setSelection(layers.filter((l) => l.visible && intersects(rectOf(l), rect)).map((l) => l.id));
+      setSelection(
+        studio.withGroupsOf(
+          layers.filter((l) => l.visible && !l.locked && intersects(rectOf(l), rect)).map((l) => l.id),
+        ),
+      );
       return;
     }
 
@@ -394,6 +449,7 @@ export function Canvas({ studio }: { studio: Studio }) {
     }
     setDrag(null);
     setGuides([]);
+    setGaps([]);
   };
 
   /** Topmost image layer under the pointer, a drop lands there, sized to its box. */
@@ -479,6 +535,23 @@ export function Canvas({ studio }: { studio: Studio }) {
                 zoom={zoom}
               />
             ) : null}
+
+            {/* equal-spacing markers: the two gaps that are now the same */}
+            {gaps.map((g, i) =>
+              g.axis === "x" ? (
+                <div
+                  key={`gap-${i}`}
+                  className="absolute bg-danger"
+                  style={{ left: g.from, top: g.cross, width: g.to - g.from, height: 2 / zoom }}
+                />
+              ) : (
+                <div
+                  key={`gap-${i}`}
+                  className="absolute bg-danger"
+                  style={{ top: g.from, left: g.cross, height: g.to - g.from, width: 2 / zoom }}
+                />
+              ),
+            )}
 
             {/* snap guides */}
             {guides.map((g, i) =>

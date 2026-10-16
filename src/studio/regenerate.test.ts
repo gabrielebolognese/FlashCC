@@ -3,7 +3,14 @@ import { describe, expect, it } from "vitest";
 import { buildSlides } from "./compositions.js";
 import { makeDoc, makeLayer, type Doc, type Layer } from "./model.js";
 import { styleById } from "./styles.js";
-import { handEditedCount, markEdited, mergeRegenerated, regenerate, textsOf } from "./regenerate.js";
+import {
+  handEditedCount,
+  markEdited,
+  mergeRegenerated,
+  regenerate,
+  relaySlides,
+  textsOf,
+} from "./regenerate.js";
 
 const THEME = styleById("ink").theme;
 const COPY = ["A hook that earns the swipe.", "Some body copy in the middle.", "Follow for more."];
@@ -110,5 +117,30 @@ describe("regenerating", () => {
   it("is a no-op on a document with nothing in it", () => {
     const empty = { ...makeDoc(), slides: [] };
     expect(() => regenerate(empty, THEME)).not.toThrow();
+  });
+});
+
+/* ── Batch 18.5, re-lay a picked set ──────────────────────────────────── */
+
+describe("relaySlides", () => {
+  it("rebuilds only the picked slides, keeping their ids and hand edits", () => {
+    const doc = deck();
+    const moved = {
+      ...doc,
+      slides: doc.slides.map((s) => ({ ...s, layers: s.layers.map((l) => ({ ...l, x: l.x + 50 })) })),
+    };
+    moved.slides[1] = { ...moved.slides[1]!, layers: [...moved.slides[1]!.layers, mine()] };
+
+    const picked = [moved.slides[1]!.id];
+    const r = relaySlides(moved, picked, THEME);
+
+    expect(r.doc.slides.map((s) => s.id)).toEqual(moved.slides.map((s) => s.id));
+    // Untouched slides are the same objects.
+    expect(r.doc.slides[0]).toBe(moved.slides[0]);
+    expect(r.doc.slides[2]).toBe(moved.slides[2]);
+    // The picked one is laid out fresh, with the hand-made layer still on it.
+    expect(r.doc.slides[1]!.layers.some((l) => l.name === "Mine")).toBe(true);
+    expect(r.kept).toBe(1);
+    expect(r.replaced).toBeGreaterThan(0);
   });
 });
