@@ -2503,6 +2503,1952 @@ that ends the batch.
 that idea drafted from its own words, rather than stopping before a single
 carousel exists.
 
+## Batches 17 onward, how to read this
+
+This is the second half of the plan of record: seventeen new batches, 17 to 33, that
+pick up where Batch 16 stopped. Batches 1 to 16 are done and are not repeated here.
+Every item below either builds on something they shipped or says plainly why it
+cannot.
+
+The format is the same as the first half, so `/next-batch` can keep working through
+it unchanged:
+
+- **Status, Size, Why here** at the top of each batch.
+- Numbered items with **What**, **Why** and **Done when**.
+- An **Invariant check** wherever an item comes near one of the seven rules in
+  `CLAUDE.md`.
+- **What this batch deliberately does not do** at the foot.
+- A **Built as** section is left for whoever builds it, because every batch in the
+  first half found something the plan got wrong, and this half will too.
+
+**One difference in how this half was written.** The first sixteen batches were
+planned against the code. This half was planned against the roadmap that describes
+the code, not the code itself. Where an item depends on something the roadmap does
+not settle (whether a calendar view exists, what `platforms.ts` currently lists, how
+`compositions.ts` exposes its catalogue), it says so as an **Unknown** at the top of
+the batch. Resolve those against the repo before starting, the same way Batch 9
+started with an audit.
+
+The request this half answers is three things at once: a product where the user can
+**make anything a carousel needs** without leaving, **extreme time saving** on the
+parts that actually cost time, and **many presets**. Those pull in different
+directions, and the frame below is how they are reconciled.
+
+---
+
+## The frame for the second half
+
+**Batches 1 to 16 removed the reasons to choose PostNitro. Batches 17 to 23 remove
+the reasons to open Canva for a single slide. Batches 24 to 29 are the time saving
+nobody else has. Batches 30 to 33 are the long tail.**
+
+The first half's test still holds and gets one more clause. The competitor that
+matters is still PostNitro, and as of October 2026 it turns a topic, pasted text or
+a URL into carousels, supports more than thirteen languages, and ships a REST API
+plus an embeddable SDK. FlashCC already answers most of that list on its own terms.
+What it does not answer yet is the moment somebody needs a chart, a comparison
+table, a photo with the background removed, or a slide that reads as one image
+across three swipes, and leaves for Canva to make it. Every time that happens, the
+batch at post three or four breaks a little earlier.
+
+### The test every item in this half must pass
+
+> **It removes a decision or a click from an 8 to 15 carousel session, or it makes
+> something possible that currently forces leaving the app.** If it does neither, it
+> is a menu item, and it does not go in.
+
+### Many presets, few buttons
+
+The product thesis is that fewer buttons is what makes FlashCC good. "Many presets"
+sounds like the opposite, and done badly it is: a gallery of 300 layouts is Canva's
+problem, and the first half already rejected template count on evidence ("too many
+identical templates already exist").
+
+The resolution is a rule about where presets live:
+
+- **A preset is a default, not a menu.** It is chosen by the context it appears in
+  (the slot, the framework, the platform, the brand) and shown as the one sensible
+  answer, with alternatives one keystroke away rather than all on screen.
+- **Cycling beats browsing.** "Next layout" on a selected slide walks the compatible
+  options one at a time. Nobody scrolls a grid.
+- **A preset must encode a decision a person would otherwise make by hand.** A hook
+  formula, a CTA that matches the goal, a type ramp that already passes the legibility
+  check. A preset that only offers another colour is not one.
+- **Every preset runs once and leaves plain layers.** That is the existing invariant,
+  and it is what keeps a large preset library from turning into a live template
+  system.
+
+### Marketed as a time saver, not as AI
+
+FlashCC is sold as a time saver for the user's own creativity, not as an AI tool.
+That shapes this half directly. **Every AI feature below has a deterministic half
+that works with no key and no account**, the same way `longform.ts` sits beside
+`/api/distil` and `captionOf` sits beside `/api/caption`. Where an item has no
+sensible deterministic half, it says so, and it is gated on Pro like every other
+route that spends money.
+
+### Invariants carried forward
+
+| Rule | What it means for this half | Where it bites hardest |
+| --- | --- | --- |
+| Presets run once, nothing is derived | Layouts, blocks, furniture, templates and translations all write plain layers and keep no binding | 18, 20, 23, 25, 29 |
+| 5. AI writes words, never layout | No model chooses a block, an image, a colour or a position | 19, 21, 25, 29 |
+| 6. Approvers are free and unlimited | Nothing in client work gains a seat price | 31 |
+| 7. Nothing is metered | Video export and stock search get abuse ceilings, never credits | 21, 26 |
+| Every route returns words | New routes return strings or structured words, never geometry | 19, 28, 29 |
+| Nothing is ranked or scored | Remixing a winner sorts by the user's own numbers, never by a model's opinion | 28 |
+
+### The pattern this half leans on: stamp and reseal
+
+Several items here look like they need a live binding: page numbers that follow a
+reorder, a footer on every slide, a template whose change reaches every deck made
+from it. The first half already solved this shape twice, with `stampLogo` (Batch 5)
+and the series reseal on delete (Batch 6). The answer is the same each time.
+
+1. **Stamp:** a one-shot function writes ordinary layers, tagged with a stable role so
+   a later pass can find them.
+2. **Reseal:** a second one-shot function runs at an existing mutation funnel (reorder,
+   insert, delete, format change) and rewrites only the stamped layers, never anything
+   hand-edited.
+3. **Idempotent:** running either twice produces the same document, and a test asserts
+   it.
+
+That is not derivation. Nothing is computed at render time and nothing reads from
+anywhere but the document. It is the same funnel discipline `markEdited` already
+follows, applied to more things.
+
+---
+
+## Batch 17, Every format people actually post to
+
+**Status:** next
+**Size:** small to medium. Mostly data, plus one real feature in 17.5.
+**Why first:** the format list was set in Batch 1 and Instagram changed underneath
+it. Since January 2025 the profile grid shows tall 3:4 tiles, and since May 2025
+Instagram accepts 3:4 uploads (1080x1440) for single photos and carousels. FlashCC
+exports 4:5, 1:1 and 9:16, so the most valuable Instagram size in 2026 is the one it
+cannot make. Same damage-to-effort shape as Batch 1.
+
+**Unknowns:** what `platforms.ts` lists today, and whether Batch 9's `MY = 140`
+Instagram inset was computed for a square grid crop or a 3:4 one. If the former, the
+inset is now wrong for every Instagram deck.
+
+### 17.1 Instagram 3:4
+
+**What:** a 1080x1440 format, added to the switcher, the Instagram platform preset,
+`reflow.ts` and `safearea.ts`.
+
+**Why:** a 3:4 upload is the only size the profile grid shows without a crop, and it
+takes more vertical feed space than 4:5. A rival already ships 1080x1440 as a named
+option. Size guides disagree on whether the feed itself displays 3:4 uncropped or
+caps at 4:5, which is exactly why this needs checking on a real account rather than
+trusting either.
+
+**Landmine:** if 3:4 becomes the Instagram default, every existing 4:5 deck is
+suddenly "the wrong size" in the pre-flight. It should not be. 4:5 stays valid and
+silent; 3:4 is offered, not imposed.
+
+**Done when:** a 4:5 deck switches to 3:4 through the existing reflow with zero
+safe-zone warnings, and a 3:4 slide posted to a test account shows uncropped in both
+the feed and the grid.
+
+### 17.2 The rest of the platform list
+
+**What:** presets for the destinations people cross-post the same carousel to. Each
+row carries ratio, pixel size, item ceiling, preferred file type and a **last
+verified** date.
+
+| Destination | Shape | Item ceiling | Note |
+| --- | --- | --- | --- |
+| Instagram | 4:5 1080x1350, 3:4 1080x1440, 1:1 | 20 in app, 10 through the Graph API | already in Batch 1, ratio list grows |
+| Threads | 4:5 1080x1350 | 20 in app since late 2024; schedulers report 10 through the API | same split as Instagram, so the pre-flight must say which one applies |
+| LinkedIn | any ratio, as one PDF | 300 pages | unchanged; JPG rule from 1.1 stands |
+| TikTok photo mode | 9:16 1080x1920 | 35 | unchanged |
+| X | 4 images per post | 4 | see 17.3 |
+| Pinterest | 2:3 1000x1500 | 2 to 5 per carousel (approximate, verify) | taller than anything else on this list |
+| Bluesky | 4 images per post | 4 (approximate, verify) | behaves like X |
+| Facebook | 4:5 or 1:1 multi-photo | verify | lowest priority, mostly reached through schedulers |
+
+**Rule for the table:** a row with no verified date does not ship as a named preset.
+Unverified numbers from size-guide blogs are how Batch 1's Instagram ceiling nearly
+shipped wrong.
+
+**Done when:** every shipped row has a verified date, and `npm run check:schema`'s
+sibling, `check:platforms`, prints any row older than 180 days as a warning (not a
+failing test, because a test that fails on the calendar is a test people learn to
+ignore).
+
+### 17.3 Decks that do not fit in one post
+
+**What:** for destinations capped at 4 images (X, Bluesky), split a deck into a
+numbered thread of posts, 4 slides each, and export one folder per post with the
+post order in the file names.
+
+**Why:** a 10-slide carousel on X today means the user splits it by hand and guesses
+where the breaks go. The split is arithmetic plus one rule: never strand the CTA
+slide alone in the last post. If the remainder is 1, move a slide back so the last
+post has 2.
+
+**Done when:** a 10-slide deck exports as posts of 4, 4 and 2, never 4, 4, 1, 1, and
+the caption route can be asked for one short line per post.
+
+### 17.4 Pinterest is a different shape, not a different size
+
+**What:** 2:3 runs through the same reflow, but Pinterest carousels are short
+(single digits) and each pin is discovered on its own. So the Pinterest preset also
+proposes **which 5 slides** to keep, by structure only: the hook, the strongest
+three body slides by the deck's own slot order, and the CTA.
+
+**Invariant check:** "strongest" is positional, never a model's judgement. Nothing
+is ranked. The user sees the five, can swap any of them, and the choice is theirs.
+
+### 17.5 One deck, every destination, one export
+
+**What:** pick several platforms in the export dialog and get one zip with a folder
+per destination, each reflowed, safe-zoned and pre-flighted for that platform.
+
+**Why:** the same carousel goes to Instagram, LinkedIn and TikTok in nearly every
+workflow in the research, and today that is three format switches, three exports and
+three chances to forget the JPG rule.
+
+**The decision to make first:** are the variants documents, or only exports?
+**Recommend exports first, documents on request.** A variant that becomes a document
+drifts from its source the moment either is edited, which is correct (nothing is
+derived) but invisible. So the default is render-only: reflow a copy in memory,
+export it, throw the copy away. A **Keep as separate carousel** checkbox per
+destination saves it as a real document with a `variantOf` field, used for
+findability only and never for syncing.
+
+**Show a contact sheet before writing the zip:** every slide of every destination in
+one grid, with each destination's pre-flight result above its column. Reflow is good
+and it is not perfect, and a 9:16 slide that reflowed badly should be caught here
+rather than after posting.
+
+**Done when:** one 4:5 deck exports to Instagram 3:4, LinkedIn and TikTok in a
+single action, three folders, each passing its own pre-flight, with nothing new
+saved unless asked.
+
+### 17.6 Grid preview
+
+**What:** an Instagram profile-grid preview showing this deck's cover beside the
+covers of the user's last eight **published** FlashCC carousels, at the real tile
+ratio.
+
+**Why:** people judge a cover by how it sits next to the others, and today they find
+out after posting. Batch 5 already keeps published slides at public URLs, so the
+data is there and nothing new is fetched.
+
+### What this batch deliberately does not do
+
+- **No video formats.** That is Batch 26.
+- **No posting to any of these.** Unchanged from the first half.
+- **No unverified presets.** See 17.2.
+
+---
+
+## Batch 18, Layout tools that act once
+
+**Status:** queued
+**Size:** medium
+**Why here:** "Post-generation editing is the stated churn path" is the strongest
+line in the first half's caveats, and the most common hand edit after generation is
+moving things until they line up. Today that is done by eye, slide by slide. Every
+item here is an editing tool that writes ordinary coordinates and then forgets it
+ran.
+
+**Unknowns:** whether the canvas already has snapping, multi-select within a slide,
+grouping or a layers list. The Photoshop-model rewrite suggests a layers list
+exists. Batch 11 confirmed there is **no multi-slide selection** in the filmstrip.
+
+### 18.1 Smart guides and snapping
+
+**What:** while dragging or resizing, snap to the artboard centre lines, the
+composition's margins (`MX`, `MY`), the active platform's safe-zone edges, and the
+edges and centres of other layers. Show equal-spacing markers when a layer sits
+evenly between two others.
+
+**Why:** it is the single editor behaviour every designer expects and every
+non-designer benefits from without knowing its name. It also stops the most common
+way a hand-edited slide fails the pre-flight: a layer nudged a few pixels into the
+safe zone.
+
+**Invariant check:** snapping is a property of the drag, not of the document.
+Nothing about it is stored.
+
+**Done when:** dragging a headline snaps to the safe-zone edge of the active
+platform, and holding a modifier key disables all snapping for that drag.
+
+### 18.2 Tidy
+
+**What:** with several layers selected, one action each for align (six directions),
+distribute (horizontal, vertical), equal gap, and match width. With nothing
+selected, **Tidy slide** reads the layers top to bottom by their current position
+and re-spaces them on the composition's own spacing scale.
+
+**Why:** "the spacing never survives the resize" was the first half's diagnosis of
+the format switcher. It is equally true of hand editing. Tidy is the button that
+undoes ten minutes of nudging.
+
+**Decision:** Tidy slide **never changes reading order** and never resizes text. It
+moves boxes. If two layers overlap so that their order is ambiguous, it leaves both
+where they are and says so, rather than guessing.
+
+**Done when:** a slide with four uneven gaps becomes four equal gaps from the
+spacing scale in one action, and undo restores the exact previous coordinates.
+
+### 18.3 Match across slides
+
+**What:** select a layer, then **Match on every slide**: every layer on the other
+slides with the same stamped role (headline, body, number, furniture) takes this
+layer's position, size and type size. Optional scope: this slide range only.
+
+**Why:** the documented complaint about AI carousels is "text sizing shifted from
+slide to slide with no clear logic". Generation already avoids most of that. Hand
+edits reintroduce it, one slide at a time.
+
+**Invariant check:** this is a one-shot copy of numbers, not a style link. Change
+the headline on slide 1 afterwards and slide 2 does not follow. That is the point.
+
+**Landmine:** a matched text layer can now overflow on a slide whose words are
+longer. Run `fit` and the Batch 4 overflow check over every slide the action touched
+and show "2 slides now overflow" with a link to each, rather than silently squashing
+them.
+
+**Done when:** matching slide 1's headline across a 9-slide deck leaves every
+headline at the same y and size, and any slide that newly overflows is reported by
+number.
+
+### 18.4 A spacing scale per composition
+
+**What:** each composition in `compositions.ts` declares the spacing steps it is
+built from (for example 16, 24, 40, 64). Tidy and the equal-gap tool use those steps
+rather than an arbitrary pixel average.
+
+**Why:** equal gaps of 37px look accidental; equal gaps of 40px look designed. The
+compositions already encode a rhythm implicitly. This makes it explicit so the tools
+can respect it.
+
+### 18.5 Multi-slide selection in the filmstrip
+
+**What:** shift-click for a range, modifier-click to add or remove, with **delete,
+duplicate, move, apply layout, match** acting on the set.
+
+**Why it is in this batch and not in Batch 11:** Batch 11 correctly refused to build
+it for rewriting, because each rewrite can invalidate the next. Structural actions
+are different: delete, duplicate and move are well defined on a set, and match is
+defined on a set by construction.
+
+**Rules that keep it sound:**
+
+- Selection is a set of **slide ids**, not indexes, so a reorder does not change what
+  is selected.
+- Drag reorder with a multi-selection moves the set as a block, keeping its internal
+  order.
+- Any action that changes the slide count clears the selection afterwards. Nobody
+  should have to guess which slides are still selected after a split.
+- Rewrite stays single-slide, for the reason Batch 11 gave.
+
+**Done when:** selecting slides 3 to 6 and duplicating produces 3 to 6 again
+directly after slide 6, in order, and the selection is cleared.
+
+### 18.6 Group and lock
+
+**What:** **group** is a `groupId` shared by several layers so they select and move
+together. **Lock** is a flag that makes a layer unselectable on the canvas but still
+editable from the layers list.
+
+**Decision:** a group is **not a container layer**. A container would need its own
+transform, nested coordinates, and a change to reflow, render and export. A shared
+tag needs none of those. If somebody later needs rotation of a group as a unit, that
+is when to revisit, not before.
+
+**Why lock matters here specifically:** backgrounds. Every user who has tried to
+select a headline on a full-bleed image and grabbed the image instead wants this,
+and the stamped furniture in Batch 20 should be locked by default.
+
+### What this batch deliberately does not do
+
+- **No auto-layout frames.** A Figma-style frame that re-lays its children on every
+  change is live derivation. Reflow (Batch 1), Tidy and Match cover the same need with
+  one-shot actions.
+- **No nested groups.** See 18.6.
+- **No rulers with user guides.** Smart guides cover the need, and user guides are
+  state that nobody asks to keep.
+
+---
+
+## Batch 19, The block library
+
+**Status:** queued
+**Size:** large. Many small pieces, each with its own tests.
+**Why here:** this is the batch that makes "create everything" true. Today a slide
+is headline, body, shapes and images. Every carousel that needs a chart, a
+comparison, a checklist with ticks or a code sample is built by hand from
+rectangles, or built in another tool and imported as a flat picture that cannot be
+edited or re-branded. A block is the missing middle: a preset for **content with a
+shape**.
+
+**Unknowns:** how `compositions.ts` exposes its catalogue, and whether a layer can
+already carry a role tag beyond `handEdited`. Batch 11 found roles are not stored at
+runtime; this batch needs one stamped field per block layer, the same shape as
+`stampLogo`'s.
+
+### 19.1 What a block is
+
+A block is a pure function: **fields in, plain layers out**, sized to a box it is given.
+
+```
+type Block = {
+  id: string;                 // "stat", "checklist", "chart.bar"
+  fields: FieldSpec[];        // words and numbers only
+  minBox: { w: number; h: number };
+  build(fields, box, theme): Layer[];
+};
+```
+
+- **Fields are words and numbers.** That is what lets a framework slot ask a model to
+  fill one without breaking invariant 5.
+- **Every emitted layer is stamped** `{ block: id, blockInstance: uuid, part: "label"
+  }`, so a later pass can find the block again.
+- **The block never measures itself into overflow.** It gets a box, runs the same
+  `fit` ladder as everything else, and if the content cannot fit at the 60% floor from
+  Batch 4, it reports overflow like any other text. No block shrinks to the floor
+  silently.
+
+**Invariant check:** a block runs once. Changing the theme afterwards restyles its
+layers through the normal brand re-apply path, because they are ordinary layers.
+Nothing reads the block definition at render time.
+
+### 19.2 The library
+
+| Block | Fields | The rule that matters |
+| --- | --- | --- |
+| Checklist | 3 to 7 items, tick or cross per item | numbering and ticks continue across a slide split (the 4.2 bug, not repeated) |
+| Steps | 3 to 6 numbered steps, optional connector | steps never split mid-step; a split moves a whole step |
+| Big number | value, label, optional source line | the number is checked by `checks.ts` against the brief, same flag tier as Batch 15 |
+| Quote | text, attribution | a quote inserted from Batch 13's verified list carries a `verbatim` flag; editing its words clears the flag |
+| Two columns | left label, right label, rows | presets: Do / Don't, Myth / Fact, Before / After, Us / Them, Old way / New way |
+| Before and after | two images or two texts, divider | the divider can sit on a slide boundary (see Batch 23) |
+| Timeline | 3 to 6 points, each a label and a short line | horizontal on wide boards, vertical on 9:16 |
+| Table | up to 4 columns by 6 rows | over that, it proposes a split across slides rather than shrinking |
+| Chart | pasted `label, value` lines | see 19.3 |
+| Code | code, language | see 19.4 |
+| Post card | text, optional image | uses the brand's own identity only (Batch 20), see 19.5 |
+| Testimonial | words, name, role | never filled by a model, see 19.5 |
+| Annotation | arrow, note, target point on an image | the arrow stays attached to the image region when the image is moved, because both are in one group (18.6) |
+| Screen frame | image, frame style (phone, browser, plain card) | generic frames drawn from shapes, no manufacturer outlines or trademarks |
+| Screenshot polish | image, padding, corner radius, shadow, backdrop | the most-requested look in tutorial carousels, one action |
+| QR code | URL | generated locally, never below the size a phone can scan at feed scale, contrast checked |
+| Icon grid | 3 to 6 icons with labels | icons from Batch 21 |
+| Question | prompt, 2 to 4 options | for the "which one are you" slides; a closing-slide companion to the CTA |
+| Section title | number, title | the "Part 2" divider inside long decks |
+
+**That is nineteen blocks, and the list should stop there until somebody asks for
+the twentieth.** Each one is a decision a person makes by hand today. A twentieth
+that nobody asked for is a menu item.
+
+### 19.3 Charts, done the boring way
+
+**What:** bar, horizontal bar, line, donut and progress. Data comes from pasted
+lines (`Q1, 40`), and the chart is drawn as ordinary shape and text layers, so it
+exports through the existing Playwright path with no new renderer.
+
+**Rules, all deterministic and all tested:**
+
+- Bars start at zero. Always.
+- At most 8 bars, 12 line points, 6 donut segments. Over that, the block says so
+  rather than drawing an unreadable chart.
+- Values are labelled directly on the marks. No legend unless there are two series.
+- Colours come from the brand's roles, with the accent reserved for the one value the
+  user marks as the point.
+- No 3D, no gradients on marks, no pie charts with more than three slices disguised as
+  donuts.
+
+**Why so strict:** a carousel chart is read in under two seconds at phone size.
+Every rule above is one that the first half's legibility evidence already implies.
+
+**Invariant check:** the chart is a snapshot of the numbers pasted. There is no data
+source and no refresh. Live data binding was rejected in the first half and stays
+rejected.
+
+**Done when:** pasting five lines produces a bar chart that passes the pre-flight at
+1080x1350 and 1080x1920, and pasting a negative value draws a bar below a visible
+zero line rather than breaking.
+
+### 19.4 Code
+
+**What:** a monospace block with syntax highlighting from a deterministic tokenizer
+(no network), a line ceiling per format, and the brand's colours mapped onto a small
+fixed set of token roles.
+
+**Landmine:** code is the one text that must never be re-wrapped silently, because a
+wrapped line can change meaning in Python or YAML. Over the line width, the block
+reports overflow and offers a smaller step on the ladder or a split by lines. It
+never soft-wraps.
+
+### 19.5 Two blocks with an honesty rule
+
+**Post card** looks like a social post: avatar, name, handle, text. It is filled
+**only from the user's own identity** in the brand (Batch 20) and carries no
+platform logo, no verified mark and no engagement numbers. A post card that can be
+set to somebody else's name and handle is a fake screenshot generator, and that is
+not a feature FlashCC ships.
+
+**Testimonial** is never filled by a model. The draft prompt already forbids
+inventing a client or a result (Batch 10's finding), and a testimonial is exactly
+that. Framework slots can request a testimonial block; the model leaves it empty
+with a placeholder that the pre-flight then catches, so it cannot ship blank by
+accident.
+
+### 19.6 Inserting a block
+
+**What:** `/` on an empty canvas area, or the command palette (Batch 24), opens a
+short filtered list. The block lands in the largest free rectangle on the slide that
+meets its `minBox`, found deterministically. If there is no room, it proposes a new
+slide after this one rather than overlapping.
+
+**Done when:** inserting a checklist on a slide that already has a headline places
+it under the headline, clear of the safe zone, with no overlap.
+
+### 19.7 Blocks inside frameworks
+
+**What:** a framework slot can name a block. A "results" slot asks for a big number;
+a "compare" slot asks for two columns. The model fills the block's fields through
+the existing structured output, words and numbers only, and `compositions.ts` places
+the block.
+
+**Invariant check:** this is the line invariant 5 draws, and it holds. **The
+structure chose the block, not the model.** The model never sees a list of blocks
+and never decides which one to use.
+
+### 19.8 Editing a block after it is placed
+
+**What:** selecting any stamped layer offers **Edit as block**, which reopens the
+field form. Saving re-runs `build` and replaces only the untouched layers of that
+instance, exactly the Batch 4.6 rule, so a hand-recoloured bar survives a data
+change.
+
+**Done when:** changing one value in a placed chart redraws the bars, keeps the
+user's hand-moved title where they put it, and is one undo step.
+
+### What this batch deliberately does not do
+
+- **No user-authored block definitions.** Saved templates (Batch 25) cover reuse
+  without a block authoring language.
+- **No chart data from a spreadsheet link.** Paste is enough and keeps nothing live.
+- **No AI choosing blocks.** See 19.7.
+- **No fake screenshots of real platforms or people.** See 19.5.
+
+---
+
+## Batch 20, Deck furniture and author identity
+
+**Status:** queued
+**Size:** medium
+**Why here:** almost every LinkedIn and Instagram carousel in the research carries
+the same furniture on every slide: who made it, which slide this is, and a nudge to
+keep swiping. Today that is placed by hand on each slide and re-placed after every
+reorder. It is the most repetitive edit in the product and it is entirely
+mechanical.
+
+**Unknowns:** none that block. `stampLogo` (Batch 5) is the template for everything
+here.
+
+### 20.1 Identity lives on the brand
+
+**What:** `Brand.identity` gains `name`, `role`, `avatar` (an asset id, Batch 5),
+`site`, and **a handle per platform**.
+
+**Why per platform:** the same person is `@shortname` on Instagram and their full
+name on LinkedIn. A single handle field means every multi-destination export (17.5)
+is wrong on at least one of them.
+
+**Invariant check:** this is data on the brand, applied once at stamp time like
+colours. Nothing reads it at render.
+
+### 20.2 The furniture kinds
+
+| Piece | What it shows | Default rule |
+| --- | --- | --- |
+| Author chip | avatar, name, handle | large on the cover, small on body slides, absent on the CTA if the CTA block already shows identity |
+| Counter | `3 / 10` or `3` | skips the cover by default, so a 10-slide deck reads 1 to 9 after it |
+| Progress bar | a thin bar filling by position | never on the cover |
+| Swipe cue | an arrow, optionally a word | every slide except the last, which is the only slide where it is a lie |
+| Logo | the existing `stampLogo` mark | unchanged, now one piece of a set |
+| Footer line | a URL or a short line | body slides only |
+
+### 20.3 Placement respects the destination
+
+**What:** each piece declares a preferred corner and is placed inside the active
+platform's safe area from `safearea.ts`, never inside a chrome zone. On TikTok,
+nothing goes in the right rail or the bottom band; on Instagram 3:4, nothing goes
+where the grid tile crops.
+
+**Landmine:** furniture and content compete for the same corners. If a corner is
+occupied by content when furniture is stamped, the piece moves to its second
+preference rather than overlapping, and if no corner is free it is skipped on that
+slide and listed in the pre-flight. Furniture never pushes content.
+
+### 20.4 Stamp, then reseal
+
+This is the pattern from the frame, applied for real.
+
+1. **Stamp** writes each piece as ordinary, **locked** layers (18.6), tagged `{
+   furniture: "counter" }`.
+2. **Reseal** runs at the existing mutation funnels: slide insert, delete, reorder,
+   split, merge, format change, and export. It rewrites the text of counters, the width
+   of progress bars and the presence of swipe cues, from the deck as it now stands.
+3. **Moving a piece keeps its stamp.** Reseal updates the counter's number and leaves
+   it where the user put it.
+4. **Typing into a piece removes its stamp.** It becomes an ordinary text layer and
+   reseal never touches it again. Somebody who typed "Swipe for the secret" into the
+   swipe cue has said what they want.
+
+**Done when:** reordering slide 7 to position 2 renumbers every counter, moves the
+missing swipe cue to the new last slide, and a test asserts reseal run twice changes
+nothing the second time.
+
+### 20.5 Furniture per destination at export
+
+**What:** in a multi-destination export (17.5), reseal runs on each reflowed copy
+with that platform's handle and safe area. The Instagram folder says `@handle`; the
+LinkedIn PDF says the full name.
+
+**Done when:** one deck exported to Instagram and LinkedIn shows two different
+handles, and neither copy's furniture sits inside its platform's chrome.
+
+### 20.6 Six furniture sets
+
+**What:** Minimal (counter only), Creator (author chip and swipe cue), Editorial
+(footer line and counter), Corporate (logo, footer, counter), Bold (large progress
+bar and chip), and None. Each brand stores which set it uses, so a new carousel
+arrives already furnished.
+
+**Why only six:** each set is a coherent decision about how loud the furniture is. A
+seventh set would differ from one of these by a corner, and that is what the
+per-piece placement controls are for.
+
+### What this batch deliberately does not do
+
+- **No forced "Made with FlashCC" mark on the free tier.** It is a common growth loop
+  and it is the opposite of the honest billing promises from Batch 8. An opt-in credit
+  line in the Footer piece is fine; a mandatory one is not.
+- **No live binding of identity.** Changing your avatar does not reach published
+  decks. Re-apply the brand (Batch 3.2) to update a document on purpose.
+
+---
+
+## Batch 21, Imagery, icons and backgrounds
+
+**Status:** queued
+**Size:** large. Stock search and background removal are each real work.
+**Why here:** after blocks, pictures are the second reason somebody leaves for Canva
+mid-session. A carousel that needs one icon per tip, a photo behind the cover, or a
+product shot with the background cut out cannot be finished in FlashCC today without
+an upload from somewhere else.
+
+**Unknowns:** whether an image layer can already carry a focal point, and how large
+the client bundle can grow before load time suffers.
+
+### 21.1 Icons, bundled and recoloured
+
+**What:** one or two permissively licensed icon sets (Lucide is ISC, Phosphor and
+Tabler are MIT), searchable locally by name and tag, inserted as vector layers in
+the brand's colour roles. The index loads on first open of the picker, not with the
+app.
+
+**Why:** "one icon per tip" is the most common decoration in educational carousels,
+and an icon that does not match the brand colour is the most common thing people go
+back to fix.
+
+**Decision: one style per deck by default.** Mixing an outline set with a filled set
+on the same carousel is the most visible amateur tell. The picker shows the deck's
+current set first and the others behind a switch.
+
+### 21.2 Stock photos through the providers' own APIs
+
+**What:** search Unsplash and Pexels from a picker, with the search proxied through
+the server so the keys never reach the browser. Chosen photos land in the asset
+library (Batch 5) with their attribution stored beside them.
+
+**Why this is not the Batch 13 rejection:** Batch 13 refused to fetch somebody
+else's page. A stock API is an offer, from the owner, to license exactly this use.
+That is the line, and it should be written into `CLAUDE.md` so the next feature does
+not blur it.
+
+**Landmine, before writing any code:** the two providers' terms differ on
+hotlinking, on keeping a copy, on attribution, and on reporting a download. Read
+each one's current API guidelines and build to the stricter. It is possible that one
+of them does not allow copying the file into a private bucket, in which case the
+asset stores a reference and `inline.ts` (Batch 5) fetches it at export time, which
+it already knows how to do.
+
+**Invariant check:** an abuse ceiling per account on search, keyed like the others.
+Never a quota anybody meets in normal use.
+
+**Done when:** searching "desk" returns photos, choosing one stores it with its
+credit, and the credit appears in the caption's first comment suggestion (Batch 12)
+when the provider asks for attribution.
+
+### 21.3 Backgrounds that are generated, not downloaded
+
+**What:** a small set of seeded generators drawn from brand colours: gradient mesh,
+grain overlay, dot grid, line field, soft blobs, paper texture, geometric tiles. The
+seed comes from the deck, the same way Batch 4 derives the composition offset from
+the deck's words, so one carousel is consistent and two carousels differ.
+
+**Why:** a plain background on every slide is the second half of the sameness
+complaint. A photo on every slide is noise. A generated texture in the brand's own
+colours is the cheap middle, and it costs no licence and no network.
+
+**Landmine:** grain and noise compress badly. A grain overlay can push a LinkedIn
+JPG past the 2MB ceiling from Batch 1.2. The generator needs a strength cap per
+platform, and the pre-flight's file-size check is what proves it.
+
+**Done when:** every generator renders identically in the editor and the Playwright
+export, and no generator pushes a 10-slide LinkedIn deck over 2MB at default
+strength.
+
+### 21.4 Image tools that stay on the layer
+
+| Tool | What it does | Why it is here |
+| --- | --- | --- |
+| Focal point | one point per image, set by a click | reflow and every crop keep the subject in frame, which `reflow.ts` currently cannot know |
+| Shape mask | circle, rounded, arch, blob, slanted | the most common frame for a face or product |
+| Filter presets | duotone in brand colours, mono, high contrast, soft blur | duotone in brand colours makes any stock photo look like it belongs |
+| Text scrim | a gradient behind text over an image | the honest fix for unreadable text on photos, see Batch 30 |
+| Replace image | swap the picture, keep crop, mask, filter and focal logic | the edit people make most often and currently redo from scratch |
+
+**Invariant check:** each tool writes properties onto the image layer once. A filter
+is a stored value rendered by CSS, not a pipeline that re-runs.
+
+### 21.5 Background removal, on the device
+
+**What:** cut a person or product out of a photo, in the browser, with no upload.
+
+**Why on the device:** a customer's product photo should not travel to a third party
+for a cut-out, and the free tier stays free because the compute is theirs.
+
+**Landmine:** the most popular in-browser removal library is AGPL licensed, which is
+incompatible with a closed commercial product. Check the licence of whatever model
+and runtime is chosen before writing the first line. The first run also downloads
+model weights in the tens of megabytes, so say so in the button the first time,
+rather than showing a spinner that looks broken.
+
+**Done when:** removing the background of a portrait produces a transparent cut-out
+that exports with clean edges, and a second removal in the same session starts in
+under three seconds.
+
+### 21.6 A palette from an image
+
+**What:** pick any image (a logo, a product, a photo) and get a proposed brand
+palette: background, foreground, accent and muted roles, chosen so foreground on
+background passes contrast (Batch 30). Deterministic colour quantisation in the
+browser.
+
+**Why:** it is the fastest possible way to a usable brand, and Batch 33's onboarding
+depends on it.
+
+### 21.7 A different picture for every carousel in a run
+
+**What:** Batch 16's run sheet gains an optional image pool. Images cycle through
+the run the same way ideas and styles do, so a 9-carousel run with 3 images gives
+each carousel a different cover image in a predictable order.
+
+**Why:** "I tried Canva bulk create but that only gives you one image. I want a
+different image for each post" is verbatim evidence from the first half, and the run
+sheet is already the place where cycling is decided.
+
+**Done when:** `planRun` with three images and nine carousels assigns image indexes
+`0,1,2,0,1,2,0,1,2`, in a pure test.
+
+### What this batch deliberately does not do
+
+- **No AI image generation.** It would be a second vendor, it pushes every customer
+  towards the same look, the rights question is unsettled, and FlashCC is not marketed
+  as an AI tool. Revisit only on direct demand.
+- **No scraping images from links.** The Batch 13 rule stands. Stock APIs are the
+  licensed route.
+- **No animated stickers or GIFs.** Batch 26 is where motion lives.
+
+---
+
+## Batch 22, Typography and emphasis
+
+**Status:** queued
+**Size:** large, because 22.3 changes the text model.
+**Why here:** a carousel is mostly type. The first half made type fit; it never made
+type expressive. The single most common hand edit on generated slides, after
+alignment, is colouring one word in the headline. Today that means splitting a text
+layer in two and placing the halves by eye.
+
+**Unknowns:** whether a text layer can hold styled runs today. If it cannot, 22.3 is
+the biggest change to `model.ts` since the Photoshop-model rewrite, and it should be
+scoped before anything else in the batch.
+
+### 22.1 Type ramps as presets
+
+**What:** three ramps, each a ratio between steps: **Tight** (1.2), **Editorial**
+(1.333) and **Loud** (1.5). A ramp sets the headline, subhead, body and caption
+sizes for a style, and every step sits above the pre-flight floors from Batch 1.3
+(body 18pt, headline 24pt).
+
+**Why:** a ramp is the decision that makes a deck look designed rather than typed.
+The compositions already imply one; this makes it a choice a brand can make once.
+
+**Invariant check:** the ramp sets the **top** of the `fit` ladder for each role.
+The ladder and its 60% floor from Batch 4 are unchanged.
+
+### 22.2 A curated pairing library
+
+**What:** about two dozen display and body pairs, all open-licensed fonts, each
+tested to render the same in the editor and in Playwright, grouped by voice:
+editorial, technical, friendly, luxury, brutal, handwritten.
+
+**Landmine, and it is the whole reason this is a batch item and not a list:** Batch
+4 found that measuring with one typeface and rendering with another overflowed three
+slides in four (D1), and that `Measure.family` was being handed a CSS stack where a
+FONTS id was expected (F1). **Every pair added must register its metrics in**
+`FONTS`, and a test must build a deck in every pair and assert zero overflow. A
+pairing that only exists in CSS is D1 coming back.
+
+**Done when:** every pair in the library passes a generated-deck overflow test at
+every format, and adding a pair without metrics fails the build.
+
+### 22.3 Emphasis inside a line
+
+**What:** three marks inside any text: `*word*` for accent colour, `**word**` for
+weight, `==word==` for a highlighter stroke. They are typed in the compose screen,
+in outline mode (Batch 24) and on the canvas, and rendered as styled runs.
+
+**Why:** "colour the one word that matters" is the most common emphasis in every
+carousel style in the research, and it is currently impossible without breaking a
+layer apart.
+
+**The invariant 5 question, answered:** can the model write the marks? **Yes, with a
+ceiling of one marked span per slide.** Emphasis is part of what a sentence means,
+not where it sits, so it is words. The model never chooses colour, weight or size;
+it chooses which word matters, and the style decides how that looks. `plainText`
+keeps the three marks and strips anything else that looks like markup.
+
+**Landmine:** measurement. A bold run is wider than a regular run, so `fit` must
+measure runs, not strings. If styled runs land without that, every emphasised
+headline overflows by a few characters and Batch 4's guarantee quietly breaks.
+
+**Done when:** a headline with one accented word renders identically in editor and
+export, measures within a pixel of its rendered width, and a slide with two
+model-written marks keeps the first and drops the second.
+
+### 22.4 Text effects
+
+| Effect | Notes |
+| --- | --- |
+| Highlighter | a rough stroke behind the run; the `==` mark |
+| Scribble underline | a hand-drawn underline under one run |
+| Label box | text on a solid box, the short-video caption look; padding counts in measurement |
+| Outline | stroked text, never below the 2px stroke floor from 1.3 |
+| Soft shadow | for text over photos; the scrim (21.4) is preferred, shadow is the fallback |
+| Gradient text | already shipped; moves into this list so all effects share one picker |
+
+**Rule:** at most one effect per text layer. Two effects on one line is the second
+most visible amateur tell after mixed icon styles.
+
+### 22.5 Scripts other than Latin
+
+**What:** font fallbacks for Cyrillic, Greek, CJK, Arabic and Hebrew, right-to-left
+layout for the last two, and line breaking that does not assume spaces between
+words.
+
+**Why now:** Batch 29 (translation) is impossible without it, and a creator who
+writes in Japanese cannot use FlashCC today at all.
+
+**Landmine:** `sentences()` from Batch 6 and the wrapping in `text.ts` both assume
+spaces and Latin punctuation. CJK needs a break opportunity between almost any two
+characters, and RTL needs alignment mirrored in every composition. Treat each script
+as its own test suite.
+
+### 22.6 Emoji that survive the server
+
+**What:** ensure the Playwright server has a colour emoji font installed and that
+the editor and export use the same one.
+
+**Why:** headless Chromium on a Linux server commonly has no colour emoji font, so
+an emoji that looks fine in the editor exports as an empty box. This is a one-line
+fix in the server image and an embarrassing bug if it ships first.
+
+**Done when:** a slide with five common emoji exports pixel-identical to the editor
+preview, and a test renders one on the server in CI.
+
+### What this batch deliberately does not do
+
+- **No arbitrary rich text.** Three marks, not a toolbar with underline, strike,
+  superscript and twelve colours. Fewer buttons.
+- **No variable-font axis sliders.** Weight steps from the pair are enough.
+- **No font uploads beyond Batch 5.** The asset path already handles them.
+
+---
+
+## Batch 23, Panoramic carousels
+
+**Status:** queued
+**Size:** medium to large
+**Why here:** the seamless carousel, where a line, a photo or a shape runs across
+the slide edge so the swipe feels like one continuous image, is one of the most
+recognisable Instagram carousel looks, and it is the hardest one to make by hand. It
+needs pixel-exact offsets on every slide, and one reorder ruins it. That is
+precisely the kind of work a tool should take away.
+
+**Unknowns:** whether the canvas can show more than one slide at a time, and how the
+Playwright export currently screenshots (per slide, or one page sliced).
+
+### 23.1 Strip view
+
+**What:** a toggle that shows every slide side by side with no gap, at the same
+scale, as one long canvas. Any layer can be dragged across a slide edge.
+
+**Why:** the seam is invisible in single-slide editing. It is the only view in which
+a spanning design can be judged.
+
+### 23.2 A spanning layer is several ordinary layers
+
+**What:** when a layer is dropped across an edge, it is committed as **one plain
+layer per slide it touches**, each at the correct offset (the piece on the
+right-hand slide sits at `x - W`), all sharing a `spanId`. Each slide clips its own
+piece naturally.
+
+**Invariant check:** this is the whole design, and it is why the feature is possible
+at all. Nothing is computed at render time; each slide holds real layers and renders
+alone. `spanId` behaves like `groupId` (18.6) across slides: in strip view the
+pieces select and move together, and in single-slide view each is an ordinary layer.
+
+**Done when:** a circle dropped across the edge of slides 2 and 3 becomes two
+layers, the slides render with the circle meeting exactly at the edge, and moving it
+in strip view moves both pieces.
+
+### 23.3 Continuous backgrounds and photos
+
+**What:** one image or one generated background (21.3) covering the whole strip, `N
+x W` wide, split into pieces per slide. The focal point (21.4) applies to the strip,
+not to each slide.
+
+**Also: Panorama from one image.** Drop a wide photo, choose how many slides, and
+get it split across a new deck. It is the single most common reason photographers
+want a carousel tool, and it is about forty lines of code on top of 23.2.
+
+### 23.4 Bridge presets
+
+**What:** a handful of designs whose entire point is the seam: a line that leads
+from one slide into the next, a large number split across two slides, an arrow that
+starts on the hook and lands on slide 2, a shape that peeks in from the right edge
+as a swipe cue.
+
+**Why:** the peek on the right edge of the cover is the most effective swipe cue
+there is, because it shows the next slide exists rather than telling the reader to
+swipe. It replaces the swipe-cue furniture (Batch 20) on decks that use it.
+
+### 23.5 The four ways a seam breaks, and what to do about each
+
+| What breaks it | What happens |
+| --- | --- |
+| A format switch | reflow must treat span pieces as one: rebuild the full-width layer, reflow it on the strip, split it again. Reflowing each piece alone breaks every seam |
+| A reorder that separates two pieces | warn, and offer **Unspan**: the pieces become independent layers and keep their position. Never silently stretch a span across slides that are no longer neighbours |
+| Inserting a slide inside a span | same as above; the span is broken by construction |
+| Export anti-aliasing | screenshotting slides one by one leaves a faint 1px seam at shapes that cross the edge. Render the strip **once**, at full width, and slice it, so both sides of every seam come from the same pixels |
+
+**Landmine:** the last row is invisible in the editor and obvious on a phone. It
+needs a pixel test: render a spanning shape, slice, and assert the two edge columns
+match.
+
+**Done when:** a seamless 5-slide deck survives a 4:5 to 3:4 format switch with
+every seam intact, and its export passes the edge-column pixel test.
+
+### 23.6 The cover still has to work alone
+
+**What:** the pre-flight gains one check for spanning decks: the cover must read on
+its own, because the profile grid and most feed impressions show nothing else. A
+cover whose headline is cut by the right edge is flagged.
+
+### What this batch deliberately does not do
+
+- **No spans across non-adjacent slides.** By definition there is no seam there.
+- **No automatic seam design.** The model writes words; a bridge is a layout choice
+  the user makes (invariant 5).
+
+---
+
+## Batch 24, Outline mode and keyboard speed
+
+**Status:** queued
+**Size:** medium
+**Why here:** the first half's central finding was that **writing the slides is the
+biggest time sink**, 30 to 60 minutes of a 45 to 120 minute carousel. Every writing
+feature so far happens inside a form or on a slide. Nobody writes well one text box
+at a time. This batch gives the writing a place of its own, and then makes
+everything else reachable without the mouse.
+
+**Unknowns:** which shortcuts already exist, and whether there is a global key
+handler or one per panel.
+
+### 24.1 Outline mode
+
+**What:** a view of the whole deck as one plain text document. Each slide is a line
+starting with `#` (its headline) followed by its body lines. A new `#` line is a new
+slide. Emphasis marks from 22.3 work here. Blocks (Batch 19) appear as one labelled
+line each, editable in place.
+
+```
+# Your edits feel mechanical. Here is why.
+# You cut on the beat
+The beat is the most predictable moment in the track.
+Predictable cuts read as *mechanical*.
+# Cut on movement instead
+A hand leaving frame. A door closing.
+```
+
+**Why:** this is how people already draft carousels, in a notes app, before pasting
+slide by slide. Outline mode removes the paste and keeps the draft live.
+
+**How edits land:** on a pause in typing (about 800ms) or on leaving the view, each
+changed slide goes through `restateSlide`, by position, exactly as Batch 11 applies
+a rewrite. Hand-edited layers are kept, the composition re-lays the rest, and the
+whole session is **one undo step** labelled "Outline".
+
+**This is not the paste importer coming back.** Batch 16 deliberately deleted `---`
+parsing because a text importer is not a feature. Outline mode is not an import; it
+is a second view of the same document, and it never creates a document on its own.
+
+**Landmine:** slot mapping. Batch 11 found the only route back to a slot is
+positional and only valid while the slide count matches the structure. Adding a `#`
+line in the middle changes the count, so after that edit the deck is treated as
+free-form for slot purposes, and the outline says so in its margin.
+
+**Done when:** rewriting three slides and adding a fourth in outline mode and
+switching back shows the new copy laid out, every hand-moved layer where it was, and
+one undo restores all of it.
+
+### 24.2 Command palette
+
+**What:** `Cmd+K` opens a filtered list of every action in the product: insert a
+block, apply a brand, change format, export to a destination, run Tidy, open
+outline, jump to a project. Recent actions first.
+
+**Why:** it is the answer to "many presets, few buttons". Hundreds of presets can
+exist without a single extra button, because the palette is where they are found.
+
+**Done when:** every action reachable from a button is also reachable from the
+palette, enforced by a test that walks the action registry.
+
+### 24.3 The keyboard map
+
+| Key | Action |
+| --- | --- |
+| `N` | new slide after this one |
+| `D` | duplicate slide |
+| `Cmd+Shift+Up/Down` | move slide |
+| `/` | insert a block (19.6) |
+| `L` | next layout for this slide (25.2) |
+| `R` | rewrite the selected text (Batch 11) |
+| `T` | Tidy (18.2) |
+| `M` | match on every slide (18.3) |
+| `O` | outline mode |
+| `G` / `Shift+G` | group / ungroup |
+| `Arrows` / `Shift+Arrows` | nudge 1px / 10px |
+| `Cmd+E` | export with the last-used destination |
+| `?` | this table, as an overlay |
+
+**Rule:** single-letter keys never fire while a text field has focus. That is the
+bug every editor with letter shortcuts ships once.
+
+### 24.4 Find and replace, across the deck and across projects
+
+**What:** one-shot replace in this deck, or across every project matching the
+current filters. A preview lists every match with its slide before anything changes.
+
+**Why across projects:** a product renamed, a price changed, a handle changed. For
+an agency with forty carousels per client, that is currently forty documents opened
+by hand.
+
+**Rules:**
+
+- Snapshot every touched document first (Batch 8.3), so the whole replace can be
+  undone document by document.
+- A match inside a **verbatim** quote (Batch 13 and 19.2) is shown but unticked by
+  default, because changing a quote makes it no longer a quote.
+- Replaced text goes through the overflow check, and newly overflowing slides are
+  listed.
+
+**Done when:** replacing a product name across 12 filtered projects changes every
+match, snapshots each document first, and reports any slide that now overflows.
+
+### 24.5 Type a slide into existence
+
+**What:** a `+` at the end of the filmstrip that takes a line of text. Enter creates
+a slide with that line as its headline, laid out by the next composition in the
+cycle.
+
+**Why:** it is the outline mode gesture for somebody who stays in the visual editor.
+
+### What this batch deliberately does not do
+
+- **No custom key bindings.** One map, learnable, printed on `?`.
+- **No markdown import as a document.** See 24.1.
+- **No vim mode.** Somebody will ask; the answer is outline mode.
+
+---
+
+## Batch 25, The preset system
+
+**Status:** queued
+**Size:** large, mostly content and tests rather than new machinery.
+**Why here:** this is where "many presets" is delivered, and it comes after Batches
+19 to 24 on purpose. A preset is only as good as the pieces it can assemble: a
+framework that wants a chart needs the chart block, a template that wants a seam
+needs strip view, and a library of hundreds of presets needs the command palette to
+be findable without a gallery.
+
+**Unknowns:** the names and slot definitions of the four existing frameworks, and
+how many compositions `compositions.ts` holds per content shape.
+
+### 25.1 Sixteen frameworks, not four
+
+**What:** keep the four that exist and add twelve, each defined as a slot sequence
+with a **slide-count range**, which slots may repeat, which slots ask for a block
+(19.7), and two or three section rhythms.
+
+| Framework | Slot shape | Slides | Block slots |
+| --- | --- | --- | --- |
+| Mistakes and fixes | hook, (mistake, fix) repeated, CTA | 6 to 12 | two columns |
+| Myth versus fact | hook, (myth, fact) repeated, CTA | 5 to 10 | two columns |
+| Step by step | hook, steps, result, CTA | 5 to 10 | steps |
+| Before and after | before, turning point, after, how, CTA | 5 to 7 | before and after |
+| Case study | context, problem, approach, result, lesson, CTA | 6 to 8 | big number, testimonial |
+| Story | setup, tension, turn, lesson, CTA | 5 to 8 | none |
+| Comparison | hook, criteria repeated, verdict, CTA | 5 to 9 | two columns, table |
+| Named model | name, parts repeated, how to apply, CTA | 5 to 9 | icon grid |
+| Checklist | hook, checklist, save CTA | 3 to 5 | checklist |
+| FAQ | hook, questions repeated, CTA | 5 to 10 | none |
+| Tool stack | hook, tools repeated, CTA | 5 to 10 | screen frame |
+| Hot take | claim, the common belief, evidence, nuance, comment CTA | 5 to 7 | big number |
+| Lessons learned | hook, lessons repeated, CTA | 6 to 12 | none |
+| Data breakdown | headline number, context, chart, implication, CTA | 5 to 7 | big number, chart |
+| Quote set | hook, quotes repeated, source, CTA | 5 to 10 | quote |
+| Question | hook, options, reveal, CTA | 4 to 6 | question |
+
+**The sameness constraint is the design constraint for this whole table.** The first
+half's loudest one-star complaint was "the same 8-slide hook / 5 tips / CTA layout".
+Sixteen frameworks help; varying the slide count and rhythm **within** each
+framework is what actually fixes it. Each framework ships with Batch 4's test:
+twenty decks from different briefs do not all come out the same shape.
+
+**Honesty rule:** Case study and Data breakdown are the two frameworks most likely
+to make the model invent a result. The Batch 10 rule (never invent a client, a
+number or a result) applies, and both frameworks leave their result slots **empty
+with a placeholder** when the brief contains no result, rather than writing a
+plausible one. The pre-flight catches the placeholder.
+
+**Done when:** every framework drafts from three test briefs through the eval
+harness with zero structural failures, and the sameness test passes per framework.
+
+### 25.2 Layouts you cycle, not browse
+
+**What:** `L` on a slide (or the arrows beside it in the filmstrip) steps to the
+next composition compatible with **what is on this slide**: text only, text and
+image, a given block. The words stay, hand-edited layers stay, and the order is
+fixed so pressing `L` three times and `Shift+L` three times returns to the start.
+
+**Also, deck-wide: Shuffle rhythm** re-runs the deck's composition cycle from a
+different offset (the Batch 4 seed), for when the whole deck looks too regular.
+
+**Why:** this is the frame's rule made concrete. Somebody judging layouts wants to
+see each one in place, on their own words, one at a time. A thumbnail grid of empty
+layouts is the Canva template wall in miniature.
+
+**Target size of the catalogue:** at least six compositions per common content shape
+(headline only, headline and body, headline and image, each block). Fewer than that
+and cycling repeats too fast; many more and nobody reaches the later ones.
+
+**Done when:** cycling a headline-and-body slide shows at least six distinct
+layouts, none overflowing, all inside the safe zone of the active platform.
+
+### 25.3 Hook formulas
+
+**What:** about thirty hook patterns as fill-in-the-blank templates, for example
+`Stop [doing the common thing].`, `[Number] [things] nobody tells you about
+[topic].`, `I [did X] for [time]. Here is what happened.`, `You are not bad at [X].
+You are [doing Y].`
+
+**Two ways to use one:**
+
+- **By hand, no AI:** pick a formula and fill the blanks on the cover. This is the
+  deterministic half, and it serves Batch 4.1's finding that people should write the
+  hook themselves.
+- **As a hint:** pass the chosen pattern to `/api/hooks`, which then writes its
+  variants in that shape.
+
+**Invariant check:** nothing is ranked. The formulas are listed by kind (curiosity,
+contrarian, result, list, story), never by a claimed performance number. A "top
+converting hooks" label would be the virality score again.
+
+### 25.4 Calls to action by goal
+
+**What:** a CTA library keyed by what the post is for: follow, save, share, comment
+with a keyword, DM a keyword, link in bio, newsletter, book a call, and "part 2
+tomorrow" (which pairs with series, Batch 6.2). Wording varies per platform
+(LinkedIn says repost, Instagram says share).
+
+**Why:** the CTA slide is the one the caption route already reads (`cta` in Batch
+12.1), so choosing it from a library means the caption and the closing slide agree
+by construction.
+
+### 25.5 Saved templates
+
+**What:** **Save as template** captures a deck's structure: slide count, composition
+per position, block placements, brand, furniture set and spans. It does not keep the
+words, unless the user ticks "keep as example text". Templates belong to a client
+(Batch 7) and appear in the command palette and on the start screen.
+
+**Why:** the first half's "Explicitly not building" table says it plainly: saved
+user templates yes, a bigger template library no. "Locking 1 template and batching
+killed 80% of my decision fatigue" is the evidence.
+
+**Invariant check:** applying a template runs once. Editing a template later does
+**not** reach the decks made from it. **Re-apply template** on a document is the
+explicit, one-shot way to do that, by position, keeping words and hand edits,
+exactly like re-applying a brand (Batch 3.2).
+
+**Done when:** a template saved from a 7-slide deck produces, from a new brief, a
+7-slide deck with the same composition per position, and changing the template
+afterwards leaves that deck untouched.
+
+### 25.6 Style packs
+
+**What:** a style pack bundles every visual preset into one choice: palette roles,
+font pair (22.2), type ramp (22.1), background generator (21.3), furniture set
+(20.6) and icon style (21.1). Ship packs grouped by kind of creator: education, SaaS
+and product, agency, finance, fitness, food, coaching, personal brand.
+
+**Landmine:** the test matrix. Batch 9 already asserts zero safe-zone warnings
+across 180 deck and platform combinations. Sixteen frameworks times a dozen packs
+times six destinations is well over a thousand. Run a fixed sample on every commit
+and the full matrix nightly, so the suite stays fast and nothing ships untested.
+
+### 25.7 Starter kits
+
+**What:** for each creator kind, one kit: a pack, three frameworks that suit it, a
+default hook kind and a default CTA. A kit is what Batch 33's onboarding offers. It
+is a preset of presets and it runs once.
+
+### What this batch deliberately does not do
+
+- **No template marketplace or community gallery.** Template count was rejected on
+  evidence in the first half, and a marketplace is template count with a payout
+  problem.
+- **No performance claims on any preset.** Nothing is ranked.
+- **No live template inheritance.** See 25.5.
+
+---
+
+## Batch 26, Motion export
+
+**Status:** queued
+**Size:** large. The first server job in FlashCC that cannot answer inside one request.
+**Why here:** the same carousel is routinely re-posted as a short video for Reels,
+TikTok, Shorts and LinkedIn video, because video formats reach people who never see
+a carousel. Today that means exporting slides, opening a video editor, placing them
+on a timeline, and guessing durations. The slides already exist and the timing is
+arithmetic.
+
+**Unknowns:** whether the server host allows long-running jobs and a bundled
+`ffmpeg` binary.
+
+**Scope decision, recorded:** FlashCC is a standalone product and does not depend on
+the FlashFX engine. This batch is built inside FlashCC's own server with Playwright
+and `ffmpeg`, and stays deliberately small. Anything that needs a real motion
+timeline belongs in a video editor, not here.
+
+### 26.1 Slideshow video
+
+**What:** render each slide as an image (the existing path), then compose an MP4 at
+30fps with one transition preset per deck: **Cut**, **Push** (slides move left, like
+a swipe), **Fade** or **Zoom**.
+
+**Duration per slide, deterministic:** a floor of 2 seconds, plus reading time at
+about 3.5 words per second, capped at 6 seconds. The cover gets an extra half
+second; the CTA slide holds 1 second longer. Every number is adjustable per slide in
+a small timing strip, and the total runtime is always shown.
+
+**Why arithmetic and not a model:** reading time is the one thing about a slide that
+can be computed exactly, and a model guessing durations would be AI near layout
+(invariant 5) for no gain.
+
+**Done when:** a 9-slide deck exports as an MP4 whose per-slide durations match the
+formula within one frame, playable on a phone.
+
+### 26.2 The shape of the video
+
+| Destination | Video shape | How a 4:5 deck gets there |
+| --- | --- | --- |
+| Reels, TikTok, Shorts | 9:16 1080x1920 | reflow to 9:16 first (Batch 1.5 and 9), shown in the 17.5 contact sheet |
+| LinkedIn video | 4:5 or 1:1 | as the deck is |
+| X video | 16:9 or 1:1 | reflow, or letterbox on the brand background |
+
+**Decision: reflow, never letterbox by default.** A 4:5 slide floating in a 9:16
+frame wastes a third of the screen and puts the bottom of the content under TikTok's
+caption band. Letterboxing stays available as an explicit option for decks that
+reflow badly.
+
+### 26.3 Entrance animations, a short list
+
+**What:** per role, not per layer: headline **rises**, body **fades in**, numbers
+**count up**, list items **arrive in order**, accent word **highlights** (the 22.3
+mark, drawn on). One choice per deck, plus None.
+
+**How it renders:** each frame is a Playwright screenshot with the page's animations
+seeked to an exact time, so the output is deterministic and identical on every run.
+No real-time capture, which drops frames under load.
+
+**Landmine, cost:** 30fps for 40 seconds is 1,200 screenshots. That is the most
+expensive thing FlashCC can be asked to do. Render only the frames where something
+is moving, and reuse the still frame for the rest of each slide's hold. For a
+typical deck that is under a fifth of the total.
+
+**Done when:** an animated 9-slide export renders twice to byte-identical files, and
+a slide with no animation costs one screenshot, not ninety.
+
+### 26.4 Sound
+
+**What:** **silent by default**, with an optional track the user uploads.
+
+**Why:** trending audio is added inside Instagram and TikTok, and a video exported
+with music cannot have it swapped there. A built-in music library would be a
+licensing liability in exchange for something the platforms already do better.
+
+### 26.5 A job, not a request
+
+**What:** video export becomes a queued job with a progress state, a result URL in
+the `slides` bucket (Batch 5), and a notification inside the app when it finishes.
+The URL slots into the scheduler CSV (Batch 5.5) as a video post.
+
+**Invariant check:** an abuse ceiling per account on concurrent and hourly renders,
+keyed like the others. **Slideshow video without animation is free**, because it is
+cheap and it is the same export the free tier already has in another shape.
+**Animated export is Pro**, because 26.3 is real compute. Neither is metered by
+credits.
+
+**Landmine:** the first half noted the rate limiter is in-process and resets on
+deploy. A render queue in the same process loses every job in flight on deploy.
+Either finish jobs before shutdown or store them durably, and say which in the code.
+
+**Done when:** a render that is interrupted by a deploy either completes after it or
+is reported as failed with a one-click retry, never silently lost.
+
+### What this batch deliberately does not do
+
+- **No timeline editor.** One transition, one animation choice, per-slide durations.
+  Anything more is a video editor.
+- **No music library.** See 26.4.
+- **No burned-in subtitles.** The slides are already text.
+- **No dependency on the FlashFX engine.** See the scope decision above.
+
+---
+
+## Batch 27, Idea bank, lanes and the weekly session
+
+**Status:** queued
+**Size:** medium
+**Why here:** the first half's batching evidence says three things about planning,
+and none of them is "give people more ideas". Content goes stale in about a week.
+Experienced creators now "plan formats and lanes ahead, not finished posts". And the
+idea is not the bottleneck: "the wall is everything AFTER the idea". So this batch
+plans **formats**, captures ideas people already have, and puts its effort into the
+last mile.
+
+**Unknowns:** whether the pipeline already has a calendar or week view, or only
+stages. `posts` has dates since Batch 16.6.
+
+### 27.1 The idea bank
+
+**What:** a list of one-line ideas, each with optional notes, a pillar (Batch 8.4),
+a client (Batch 7), and where it came from. Adding one is a single keystroke
+anywhere in the app, and captures arrive from the phone (Batch 32) and the browser
+extension (Batch 31).
+
+**Decision: the bank is never filled by a model.** The first half's evidence
+explicitly struck "running out of ideas" as a pain point, and an idea generator
+would be the product spending money on the one step nobody struggles with.
+
+**Done when:** capturing an idea takes one shortcut and one line, and the bank
+filters by pillar and client with no tags typed.
+
+### 27.2 Lanes
+
+**What:** a lane is a recurring slot in the week with its format already decided:
+**weekday, platform, framework, template or style pack, pillar**. For example:
+Monday, LinkedIn, Myth versus fact, editorial pack, pillar "Editing".
+
+**Why:** this is "plan formats and lanes ahead" turned into an object. Once the
+format is locked, "you're just swapping the content into a template, not inventing a
+new thing weekly". That sentence is the strongest evidence in the first half's
+batching section, and lanes are its direct implementation.
+
+### 27.3 Make next week
+
+**What:** one action that looks at next week's lanes, lists them as empty slots, and
+lets the user drop an idea from the bank into each. Then it runs **Batch 16's run
+sheet**, with one change: each step takes its framework, template and platform
+**from its lane** rather than from the cycling style list. Finished carousels are
+scheduled on their lane's date (Batch 16.6).
+
+**Designed for the wall, not for the marketing number:**
+
+- The default is the next seven days, not thirty. The first half's evidence on
+  staleness is unambiguous.
+- The queue is reorderable while it runs and can stop at any point, keeping what is
+  done.
+- Pairing an idea to a lane is the user's choice. If they skip it, the slot stays
+  empty; the session never picks an idea for them.
+
+**Done when:** a week with five lanes and five ideas produces five drafted
+carousels, each in its lane's framework and template, each scheduled on its lane's
+day, and stopping after the third leaves three finished carousels and two empty
+slots.
+
+### 27.4 The finishing pass
+
+**What:** after a session, a queue that walks each new carousel through the steps
+that turn a draft into a post, one carousel at a time: **hook** (Batch 4.1),
+**payoff**, **caption** (Batch 12), **alt text**, **pre-flight**, **schedule**. Each
+step is one screen with one decision, and each carousel shows how many steps it has
+left.
+
+**Why:** the batch breaks at post three or four. It breaks because finishing is a
+dozen small decisions spread over several screens, and by the fourth carousel the
+energy for them is gone. The finishing pass puts the same decisions in the same
+order every time, so the fifth carousel costs less attention than the first rather
+than more.
+
+**Done when:** a finished carousel needs no screen other than the finishing pass
+between draft and scheduled.
+
+### 27.5 A week view
+
+**What:** if the pipeline has no calendar yet, a week view: lanes as labelled empty
+slots, scheduled posts filling them, drag to move a post to another day, and drafts
+older than seven days marked as possibly stale.
+
+**Why the stale mark is a mark and not a block:** a draft that is a week old is
+often fine. The mark is information, the same tier as Batch 15's flags.
+
+### What this batch deliberately does not do
+
+- **No idea generator.** See 27.1.
+- **No best-time-to-post suggestions.** Rejected in Batch 12 as the least defensible
+  number in this category.
+- **No month-ahead batching as the default.** The evidence says it fails.
+- **No silent calendar filling.** Every scheduled post comes from a choice the user
+  made.
+
+---
+
+## Batch 28, Remix what worked
+
+**Status:** queued
+**Size:** medium
+**Why here:** structural attribution was the first half's unclaimed ground (zero of
+seventeen tools connect hook shape, framework or slide count to outcome) and the
+reason it said attribution "wins the renewal". The insight screens show what worked.
+Nothing yet turns that into the next carousel. That gap is the difference between a
+report somebody reads once and a loop they come back for.
+
+**Unknowns:** exactly which dimensions the current insight screens group by, and
+whether metrics exist for platforms other than LinkedIn.
+
+### 28.1 Make another like this
+
+**What:** on any post with metrics, one action creates a new carousel with **the
+same structure**: framework, slide count, composition per position, blocks,
+furniture and style. The words come from a new brief or an idea from the bank (Batch
+27), drafted through the normal route.
+
+**Why:** "what worked" is almost always a shape, not a sentence. Copying the shape
+and writing new words is what experienced creators do by hand when something lands.
+
+**Invariant check:** the structural copy is deterministic and needs no key, the same
+split as `longform.ts` beside `/api/distil`. Only the words use the model, and only
+if the user asks it to draft.
+
+**Done when:** remixing a 7-slide post with a stat block in slot 4 produces a new
+7-slide draft with a stat block in slot 4, in the same style, with none of the
+original's words.
+
+### 28.2 Worth posting again
+
+**What:** a view of posts older than a chosen age (default 4 months) sorted by **the
+metric the user picks** (saves, shares, impressions), with **Repost as new** on
+each. Reposting creates a variant with a fresh cover (Batch 6.3 hook variants are
+one click away) and runs a staleness check on the copy.
+
+**The staleness check, deterministic:** flag explicit years, relative dates ("this
+week", "last month"), prices and version numbers, and any line containing a number
+the user may want to update. Flags, never edits.
+
+**Invariant check:** sorting a table by a column the user chose is not ranking. The
+rule from the first half is about a machine asserting which of somebody's sentences
+is better. Here the user's own audience already said so, in numbers the user
+brought.
+
+### 28.3 Posted in one place only
+
+**What:** a filter for posts that did well on one platform and were never published
+on another. Combined with the multi-destination export (17.5), turning a LinkedIn
+post into its Instagram version is one filter and one export.
+
+**Why:** cross-posting what already worked is the cheapest content anybody can make,
+and it is invisible until somebody goes looking.
+
+### 28.4 More analytics sources, same matching
+
+**What:** extend Batch 8.1's three-pass matcher (URL, exact text, leading text in a
+date window) to the exports other platforms provide, starting with whichever of
+Instagram's and TikTok's own exports carries per-post rows today.
+
+**Landmine:** verify each export's current columns before writing a parser. These
+change without notice, and Batch 8.1's rule holds: absent is not zero, and an
+unmatched row is shown, never dropped.
+
+### 28.5 Attribution by the new dimensions
+
+**What:** the insight screens gain the dimensions this half adds: block used (19),
+furniture set (20), hook kind (25.3), panoramic or not (23), video or carousel (26).
+
+**Honesty rules for every chart on those screens:**
+
+- Show the sample size beside every median.
+- Show nothing for a group with fewer than five posts. A median of two posts is an
+  anecdote with a chart around it.
+- No significance language, no "winning" badge, no prediction. The screen says what
+  happened, in the user's own numbers.
+
+### What this batch deliberately does not do
+
+- **No performance prediction.** "This carousel will do well" is the virality score.
+- **No recommendations of what to post.** The user reads their own numbers and decides.
+- **No automatic reposting.**
+
+---
+
+## Batch 29, One deck, several languages
+
+**Status:** queued
+**Size:** medium, once Batch 22.5 has made other scripts render.
+**Why here:** PostNitro advertises more than thirteen languages. For a creator or an
+agency working in more than one market, translating a finished carousel today means
+retyping every slide and then fixing every slide that the longer language
+overflowed. The model is good at the first half of that and the existing layout
+machinery already does the second.
+
+**Unknowns:** none beyond 22.5, which is a hard dependency. Do not start this batch
+until a Japanese and an Arabic deck render correctly.
+
+### 29.1 The translate route
+
+`/api/translate`.
+
+| Field | Type | Notes |
+| --- | --- | --- |
+| `deck` | string[] | every slide's text, required, ceiling 12,000 chars |
+| `target` | language code | required |
+| `voice` | Voice? | the brand's voice, plus samples in the target language when the brand has them |
+| `glossary` | `{ term, rendering? }[]?` | see 29.3 |
+
+Returns one string per slide, positional, the same shape every other route returns.
+**Words only**, invariant 5.
+
+**What is never translated:** names, handles, URLs, code blocks, numbers, and
+anything in the glossary marked as fixed. These are masked before the call and
+restored after, so the model never sees them as text it could change.
+
+**Quotes:** a quote with the `verbatim` flag (Batch 13, 19.2) is no longer verbatim
+once translated. It is translated, labelled as a translation, and loses the flag.
+The original stays available in one click.
+
+### 29.2 Longer languages get more room, not smaller type
+
+**What:** each translated slide goes through `restateSlide` and `splitToFit`, so a
+German slide that runs a third longer becomes two slides at readable size rather
+than one cramped one. That is Batch 4.5's rule applied to a new source of overflow.
+
+**The interface says what changed:** "8 slides became 9 in German, slide 4 was
+split". A translated deck that silently changes length is a surprise at posting
+time.
+
+**Done when:** an English deck translated to German, Japanese and Arabic lays out in
+all three with zero overflow and zero safe-zone warnings, and reports any
+slide-count change.
+
+### 29.3 A glossary per brand
+
+**What:** terms that are never translated (the product name, a coined phrase) and
+terms with a fixed rendering in a given language. Stored on the brand beside voice
+(Batch 10.4), applied by masking.
+
+**Why:** the most common translation complaint in any localisation workflow is a
+brand term rendered differently on every slide. A glossary is how translation
+agencies have always solved it.
+
+### 29.4 Checks, on the Batch 15 tiers
+
+| Tier | Check |
+| --- | --- |
+| Repair | restore masked terms, house punctuation |
+| Retry | a slide left untranslated, a placeholder, a glossary term missing, a slide over its ceiling |
+| Flag | **a number that differs from the source**, which is the translation failure that actually hurts |
+
+The number check is deterministic: every number in the source slide must appear in
+the translated slide, in the target language's numeral system. Anything else is
+flagged on that slide, never silently corrected.
+
+### 29.5 A language set, not a pile of copies
+
+**What:** each translation is its own document with `variantOf` pointing at the
+source (the 17.5 pattern), and the set exports together with a folder per language.
+Caption (Batch 12) and alt text are generated per language from the translated
+slides, not translated from the English caption, so they match what the slides say.
+
+**Invariant check:** editing the English deck does not update the German one.
+**Re-translate** on a variant is the explicit, one-shot way, and it keeps the
+variant's hand edits like every other re-run.
+
+### 29.6 No deterministic half, said plainly
+
+Every other AI feature in this half has a free path that needs no key. Translation
+does not have a sensible one, and inventing a weak dictionary-based one would be
+worse than nothing. Translation is Pro, gated the Batch 9 way, with an abuse ceiling
+and no credits.
+
+### What this batch deliberately does not do
+
+- **No automatic language detection of the audience.** The user picks the target.
+- **No translation of the FlashCC interface itself.** That is a separate project with
+  its own scope.
+- **No machine-translated testimonials passed off as originals.** A translated
+  testimonial is labelled as translated, like a quote.
+
+---
+
+## Batch 30, Legibility and accessibility
+
+**Status:** queued
+**Size:** small to medium
+**Why here:** the pre-flight from Batch 1.3 checks sizes, strokes, safe zones, file
+size and slide count. It does not check whether the text can actually be **seen**.
+This half adds photos behind text (21), effects (22.4) and brand palettes derived
+from images (21.6), and every one of those can produce a slide that passes every
+current check and is unreadable on a phone.
+
+**Unknowns:** whether the pre-flight runs on the client, the server or both.
+
+### 30.1 Contrast, including over photos
+
+**What:** a contrast check for every text layer: 4.5 to 1 for body, 3 to 1 for large
+headlines, the WCAG thresholds. For text over a flat colour it is arithmetic. For
+text over an image or a generated background, sample the rendered pixels **behind
+the text box** and test against the worst region, not the average.
+
+**Why the worst region:** a white headline over a photo that is mostly dark but has
+a bright sky behind two letters passes on average and fails where it matters.
+
+**Three one-click fixes, offered in this order:**
+
+1. Add a text scrim (21.4) behind the layer.
+2. Swap to the nearest brand colour role that passes.
+3. Move the layer to the part of the image that passes, if one exists inside the safe
+   area.
+
+**Done when:** white text over a photo with a bright patch behind it is flagged, and
+each fix makes the same check pass.
+
+### 30.2 See it at the size it will be seen
+
+**What:** a **phone preview** toggle that shows the slide at real feed size (a
+1080px slide is displayed at roughly 360 to 430 CSS pixels wide on a phone), and a
+**grid preview** of the cover at profile-tile size.
+
+**Plus one check:** the smallest text on each slide, measured at feed scale. The
+18pt floor from Batch 1.3 is a proxy for this; measuring the real displayed size is
+the thing itself, and it catches the cases the proxy misses, like a 9:16 deck viewed
+in a 4:5 crop.
+
+**Done when:** the cover's headline is readable in the grid preview at tile size, or
+the pre-flight says it is not.
+
+### 30.3 Colour vision
+
+**What:** a preview toggle for the three common colour-vision deficiencies, and one
+check: any slide where meaning is carried by colour alone (a red versus green
+comparison with no labels, two chart series with no direct labels).
+
+**Why this is cheap:** charts (19.3) already label marks directly, and two-column
+blocks (19.2) already carry text labels. The check mostly confirms the blocks did
+their job and catches hand-made slides that did not.
+
+### 30.4 Density
+
+**What:** a word ceiling per slide per format, flagged on the Batch 15 flag tier. A
+body slide over about 40 words at 4:5, or over about 30 at 9:16 where the safe area
+is smaller.
+
+**Invariant check:** this is a defect check, not a quality score. Forty words on a
+slide is a slide nobody reads at swipe speed, whatever the words are. It never
+blocks.
+
+### 30.5 Motion safety
+
+**What:** for animated export (26.3), refuse any combination that flashes more than
+three times a second, and offer a reduced-motion variant of every animation preset
+(fade only, no movement).
+
+### What this batch deliberately does not do
+
+- **No readability score.** Every check is a defect anybody would recognise as a defect.
+- **No blocking export on a flag.** The user can know something the check does not,
+  the same reasoning as Batch 15.
+
+---
+
+## Batch 31, Integrations and the public API
+
+**Status:** queued
+**Size:** large, split into independent items that can ship one at a time.
+**Why here:** Batch 5.5 made FlashCC "the missing first half of the bulk pipeline"
+through a CSV. A CSV is the right first step and still a manual one: export, open
+the scheduler, import, check. The research's own wording was that the pain is "copy
+paste the image url into csv and then reupload". This batch removes the remaining
+copy and paste, and opens the pipeline to people who build their own.
+
+**Unknowns:** which schedulers expose a public API that can create a multi-image or
+document draft today, and on which of their plans. **Verify each one before
+committing to it.** The first half's research could not confirm per-tool bulk
+mechanics for several of them.
+
+### 31.1 Push to a scheduler as a draft
+
+**What:** for each scheduler with an official API that accepts carousels, a
+connection the user authorises once, and a **Send as drafts** action that creates
+one draft per carousel, with hosted slide URLs, caption, alt text where supported,
+and the scheduled date from Batch 16.6 or 27.3.
+
+**Decision: drafts, never published posts.** The scheduler stays the thing that
+publishes. This keeps FlashCC on the right side of its own "no auto-posting"
+rejection, and it means a mistake costs a deleted draft rather than a public post.
+
+**Order of work:** start with whichever of Publer and Metricool verifies first,
+because they are the two the first half named as the best integration targets, and
+keep the CSV path for everything else. One dialect per tool, never a generic
+adapter, the same rule as Batch 5.5.
+
+**Done when:** a week's run (27.3) appears in the connected scheduler as drafts on
+the right dates, with nothing published, and a failure on one carousel names that
+carousel and leaves the others sent (the Batch 4.4 atomic-failure rule).
+
+### 31.2 Webhooks
+
+**What:** outgoing events, signed, retried with backoff: **carousel published**
+(Batch 5), **run finished** (16), **review approved** or **changes requested** (7),
+**export ready** (26). Each carries ids and URLs, never document contents.
+
+**Why:** Zapier and Make users can then wire FlashCC into anything without FlashCC
+building each connection. It is the cheapest integration surface there is.
+
+### 31.3 The public API
+
+**What:** personal API keys on the Agency tier, and three endpoints to start:
+
+| Endpoint | Does |
+| --- | --- |
+| `POST /v1/render` | a document in, slide images or a PDF out, per platform preset |
+| `POST /v1/decks` | words in (one string per slide, or long-form text), a laid-out document out, using a template or framework |
+| `POST /v1/runs` | a list of ideas and a run sheet in (Batch 16), carousels out, with progress through a webhook |
+
+**Why this is different from the competitor APIs the first half audited:**
+Contentdrips' API turned out to be "a renderer, not a splitter", leaving the caller
+to supply every slide. `/v1/decks` is the splitter. That was the hard part then and
+it is FlashCC's to offer now.
+
+**Invariant check, the hard one:** invariant 7 says nothing is metered. An API is
+where that promise is most expensive, because a script can call it all day. So the
+API inherits the same per-key abuse ceilings as the app, set high enough that no
+ordinary integration meets them, and the documentation says plainly that a need
+beyond them is a conversation, not an invoice. **No per-call pricing, ever.**
+
+**Done when:** the three endpoints are documented with runnable examples, every
+request is attributed to a key, and a key over its ceiling gets a 429 with the reset
+time rather than a bill.
+
+### 31.4 A browser extension that only takes what the user selects
+
+**What:** select text on any page, right-click, **Send to FlashCC** as an idea
+(Batch 27) or as a source for distil (Batch 13). The user's own LinkedIn post, a
+paragraph from their newsletter, a note in their docs.
+
+**Why this is consistent with Batch 13's rejection of URL fetching:** Batch 13
+refused to make FlashCC the one requesting somebody else's page. Here the user's
+browser already has the page, the user chooses the words, and only those words are
+sent. Nothing is fetched by FlashCC's server.
+
+### 31.5 Imports from where drafts already live
+
+**What:** a CSV of ideas into the idea bank (from Notion, Airtable or a sheet,
+exported by the user), and a Markdown or plain-text file into distil or outline mode
+(24.1). File upload first; OAuth connections to those tools only if file upload
+proves to be the friction.
+
+### 31.6 Editable exports for other tools
+
+**What:** **PowerPoint** export with real text boxes (for corporate users who must
+hand a deck to somebody in Office), and **SVG per slide** (for designers who finish
+elsewhere).
+
+**Landmine:** fidelity. Text effects (22.4), styled runs (22.3) and spans (23) do
+not all survive into PowerPoint. The export lists what it had to flatten into
+images, by slide, before writing the file, rather than producing something that
+looks broken on open.
+
+### What this batch deliberately does not do
+
+- **No embed SDK or white-label editor for other platforms.** That is PostNitro's
+  distribution channel and it conflicts with the first half's white-label rejection.
+- **No direct publishing to any social network.** Drafts in a scheduler only.
+- **No metered API.** See 31.3.
+
+---
+
+## Batch 32, Phone, capture and offline
+
+**Status:** queued
+**Size:** medium
+**Why here:** Instagram and TikTok carousels are posted from a phone, almost always.
+Every export FlashCC makes for those platforms currently ends on a desktop, and then
+the files have to reach the phone somehow, by cloud folder, email or messaging app.
+That last hop is invisible in every workflow diagram and costs a few minutes per
+post, every post.
+
+**Unknowns:** how the current layout behaves under 400px wide, and whether the app
+is already installable.
+
+### 32.1 Save straight to the phone's photos
+
+**What:** on a phone, export ends in the system share sheet with the slide images
+attached (the Web Share API with files), so **Save to Photos** puts them in the
+camera roll in slide order, ready to select in Instagram or TikTok.
+
+**Why it matters more than it looks:** posting natively from the phone is also how
+people add trending audio and in-app text, which no scheduler can do. FlashCC's job
+ends at "the right images, in order, on the device".
+
+**Landmine:** file order. Some photo pickers sort by creation time, so images saved
+in the same second can appear out of order. Space their timestamps, and test on both
+major phone platforms before claiming it works.
+
+**Done when:** a 10-slide export on a phone lands in the camera roll and appears in
+the platform's picker in slide order.
+
+### 32.2 What the phone is for
+
+**What:** an installable web app whose phone layout covers **review, text edits,
+reorder, layout cycling (`L`), caption, the finishing pass (27.4), approvals (Batch 7)
+and export**. Not free-form dragging.
+
+**Why that scope:** precise layout on a 6-inch screen is miserable, and the first
+half's research located the time sink in writing and finishing, not in positioning.
+Everything on that list is a tap or a text field.
+
+### 32.3 Capture into the idea bank
+
+**What:** share any text, link or image from another app into FlashCC's idea bank.
+
+**Landmine:** an installed web app can register as a share target on Android, but
+iOS Safari has not supported that for web apps. Verify current support before
+promising it. The fallback on iOS is a personal capture address (an email that files
+whatever is sent to it as an idea) or a system shortcut that calls the public API
+(31.3) with the user's key.
+
+**Done when:** sharing a link and a sentence from another app on Android files both
+as ideas in under five seconds, and iOS has a working path that is documented on the
+capture screen.
+
+### 32.4 Offline, honestly
+
+**What:** editing, outline mode, layout cycling, the deterministic caption and
+export to images already work from local storage. Make that visible: a quiet offline
+indicator, and every AI action disabled with a one-line reason rather than failing
+after a spinner.
+
+**Why:** the product is local-first already. Saying so, at the moment it matters, is
+free.
+
+### What this batch deliberately does not do
+
+- **No native apps.** An installable web app covers the scope in 32.2.
+- **No voice notes transcribed into ideas.** Transcription is a different product, as
+  Batch 13 said. The phone keyboard's own dictation already does this.
+- **No full canvas editing on phones.** See 32.2.
+
+---
+
+## Batch 33, The first carousel in sixty seconds
+
+**Status:** queued
+**Size:** small, because it is assembly. Every piece exists by this point.
+**Why last:** onboarding built early shows off features that are still changing.
+Built last, it is a short path through the best of everything above, and it is what
+turns a visitor who would have opened Canva into somebody who exported a branded
+carousel before deciding anything.
+
+### 33.1 Four screens
+
+1. **What do you make?** Eight creator kinds, one tap. Picks a starter kit (25.7).
+2. **Your look.** Drop a logo or any photo and get a palette (21.6), or keep the kit's
+   default. Name and handle (20.1), each optional.
+3. **Your idea.** One sentence, or paste something you already wrote.
+4. **Your carousel.** Laid out, branded, furnished, ready to export or to edit.
+
+**Nothing is asked that has a sensible default.** Platform defaults from the creator
+kind, framework from the kit, format from the platform.
+
+### 33.2 Two paths through screen 3, and the free one is not worse
+
+- **With a plan:** the idea goes to `/api/draft` in the kit's framework and voice.
+- **With no key and no account:** the deck opens in **outline mode** (24.1) with the
+  framework's slots as headings to write under, the hook pre-filled from a hook
+  formula (25.3) using the idea's own words. Typing five lines produces a laid-out
+  carousel.
+
+**Why the free path matters this much:** FlashCC is sold as a time saver for the
+user's own creativity, not as an AI tool. A first run that only impresses when a
+model writes the copy would contradict the positioning in the first minute.
+
+### 33.3 Empty states that teach one key each
+
+Every empty screen (no projects, no ideas, no brands, no lanes) shows the single
+action that fills it and its shortcut, and nothing else. The command palette (24.2)
+is mentioned once, on the first empty canvas, and never again.
+
+### 33.4 Measured with people, not telemetry
+
+**Done when:** in moderated sessions with five people who have never seen FlashCC,
+at least four export a branded carousel in under sixty seconds from landing, on the
+free path. Measured by watching, because the first half's position on analytics
+(operational signals yes, behaviour tracking of users no) applies here too.
+
+### What this batch deliberately does not do
+
+- **No product tour overlay.** Empty states and the palette replace it.
+- **No signup before the first export.** "Make carousels and export them" is the free
+  tier with no sign-in, as Batch 9 committed.
+- **No sample deck about somebody else's topic.** The first carousel is about the
+  user's own idea, or it teaches nothing.
+
 ---
 
 ## Explicitly not building
@@ -2523,6 +4469,30 @@ Each of these was considered and rejected on evidence.
 | **Multi-stage approval chains** | *"The structure that makes it great for compliance makes it heavy for a five-person agency."* |
 | **Engagement automation / auto-DM** | The account-ban narrative attaches to exactly this. A competitor markets "no automation risk" as a feature. |
 | **Chasing Beacons, Typefully or Postdrips** | Beacons is link-in-bio with a payout scandal, Typefully has no LinkedIn carousel support at all, Postdrips cannot make a carousel. They share our search results, not our customers. |
+
+---
+
+## Explicitly not building, additions
+
+The first half's table stands unchanged. These rows join it, each rejected on
+evidence or on an invariant, not on effort.
+
+| | Why not |
+| --- | --- |
+| **AI image generation** | a second vendor, a push toward one look for every customer, unsettled rights, and a product that is not marketed as AI. Stock APIs (21.2) and generated textures (21.3) cover the need |
+| **A template marketplace or community gallery** | template count with a payout problem. Saved user templates (25.5) are the evidenced version |
+| **Live components, master slides, auto-layout frames** | live derivation. Stamp and reseal (Batch 20), Match (18.3) and Re-apply template (25.5) do the same jobs as one-shot actions |
+| **Real-time co-editing** | the volume reality check in Batch 7 (solo operators at 3 to 5 clients) does not justify a sync engine rewrite. Review links and approvals already cover collaboration |
+| **An embed SDK or white-label editor** | PostNitro's channel, and a cousin of the white-label dashboards rejected in the first half |
+| **A music library** | licensing liability, and the platforms add audio better in-app (26.4) |
+| **An idea generator or trend feed** | the first half struck "running out of ideas" from the evidence. Ideas are not the bottleneck |
+| **Performance prediction, best time to post, "top converting" badges** | the virality score in three costumes. Nothing is ranked |
+| **Post cards set to other people's names, or fake platform screenshots** | a fake screenshot generator. Post cards use the user's own identity only (19.5) |
+| **Model-written testimonials or results** | the Batch 10 fabrication rule. The slot stays empty and the pre-flight catches it |
+| **A mandatory free-tier watermark** | contradicts the honest billing promises of Batch 8 |
+| **Per-call API pricing** | invariant 7 |
+| **Native phone apps** | an installable web app covers the evidenced scope (32.2) |
+| **Server-side fetching of pages people link** | Batch 13's rule, restated: licensed stock APIs and the user's own selection are the only routes in |
 
 ---
 
@@ -2607,6 +4577,56 @@ that endpoint is not.
 
 ---
 
+## Evidence for this half, and its caveats
+
+**This half rests on the first half's research corpus plus a small number of fresh
+platform checks made on 16 October 2026. It did not run a new research sweep.** Read
+every item's "Why" with that in mind.
+
+**Fresh checks, all secondary sources, verify on a real account before shipping:**
+
+- Instagram supports 3:4 (1080x1440) uploads for photos and carousels, and moved the
+  profile grid to tall 3:4 tiles in January 2025. Size guides disagree on whether the
+  feed itself shows 3:4 uncropped or caps at 4:5. ([Lindsey
+  Gamble](https://www.lindseygamble.com/blog/instagram-now-supports-34-aspect-ratio-for-photos-and-carousel-posts),
+  [DreamPixelForge](https://www.dreampixelforge.com/blog/instagram-post-size),
+  [SocialPilot](https://www.socialpilot.co/es/instagram-marketing/instagram-reel-dimensions))
+- Threads raised its carousel ceiling to 20 items in late 2024; at least one scheduler
+  documents 10 through the API. ([Social Media
+  Today](https://www.socialmediatoday.com/news/threads-users-now-add-up-20-photos-videos/727452/),
+  [PostFast API guide](https://postfa.st/api-guides/threads/carousels))
+- PostNitro offers a 3:4 1080x1440 size, more than thirteen languages,
+  article-to-carousel, and a REST API with an embed SDK. ([PostNitro
+  docs](https://postnitro.ai/docs/how-to/set-carousel-size), [PostNitro
+  blog](https://postnitro.ai/blog/post/top-features-in-ai-instagram-carousel-tools-postnitro-guide),
+  [GTM Directory](https://thegtmdirectory.com/tools/postnitro))
+
+**Pinterest, Bluesky, X and Facebook figures in 17.2 are from memory and marked
+approximate.** They do not ship until verified, by the table's own rule.
+
+**Strongest evidence in this half,** carried directly from first-half quotes:
+outline mode (24, writing is the biggest time sink), lanes and the finishing pass
+(27, "plan formats and lanes ahead", the wall at post three or four), saved
+templates (25.5, "Locking 1 template and batching killed 80% of my decision
+fatigue"), and a different image per post (21.7, verbatim).
+
+**Least evidenced, and the first candidates for a research pass:**
+
+| Batch | What it rests on |
+| --- | --- |
+| 23, panoramic carousels | how common the format is, not a complaint about making it |
+| 26, motion export | an observed cross-posting habit, no quote about the friction |
+| 29, translation | competitor feature parity, no user quote |
+| 32.1, save to the phone | reasoning about where posting happens |
+| 19, the exact block list | the shapes in the frameworks; no count of which blocks people build by hand most |
+
+**The unlock for that pass is the one the first half named:** `api.pullpush.io` for
+raw Reddit JSON. Worth searching for seamless or panoramic carousel how-tos,
+carousel to Reels workflows, and translated carousel complaints before committing to
+23, 26 or 29.
+
+---
+
 ## Where this stands
 
 Eight batches built the product. A ninth made it sellable, a tenth made the AI
@@ -2675,9 +4695,71 @@ that define the category. And **nothing is ranked, scored or graded**, because
 the ranking complaint in the research corpus is not about cost, it is about a
 machine asserting which of your sentences is better.
 
-**Every batch in this document is done.**
+**Batches 1 to 16 are done.** Batches 17 to 33 are the second half of the plan,
+and none of them is built yet. The suggested build order is at the end of this
+document.
 
 The other open work is `docs/reference.md`
 §29, the defect list, which is deliberately not a roadmap item and should not be
 folded into one, and the two migrations that wait on billing: `02-pro-gate.sql`
 and `09-gates.sql`.
+
+---
+
+## Suggested order and where this stands
+
+**None of Batches 17 to 33 is built.** The numbering groups them by theme; the build
+order below is by damage-to-effort and dependency, the same logic that put export
+first in the first half.
+
+**Do today, before any batch:** 22.6, the server emoji font. It is one line in the
+server image and every emoji in every export is broken until it lands.
+
+1. **Batch 17, formats.** Small, and 3:4 is the most valuable Instagram size FlashCC
+   cannot make.
+2. **Batch 24, outline mode and the palette.** Attacks the biggest time sink directly,
+   and the palette is where every later preset lives.
+3. **Batch 18, layout tools.** Lock (18.6) is a prerequisite for furniture.
+4. **Batch 20, furniture and identity.** The most repetitive edit in the product, gone.
+5. **Batch 19, blocks.** The core of "create everything".
+6. **Batch 21, imagery,** shipped together with **30.1, contrast over photos**, because
+   photos behind text without that check produce unreadable slides on day one.
+7. **Batch 22, typography.** Scope 22.3's text model change first; it is the riskiest
+   change in this half.
+8. **Batch 25, presets.** Needs 19 to 24 to have anything to assemble.
+9. **Batch 27, lanes and the finishing pass.** The batching evidence's direct answer.
+10. **The rest of Batch 30, legibility.**
+11. **Batch 28, remix.**
+12. **Batch 23, panoramic.** After a research pass, per the caveats.
+13. **Batch 32, phone.**
+14. **Batch 26, motion.** After a research pass.
+15. **Batch 29, translation.** Hard dependency on 22.5.
+16. **Batch 31, integrations and API.** Each item can ship alone; 31.1 can move earlier
+    the day one scheduler's API verifies.
+17. **Batch 33, onboarding.** Last on purpose.
+
+| | The gap it closes |
+| --- | --- |
+| 17 | the 2026 Instagram size, and every other destination, in one export |
+| 18 | hand alignment, slide by slide |
+| 19 | charts, tables, checklists and code built from rectangles |
+| 20 | the same furniture placed by hand on every slide |
+| 21 | leaving for an icon, a photo or a cut-out |
+| 22 | one coloured word needing two text layers |
+| 23 | seamless carousels that one reorder ruins |
+| 24 | writing one text box at a time |
+| 25 | four frameworks and no saved templates |
+| 26 | rebuilding the carousel as a video by hand |
+| 27 | planning finished posts instead of formats, and the wall at post four |
+| 28 | insights that never become the next carousel |
+| 29 | retyping a deck in another language |
+| 30 | slides that pass every check and still cannot be read |
+| 31 | the copy and paste between FlashCC and the scheduler |
+| 32 | the hop from desktop export to the phone |
+| 33 | a first run that shows features instead of the user's own carousel |
+
+**Two rules run through all seventeen,** the same two that ran through Batches 11 to
+15: **every route returns words**, and **nothing is ranked**. And one rule this half
+adds: **every preset is a decision a person would otherwise make by hand**, chosen
+by context and cycled rather than browsed. That is how a product with hundreds of
+presets keeps fewer buttons than the one it replaces.
