@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import { buildSlides } from "./compositions.js";
 import { makeDoc, makeLayer, makeSlide, type Doc, type Layer, type Slide } from "./model.js";
-import { PLATFORMS, platformById, safeBox } from "./platforms.js";
+import { PLATFORMS, platformById, platformForSize, safeBox } from "./platforms.js";
 import { preflight } from "./preflight.js";
 import { reflowDoc } from "./reflow.js";
 import {
@@ -224,8 +224,9 @@ describe("every template passes its own pre-flight", () => {
 describe("what the safe box means, per platform", () => {
   it("calls Instagram's a crop and says where it bites", () => {
     const doc = { ...deckFor("ink", "problem"), width: 1080, height: 1350 };
-    // A layer deliberately dropped into the cropped band on the cover.
-    doc.slides[0]!.layers.push(rect(100, 10, 400, 80, "Stray"));
+    // A layer deliberately dropped into the cropped band on the cover: the
+    // 3:4 grid tile loses about 34px off each side of a 4:5 slide.
+    doc.slides[0]!.layers.push(rect(10, 500, 200, 80, "Stray"));
 
     const message = preflight(doc, platformById("instagram")).find(
       (f) => f.code === "outside-safe-zone",
@@ -253,5 +254,40 @@ describe("what the safe box means, per platform", () => {
     const box = safeBox(platformById("linkedin"), doc.width, doc.height);
     expect(box.x).toBeGreaterThan(0);
     expect(preflight(doc, platformById("linkedin")).filter((f) => f.code === "outside-safe-zone")).toEqual([]);
+  });
+});
+
+/**
+ * 17.1's done-when, the half that can be asserted without a phone: a 4:5 deck
+ * moved to 3:4 the way the format switcher moves it lands with nothing in the
+ * cropped band, for every style and framework.
+ */
+describe("a 4:5 deck switched to Instagram 3:4", () => {
+  it("has zero safe-zone warnings in any template", () => {
+    const offenders: string[] = [];
+    for (const style of STYLES) {
+      for (const structure of STRUCTURES) {
+        const base = { ...deckFor(style.id, structure.id), width: 1080, height: 1350 };
+        const platform = platformForSize(1080, 1440);
+        expect(platform?.id).toBe("instagram");
+        const doc = fitToSafeArea(reflowDoc(base, 1080, 1440), platform!);
+        for (const f of preflight(doc, platform!)) {
+          if (f.code === "outside-safe-zone" || f.code === "wrong-size") {
+            offenders.push(`${style.id}/${structure.id}: ${f.message}`);
+          }
+        }
+      }
+    }
+    expect(offenders.slice(0, 5)).toEqual([]);
+  });
+
+  it("says 3:4 is app-only, and says nothing about 4:5", () => {
+    const tall = { ...deckFor("ink", "problem"), width: 1080, height: 1440 };
+    const portrait = { ...deckFor("ink", "problem"), width: 1080, height: 1350 };
+    const ig = platformById("instagram");
+    expect(preflight(tall, ig).map((f) => f.code)).toContain("app-only-shape");
+    const quiet = preflight(portrait, ig).map((f) => f.code);
+    expect(quiet).not.toContain("wrong-size");
+    expect(quiet).not.toContain("app-only-shape");
   });
 });

@@ -415,9 +415,15 @@ export function assembleDistil(input: DistilInput): Assembled & { clipped: Clipp
  */
 export const LINKEDIN_FOLD = 210;
 
-export type CaptionPlatform = "linkedin" | "instagram" | "tiktok";
+export type CaptionPlatform = "linkedin" | "instagram" | "tiktok" | "x" | "bluesky";
 
-export const CAPTION_PLATFORMS: readonly CaptionPlatform[] = ["linkedin", "instagram", "tiktok"];
+export const CAPTION_PLATFORMS: readonly CaptionPlatform[] = [
+  "linkedin",
+  "instagram",
+  "tiktok",
+  "x",
+  "bluesky",
+];
 
 /**
  * What each destination actually wants.
@@ -463,7 +469,30 @@ export const PLATFORM_CAPTION: Record<
       "Hashtags may sit inline here if they read naturally.",
     ],
   },
+  // The two four-image destinations. A carousel arrives as a thread of posts,
+  // so the caption is the opening post and the per-post lines carry the rest.
+  x: {
+    name: "X",
+    limit: 280,
+    hashtags: 2,
+    rules: [
+      "This opens a thread. The carousel follows it four images at a time, so the caption only has to make somebody read on.",
+      "One or two short sentences. No thread emoji, no \"a thread\", no \"1/\".",
+    ],
+  },
+  bluesky: {
+    name: "Bluesky",
+    limit: 300,
+    hashtags: 2,
+    rules: [
+      "This opens a thread. The carousel follows it four images at a time, so the caption only has to make somebody read on.",
+      "Plain and conversational. One or two short sentences.",
+    ],
+  },
 };
+
+/** How long one per-post line may be. Under X's 280 so a number fits in front. */
+export const MAX_POST_LINE = 200;
 
 export const MAX_ALT_CHARS = 125;
 
@@ -504,7 +533,29 @@ export type CaptionInput = {
   cta?: string | undefined;
   count: number;
   voice?: Voice | undefined;
+  /**
+   * Slides per post, when the deck goes out as a thread (17.3). Present means
+   * one short line per post is wanted as well as the caption.
+   */
+  posts?: number[] | undefined;
 };
+
+/** "Post 1 is slides 1 to 4", for the lines that go with a thread. */
+export function postsBlock(posts: readonly number[]): string {
+  let at = 1;
+  const rows = posts.map((size, i) => {
+    const from = at;
+    at += size;
+    const to = at - 1;
+    return `- Post ${i + 1}: slide${size === 1 ? ` ${from}` : `s ${from} to ${to}`}`;
+  });
+  return [
+    `This carousel goes out as a thread of ${posts.length} posts:`,
+    ...rows,
+    "",
+    `Also write exactly ${posts.length} lines, one per post, in order. Each line goes above that post's images, so it says what those slides are about, using only their words. Under ${MAX_POST_LINE} characters each. No numbering, it is added for you.`,
+  ].join("\n");
+}
 
 export function assembleCaption(input: CaptionInput): Assembled {
   const spec = PLATFORM_CAPTION[input.platform];
@@ -530,6 +581,7 @@ export function assembleCaption(input: CaptionInput): Assembled {
     ...(voice ? ["", voice] : []),
     "",
     `The carousel, slide by slide:\n${deck}`,
+    ...(input.posts && input.posts.length > 1 ? ["", postsBlock(input.posts)] : []),
     "",
     `Write ${input.count} caption${input.count === 1 ? "" : "s"}.`,
   ].join("\n");

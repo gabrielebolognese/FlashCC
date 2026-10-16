@@ -19,7 +19,7 @@
  */
 
 import type { Doc, Layer } from "./model.js";
-import { safeBox, type Platform } from "./platforms.js";
+import { safeBox, shapeOf, type Platform } from "./platforms.js";
 import { lineCount, type Measure } from "./text.js";
 
 export type Severity = "block" | "warn";
@@ -117,12 +117,33 @@ export function preflight(doc: Doc, platform: Platform): Finding[] {
     return out;
   }
 
-  if (doc.width !== platform.w || doc.height !== platform.h) {
+  if (platform.minSlides !== undefined && count < platform.minSlides) {
+    add({
+      severity: "block",
+      code: "too-few-slides",
+      slide: null,
+      message: `${count} slide. A ${platform.label} carousel needs at least ${platform.minSlides}.`,
+    });
+  }
+
+  // Any shape the platform takes is silent. 4:5 did not become wrong the day
+  // Instagram started taking 3:4, and saying so would push every existing deck
+  // through a reflow nobody asked for.
+  const shape = shapeOf(platform, doc.width, doc.height);
+  if (!shape) {
     add({
       severity: "warn",
       code: "wrong-size",
       slide: null,
       message: `Artboard is ${doc.width}×${doc.height}; ${platform.label} wants ${platform.w}×${platform.h}. It will be scaled or cropped.`,
+    });
+  } else if (shape.api === false) {
+    // The other app-versus-API trap, on the shape rather than the count.
+    add({
+      severity: "warn",
+      code: "app-only-shape",
+      slide: null,
+      message: `${shape.label} posts from the ${platform.label} app, but its publishing API still refuses anything taller than 4:5, so a scheduler may reject it. Post this one by hand.`,
     });
   }
 

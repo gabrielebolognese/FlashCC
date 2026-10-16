@@ -100,15 +100,17 @@ export type ExportResult =
   | { ok: true; filename: string; bytes: number }
   | { ok: false; error: string };
 
+export type RenderedFile =
+  | { ok: true; filename: string; blob: Blob }
+  | { ok: false; error: string };
+
 /**
- * Renders server-side and hands the browser a download.
+ * Renders server-side and returns the file, without handing it to the browser.
  *
- * The file is fetched rather than linked because the response is a POST, and
- * because the byte count is worth knowing: it feeds back into the size check,
- * which is the one pre-flight rule that cannot be evaluated until the pixels
- * exist.
+ * Split out of `exportDeck` for the multi-destination export, which renders
+ * several of these and packs them into one zip before anything is saved.
  */
-export async function exportDeck(doc: Doc, platform: Platform): Promise<ExportResult> {
+export async function renderFile(doc: Doc, platform: Platform): Promise<RenderedFile> {
   const body = await renderPayload(doc, platform);
 
   /*
@@ -143,6 +145,11 @@ export async function exportDeck(doc: Doc, platform: Platform): Promise<ExportRe
     response.headers.get("content-disposition")?.match(/filename="([^"]+)"/)?.[1] ??
     `carousel.${platform.output === "pdf" ? "pdf" : "zip"}`;
 
+  return { ok: true, filename, blob };
+}
+
+/** Hands the browser a file it already has. */
+export function saveBlob(blob: Blob, filename: string): void {
   const url = URL.createObjectURL(blob);
   const a = document.createElement("a");
   a.href = url;
@@ -152,6 +159,30 @@ export async function exportDeck(doc: Doc, platform: Platform): Promise<ExportRe
   a.remove();
   // Revoking immediately can cancel the download in some browsers; a tick is enough.
   setTimeout(() => URL.revokeObjectURL(url), 10_000);
+}
 
-  return { ok: true, filename, bytes: blob.size };
+/**
+ * Renders server-side and hands the browser a download.
+ *
+ * The file is fetched rather than linked because the response is a POST, and
+ * because the byte count is worth knowing: it feeds back into the size check,
+ * which is the one pre-flight rule that cannot be evaluated until the pixels
+ * exist.
+ *
+ * `repack` gets the file before it is saved, which is how a four-image
+ * destination turns one numbered zip into a folder per post.
+ */
+export async function exportDeck(
+  doc: Doc,
+  platform: Platform,
+  repack?: (file: { filename: string; blob: Blob }) => Promise<{ filename: string; blob: Blob }>,
+): Promise<ExportResult> {
+  const rendered = await renderFile(doc, platform);
+  if (!rendered.ok) return rendered;
+
+  const file = repack ? await repack(rendered) : rendered;
+  saveBlob(file.blob, file.filename);
+  // The size check is about what the platform receives, which is the rendered
+  // file, not the repacked one.
+  return { ok: true, filename: file.filename, bytes: rendered.blob.size };
 }

@@ -18,11 +18,13 @@ import { authHeader } from "./bearer.js";
 import { hasVoice, type Voice } from "./brand.js";
 import { readRefusal } from "./gate.js";
 
-/** The three the caption prompt knows. `x` is not one of them. */
-export type CaptionPlatform = "linkedin" | "instagram" | "tiktok";
+/** The ones the caption prompt knows. X and Bluesky since Batch 17's threads. */
+export type CaptionPlatform = "linkedin" | "instagram" | "tiktok" | "x" | "bluesky";
+
+const CAPTION_PLATFORMS: readonly string[] = ["linkedin", "instagram", "tiktok", "x", "bluesky"];
 
 export const isCaptionPlatform = (id: string): id is CaptionPlatform =>
-  id === "linkedin" || id === "instagram" || id === "tiktok";
+  CAPTION_PLATFORMS.includes(id);
 
 export type CaptionOption = {
   /** At most four words naming what this one did. Never a rank. */
@@ -41,6 +43,8 @@ export type CaptionResult = {
    * rule that enforces it.
    */
   fold?: number | undefined;
+  /** One line per post, numbered, when `posts` was asked for. */
+  lines?: string[] | undefined;
 };
 
 export type CaptionAsk = {
@@ -50,6 +54,8 @@ export type CaptionAsk = {
   cta?: string | undefined;
   count?: number | undefined;
   voice?: Voice | undefined;
+  /** Slides per post, for a deck that goes out as a thread (17.3). */
+  posts?: readonly number[] | undefined;
 };
 
 export async function writeCaption(ask: CaptionAsk, signal?: AbortSignal): Promise<CaptionResult> {
@@ -64,6 +70,7 @@ export async function writeCaption(ask: CaptionAsk, signal?: AbortSignal): Promi
       ...(ask.framework ? { framework: ask.framework } : {}),
       ...(ask.cta ? { cta: ask.cta } : {}),
       ...(hasVoice(ask.voice) ? { voice: ask.voice } : {}),
+      ...(ask.posts && ask.posts.length > 1 ? { posts: [...ask.posts] } : {}),
     }),
   });
 
@@ -78,6 +85,7 @@ export async function writeCaption(ask: CaptionAsk, signal?: AbortSignal): Promi
     hashtags: Array.isArray(body?.hashtags) ? body.hashtags : [],
     limit: typeof body?.limit === "number" ? body.limit : 2200,
     ...(typeof body?.fold === "number" ? { fold: body.fold } : {}),
+    ...(Array.isArray(body?.lines) ? { lines: body.lines } : {}),
   };
 }
 

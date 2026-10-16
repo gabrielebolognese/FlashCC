@@ -10,12 +10,15 @@ describe("which platforms the caption prompt knows", () => {
   });
 
   /**
-   * `x` has a 280 character ceiling and no carousel, so a caption written for
-   * it would be written against rules that do not apply. The button is hidden
-   * rather than the request being made and refused.
+   * X and Bluesky have no carousel, so until Batch 17 a caption written for
+   * them would have been written against rules that did not apply. Now a deck
+   * goes out there as a thread, and the prompt has rules for opening one.
+   * Pinterest still has none, so its button stays hidden.
    */
-  it("does not know x, which has no carousel", () => {
-    expect(isCaptionPlatform("x")).toBe(false);
+  it("knows the two thread destinations, and nothing it has no rules for", () => {
+    expect(isCaptionPlatform("x")).toBe(true);
+    expect(isCaptionPlatform("bluesky")).toBe(true);
+    expect(isCaptionPlatform("pinterest")).toBe(false);
     expect(isCaptionPlatform("")).toBe(false);
   });
 });

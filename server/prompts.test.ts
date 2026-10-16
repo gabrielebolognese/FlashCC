@@ -11,6 +11,7 @@ import {
   ALT_SYSTEM,
   assembleAlt,
   assembleCaption,
+  postsBlock,
   assembleRewrite,
   BODY_CHARS,
   CAPTION_PLATFORMS,
@@ -406,6 +407,16 @@ describe("what the request carries", () => {
     const { user } = assembleRewrite({ text: "A.", intent: "shorter", deck: ["One", "  ", "Two"], count: 3 });
     expect(user).toContain("1. One");
     expect(user).toContain("2. Two");
+  });
+
+  it("says how the deck splits into posts, only when it does", () => {
+    const thread = assembleCaption({ deck: DECK, platform: "x", count: 1, posts: [2, 1] }).user;
+    expect(thread).toContain("thread of 2 posts");
+    expect(thread).toContain("- Post 1: slides 1 to 2");
+    expect(thread).toContain("- Post 2: slide 3");
+    expect(thread).toContain("exactly 2 lines");
+    expect(assembleCaption({ deck: DECK, platform: "x", count: 1 }).user).not.toContain("thread of");
+    expect(postsBlock([4, 4, 2])).toContain("- Post 3: slides 9 to 10");
   });
 
   it("asks for the count it was given", () => {

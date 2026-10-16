@@ -126,12 +126,28 @@ describe("safe zones", () => {
   });
 
   it("scales the zone when the artboard is not the platform's own size", () => {
-    // Instagram's zone is the centred square crop: 135px top and bottom at 4:5.
-    const square = safeBox(IG, 1080, 1080);
-    expect(square.y).toBeCloseTo(108, 0);
+    // LinkedIn's insets are drawn for 1080x1350 and scale with the board.
+    const short = safeBox(LI, 1080, 1080);
+    expect(short.y).toBeCloseTo(64, 0);
+  });
+
+  /**
+   * Instagram's grid has shown 3:4 tiles since January 2025. The old zone was
+   * the square crop, 135px off the top and bottom of a 4:5 cover, which is
+   * now wrong in both directions: the sides go, and much less of them.
+   */
+  it("crops Instagram's cover to the 3:4 grid tile", () => {
     const portrait = safeBox(IG, 1080, 1350);
-    expect(portrait.y).toBe(135);
-    expect(portrait.h).toBe(1080);
+    expect(portrait.y).toBe(0);
+    expect(portrait.h).toBe(1350);
+    expect(portrait.x).toBeCloseTo(33.75, 2);
+    expect(portrait.w).toBeCloseTo(1012.5, 2);
+
+    expect(safeBox(IG, 1080, 1440)).toEqual({ x: 0, y: 0, w: 1080, h: 1440 });
+
+    const square = safeBox(IG, 1080, 1080);
+    expect(square.x).toBeCloseTo(135, 2);
+    expect(square.w).toBeCloseTo(810, 2);
   });
 });
 

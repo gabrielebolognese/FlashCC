@@ -129,6 +129,9 @@ export const CAPTION_LIMIT: Record<string, number> = {
   instagram: 2200,
   tiktok: 2200,
   x: 280,
+  threads: 500,
+  bluesky: 300,
+  pinterest: 500,
 };
 
 export const captionLimit = (platform: string): number => CAPTION_LIMIT[platform] ?? 2200;

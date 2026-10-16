@@ -449,8 +449,12 @@ every framework has a repeatable slot.
 **The margin is split by axis**: `MX = 96`, `MY = 140`. One constant served both until Batch 9, and
 96 is smaller than Instagram's 135px crop, so every generated carousel failed its own pre-flight.
 A single constant could only clear 135 by making every slide needlessly narrow, since Instagram
-takes nothing from the sides. 140 rather than 135 exactly, because a margin equal to the boundary is
+took nothing from the sides. 140 rather than 135 exactly, because a margin equal to the boundary is
 a rounding error away from crossing it.
+
+Batch 17 turned the grid crop around: Instagram's grid has shown 3:4 tiles since January 2025, so a
+4:5 cover now loses about 34px off each **side** and nothing off the top or bottom. `MX = 96` clears
+that with room to spare, so the margins did not change; only the safe box did.
 
 
 `W 1080 · H 1350 · M 96 · COL 888 · BAND 430 · BAND_GAP 56`, inner height 1158.
@@ -1811,13 +1815,28 @@ pipeline rather than stored on the document, so the two cannot disagree.
 
 | | LinkedIn | Instagram | TikTok |
 | --- | --- | --- | --- |
-| Size | 1080×1350 | 1080×1350 | 1080×1920 |
+| Size | 1080×1350 (also 1:1) | 1080×1350, **3:4 1080×1440 (app only)**, 1:1 | 1080×1920 |
 | Output | PDF | Numbered images | Numbered images |
 | Format / quality | JPEG 0.92 | JPEG 0.90 | JPEG 0.90 |
 | Byte band | 800KB–2MB | 200KB–1.5MB | 200KB–2MB |
 | Max slides | 300 | **10 API / 20 app** | 35 |
-| Safe zone T/R/B/L | 80/40/80/40 | 135/0/135/0 | 100/180/480/40 |
+| Safe zone | 80/40/80/40 T/R/B/L | **the cover cropped to 3:4** (`gridAspect`) | 100/180/480/40 T/R/B/L |
 | Min body / heading | 18 / 24pt | 18 / 24pt | 20 / 28pt |
+
+Batch 17 added four more, each verified against the platform's own documentation on 16 October 2026
+(`verified` on the row, `sources` beside it). Facebook is in `CANDIDATES` with no date and so is not
+offered; `npm run check:platforms` names it, and names any shipped row older than 180 days.
+
+| | Threads | X | Bluesky | Pinterest |
+| --- | --- | --- | --- | --- |
+| Shapes | 4:5, 1:1 | 4:5, 1:1 | 4:5, 1:1 | **2:3 1000×1500**, 1:1 |
+| Ceiling | 2 to 20, app and API alike | **4 per post**, so a thread | **4 per post**, so a thread | 2 to 5, so a pick |
+| Safe zone | none | none | none | none |
+
+**A shape can be app-only.** `Shape.api === false` marks one the native app takes and the publishing
+API refuses. Instagram 3:4 is the only one: it is the size the grid never crops, and every scheduler
+guide that mentions it says the Graph API still rejects anything taller than 4:5. The pre-flight
+says so (`app-only-shape`) rather than either hiding 3:4 or letting a scheduler bounce it.
 
 Three facts these encode:
 
@@ -1826,16 +1845,19 @@ wisdom that does not survive the pipeline. What survives is designing at the exa
 with type big enough to read after a lossy pass.
 
 **Instagram crops every slide to the first slide's ratio.** Get slide 1 wrong and all ten are
-ruined. Its profile grid also shows a centred square, which is why the safe inset at 4:5 is 135px
-top and bottom, anything outside it is invisible to anyone browsing your profile.
+ruined. Its profile grid also crops the cover, to a 3:4 tile since January 2025 (a centred square
+before that), and anything outside the tile is invisible to anyone browsing your profile.
+`gridCrop` works the box out from the board, so 4:5 loses its sides, 1:1 loses more of them, and
+3:4 loses nothing.
 
 **API ceilings differ from app ceilings.** A 20-slide Instagram deck can be posted by hand and by no
 scheduler that exists.
 
 ### Pre-flight
 
-Blocking: too many slides, an empty deck, type below the platform floor, text that does not fit its
-box. Warnings: the app-vs-API slide gap, wrong artboard size, placeholder copy, hairline strokes,
+Blocking: too many slides, too few (Threads and Pinterest want two), an empty deck, type below the
+platform floor, text that does not fit its box. Warnings: the app-vs-API slide gap, an app-only
+shape, an artboard that is none of the platform's shapes, placeholder copy, hairline strokes,
 anything reaching into a safe zone, a weak hook on slide 1, and, after rendering, a file outside
 the byte band.
 
@@ -1846,7 +1868,7 @@ insets mean different things and apply to different slides:
 | --- | --- | --- | --- |
 | LinkedIn | `interface` | `all` | author name on top, slide counter and arrows at the bottom |
 | TikTok | `interface` | `all` | action rail right, caption and nav bottom |
-| Instagram | **`crop`** | **`first`** | the profile grid crops 4:5 to a centred square, nothing is drawn over it, and the grid only ever shows the cover |
+| Instagram | **`crop`** | **`first`** | the profile grid crops the cover to a 3:4 tile, nothing is drawn over it, and the grid only ever shows the cover |
 
 Both of those were wrong until Batch 9, and together they made every generated carousel fail: the
 message said "covers with its own interface" for a crop, and it fired on all ten slides for a
@@ -1886,6 +1908,34 @@ PDF that renders blank, and the failure is silent until the post is live.
 Filenames are zero-padded (`01.jpg`), because every upload dialog sorts by filename and a carousel
 out of order is worse than no carousel. The zip uses `STORE`, JPEG is already compressed, so
 deflating costs time and saves nothing.
+
+### Several destinations, threads and picks (`destinations.ts`, `packing.ts`)
+
+Batch 17. Everything is decided before anything renders, in a pure module, and the dialog only
+draws it.
+
+- **A `Destination` is a platform plus a shape**, and optionally a pick and a "keep" flag.
+  `variantFor` builds that destination's copy **in memory**: the pick, then the same reflow and
+  `fitToSafeArea` the format switch uses. A deck already the destination's shape is exported as
+  drawn, never pulled clear of the chrome behind the user's back.
+- **Variants are exports first, documents on request.** "Keep as carousel" saves one through
+  `keepAsCarousel`: new id, the destination in the name, `Doc.variantOf` pointing at the source,
+  and no `series`. `variantOf` is for finding the pair and never for syncing it.
+- **Four-image destinations become threads.** `postSizes` fills posts of four and never leaves the
+  CTA alone in the last post (9 slides are 4, 3, 2). `packing.ts` regroups the server's numbered zip
+  into `post-N-of-M/post-N-slide-K.jpg`, with a `caption.txt` per post. The lines come from each
+  post's first slide (`postLines`, no key), or from `/api/caption` with `posts`, which returns
+  `lines` read positionally and numbered by the server.
+- **Pinterest keeps five**, chosen by structure only (`pickSlides`: hook, next slides in order,
+  CTA). The user swaps any of them; nothing is ranked.
+- **Several at once** renders each destination one after another through `renderFile`, then
+  `bundleZip` writes one zip with a folder per destination. Image zips are unpacked into their
+  folder, never nested. A destination that fails is named and the rest still ship.
+- **The grid preview** (`GridPreview.tsx`) draws the cover at the grid's 3:4 crop beside the last
+  eight published Instagram covers (`gridNeighbours`), from the public `slides` bucket when signed
+  in and from the local copies when not.
+- **Scheduler CSVs stay on LinkedIn, Instagram and TikTok** (`SCHEDULABLE`). None of the three
+  dialects has a column for the new destinations, so those export as files.
 
 ### Publishing for a scheduler
 

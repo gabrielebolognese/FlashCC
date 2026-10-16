@@ -2621,7 +2621,7 @@ follows, applied to more things.
 
 ## Batch 17, Every format people actually post to
 
-**Status:** next
+**Status:** done
 **Size:** small to medium. Mostly data, plus one real feature in 17.5.
 **Why first:** the format list was set in Batch 1 and Instagram changed underneath
 it. Since January 2025 the profile grid shows tall 3:4 tiles, and since May 2025
@@ -2744,11 +2744,77 @@ data is there and nothing new is fetched.
 - **No posting to any of these.** Unchanged from the first half.
 - **No unverified presets.** See 17.2.
 
+### Built as
+
+All six, and both Unknowns resolved against the repo before starting.
+
+**Unknown 1, what `platforms.ts` listed:** LinkedIn, Instagram and TikTok, one size each. It now
+holds eight rows in `CANDIDATES`, each with a `shapes` list, a `verified` date and its `sources`.
+`PLATFORMS`, what the app offers, is the rows with a date.
+
+**Unknown 2, the Instagram inset, and the plan was right to worry.** It was computed for the
+square grid crop: 135px off the top and bottom of a 4:5 cover. The grid has shown 3:4 tiles since
+January 2025, so that inset was wrong in both directions. It is now a ratio, `gridAspect: 3/4`,
+and `gridCrop` works the box out from the board: a 4:5 cover loses about 34px off each side, a 1:1
+cover 135px a side, and 3:4 nothing. `MX = 96` already clears the new crop, so no generated deck
+changed.
+
+**17.1 found something the plan did not know: 3:4 is app-only.** Every scheduler API guide checked
+says the Instagram Graph API still rejects feed images taller than 4:5. So 3:4 ships as an
+Instagram shape marked `api: false`, and the pre-flight says "post this one by hand"
+(`app-only-shape`) rather than letting a scheduler bounce it. That is the `appMaxSlides` trap again,
+on the other axis. The real-account half of 17.1's done-when (a 3:4 slide showing uncropped in the
+feed and grid) cannot be run from here and is still owed.
+
+**17.2, verified against each platform's own documentation on 16 October 2026,** not size-guide
+blogs:
+
+| Row | What the docs said | Versus the plan |
+| --- | --- | --- |
+| Threads | 2 to 20 items, **through the API too** | The plan expected Instagram's 20/10 split. There is none. |
+| X | 4 photos a post, 5MB each | As planned |
+| Bluesky | `embed.images` caps at 4, 2MB each | As planned. A newer `embed.gallery` lexicon allows 10 (soft), but 4 is what every client renders |
+| Pinterest | 2 to 5 images, 1:1 or 2:3 | As planned, and now verified rather than approximate |
+| Facebook | nothing official found | Stays in `CANDIDATES` with no date, so it does not ship |
+
+`npm run check:platforms` (via `tsx`) prints the table, warns on any row older than 180 days and
+names the unverified ones. It exits 0 every time, as the plan asked.
+
+**17.3** is `postSizes`, `postGroups` and `packing.ts`'s `threadZip`. The rule held: 10 slides are
+4, 4, 2 and 9 are 4, 3, 2, asserted for every count to 40. Each post gets a `caption.txt`. The
+lines come from each post's first slide with no key (`postLines`), and `/api/caption` takes
+`posts` and returns `lines`, read positionally and numbered by the server so a model cannot get
+the numbering wrong. X and Bluesky joined `CAPTION_PLATFORMS` with thread-opening rules.
+
+**17.4** is `pickSlides` and `togglePick`: hook, the next body slides in deck order, CTA. Swapping
+is a click on the slide numbers, and the pick can never grow past five or drop below Pinterest's
+two.
+
+**17.5** went the way the plan recommended: exports first, documents on request. `variantFor`
+builds each destination's copy in memory and the contact sheet shows every one with its
+pre-flight above it. "Keep as carousel" saves through `keepAsCarousel` with `Doc.variantOf`, and
+outside the source's series. One deviation worth knowing: **a deck already a destination's shape
+is exported as drawn**, with no safe-area pass, because pulling hand-placed layers clear of the
+chrome is the format switch's job on a change of size, not something to do silently at export.
+
+**17.6** is `GridPreview.tsx`: the cover at the grid's 3:4 crop beside the last eight published
+Instagram covers, from the public `slides` bucket when signed in and from local copies when not.
+
+### Also added, not in the plan
+
+**Scheduler CSVs stay on LinkedIn, Instagram and TikTok** (`SCHEDULABLE` in `schedulers.ts`). None
+of the three dialects has a column for the new destinations: Metricool would have written a row
+with every network `FALSE` and ContentStudio would have called it a video. The dialog says so and
+the new destinations export as files.
+
+**The safe-zone overlay lists only platforms with something to draw.** Threads, X, Bluesky and
+Pinterest have no chrome, and an overlay toggle that shades nothing reads as broken.
+
 ---
 
 ## Batch 18, Layout tools that act once
 
-**Status:** queued
+**Status:** next
 **Size:** medium
 **Why here:** "Post-generation editing is the stated churn path" is the strongest
 line in the first half's caveats, and the most common hand edit after generation is
@@ -4695,9 +4761,9 @@ that define the category. And **nothing is ranked, scored or graded**, because
 the ranking complaint in the research corpus is not about cost, it is about a
 machine asserting which of your sentences is better.
 
-**Batches 1 to 16 are done.** Batches 17 to 33 are the second half of the plan,
-and none of them is built yet. The suggested build order is at the end of this
-document.
+**Batches 1 to 17 are done.** Batches 18 to 33 are the rest of the second half
+of the plan and are not built yet. The suggested build order is at the end of
+this document.
 
 The other open work is `docs/reference.md`
 §29, the defect list, which is deliberately not a roadmap item and should not be
@@ -4708,7 +4774,7 @@ and `09-gates.sql`.
 
 ## Suggested order and where this stands
 
-**None of Batches 17 to 33 is built.** The numbering groups them by theme; the build
+**Batch 17 is built. The rest of 17 to 33 is not.** The numbering groups them by theme; the build
 order below is by damage-to-effort and dependency, the same logic that put export
 first in the first half.
 

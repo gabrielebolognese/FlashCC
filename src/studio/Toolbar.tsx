@@ -3,7 +3,7 @@ import { useEffect, useRef, useState } from "react";
 
 import { ICON_PATHS } from "../render/icons.js";
 import { makeLayer, type Tool } from "./model.js";
-import { PLATFORMS, type PlatformId } from "./platforms.js";
+import { hasSafeZone, PLATFORMS, type PlatformId } from "./platforms.js";
 import type { Studio } from "./useStudio.js";
 
 const TOOLS: { id: Tool; icon: typeof Type; label: string; key: string }[] = [
@@ -177,7 +177,9 @@ export function Toolbar({ studio }: { studio: Studio }) {
               Off
             </button>
 
-            {PLATFORMS.map((pf) => (
+            {/* Only the ones with something to draw. Threads or X would be an
+                overlay toggle that shades nothing. */}
+            {PLATFORMS.filter(hasSafeZone).map((pf) => (
               <button
                 key={pf.id}
                 type="button"

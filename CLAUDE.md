@@ -131,6 +131,11 @@ canvas reimplementation would drift, and `background-clip: text` gradients and u
 faces are exactly what such converters get wrong.
 
 Per platform (`platforms.ts`): LinkedIn takes a PDF built from **JPEG** pages, PNG pages have
-been seen converting to a PDF that renders blank, Instagram and TikTok take numbered images in a
+been seen converting to a PDF that renders blank, the image destinations take numbered images in a
 zip. `preflight.ts` checks the deck against the destination before any of it runs; blocking
 findings block, warnings do not.
+
+Every platform row carries a `verified` date and its `sources`, and **a row with no date does not
+ship** (Facebook, today). `npm run check:platforms` names any row older than 180 days. One deck to
+several destinations, X and Bluesky threads, and Pinterest's pick of five all live in
+`destinations.ts`, pure, with the zip arranging in `packing.ts`.

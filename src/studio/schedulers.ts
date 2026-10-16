@@ -190,6 +190,19 @@ function contentStudioType(platform: PlatformId): string {
 
 export const SCHEDULERS: Scheduler[] = [METRICOOL, PUBLER, CONTENTSTUDIO];
 
+/**
+ * The destinations every dialect above can actually name.
+ *
+ * Batch 17 added Threads, X, Bluesky and Pinterest to the export, and none of
+ * these importers has a column or an enum for them: Metricool would write a
+ * row with every network FALSE and ContentStudio would call it a video. So
+ * publishing for a scheduler stays on these three until a dialect is verified
+ * for another, and the others export as files.
+ */
+export const SCHEDULABLE: readonly PlatformId[] = ["linkedin", "instagram", "tiktok"];
+
+export const isSchedulable = (id: PlatformId): boolean => SCHEDULABLE.includes(id);
+
 export const schedulerById = (id: string): Scheduler =>
   SCHEDULERS.find((s) => s.id === id) ?? METRICOOL;
 

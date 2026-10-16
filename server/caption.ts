@@ -28,6 +28,7 @@ import {
   assembleCaption,
   CAPTION_PLATFORMS,
   MAX_ALT_CHARS,
+  MAX_POST_LINE,
   PLATFORM_CAPTION,
   plainText,
   shortNote,
@@ -63,6 +64,11 @@ const CaptionSchema = z.object({
     .describe("Hashtags drawn from what the carousel is actually about, without the # symbol"),
 });
 
+/** The same, plus one line per post, for a deck that goes out as a thread. */
+const ThreadSchema = CaptionSchema.extend({
+  lines: z.array(z.string()).describe("One short line per post of the thread, in order"),
+});
+
 type CaptionRequest = {
   deck?: string[];
   platform?: string;
@@ -70,7 +76,38 @@ type CaptionRequest = {
   cta?: string;
   count?: number;
   voice?: Voice;
+  /** Slides per post. See `postsOf`. */
+  posts?: number[];
 };
+
+/**
+ * The thread layout, or nothing.
+ *
+ * Accepted only when it describes THIS deck: whole numbers that add up to the
+ * slide count. Anything else is ignored rather than refused, because the
+ * caption is still worth writing without the lines.
+ */
+export function postsOf(raw: unknown, slides: number): number[] | undefined {
+  if (!Array.isArray(raw) || raw.length < 2 || raw.length > 100) return undefined;
+  if (!raw.every((n) => Number.isInteger(n) && n > 0)) return undefined;
+  const sizes = raw as number[];
+  return sizes.reduce((a, b) => a + b, 0) === slides ? sizes : undefined;
+}
+
+/**
+ * Exactly one line per post, read positionally like alt text.
+ *
+ * Padded and truncated for the same reason: a short answer would otherwise put
+ * post 3's line above post 2's images. The number is added here, not by the
+ * model, so it cannot be wrong.
+ */
+export function threadLines(raw: readonly string[], posts: number): string[] {
+  return Array.from({ length: posts }, (_, i) => {
+    const text = repair(raw[i] ?? "").replace(/^\s*\d+\s*[/.)]\s*\d*\s*/, "");
+    const line = text.length > MAX_POST_LINE ? `${text.slice(0, MAX_POST_LINE - 1).trimEnd()}…` : text;
+    return `${i + 1}/${posts} ${line}`.trim();
+  });
+}
 
 const isPlatform = (v: unknown): v is CaptionPlatform =>
   typeof v === "string" && (CAPTION_PLATFORMS as readonly string[]).includes(v);
@@ -212,6 +249,10 @@ export async function caption(req: IncomingMessage, res: ServerResponse): Promis
   const spec = PLATFORM_CAPTION[body.platform];
   const count = Math.min(3, Math.max(1, Math.round(body.count ?? 2)));
 
+  // Counted against the deck as sent, blanks included, because that is what
+  // the client split into posts.
+  const posts = postsOf(body.posts, Array.isArray(body.deck) ? body.deck.length : 0);
+
   const { system, user } = assembleCaption({
     deck,
     platform: body.platform,
@@ -219,14 +260,21 @@ export async function caption(req: IncomingMessage, res: ServerResponse): Promis
     ...(body.framework ? { framework: body.framework } : {}),
     ...(body.cta ? { cta: body.cta } : {}),
     ...(body.voice ? { voice: body.voice } : {}),
+    ...(posts ? { posts } : {}),
   });
 
+  // Two schemas rather than one with an optional field: a model handed an
+  // optional array fills it about half the time, and the lines are either
+  // wanted or not.
   const response = await callModel("caption", MODELS.caption, () =>
     anthropic().messages.parse({
       model: MODELS.caption,
       max_tokens: 4000,
       system: [{ type: "text", text: system, cache_control: { type: "ephemeral" } }],
-      output_config: { effort: "medium", format: zodOutputFormat(CaptionSchema) },
+      output_config: {
+        effort: "medium",
+        format: zodOutputFormat(posts ? ThreadSchema : CaptionSchema),
+      },
       messages: [{ role: "user", content: user }],
     }),
   );
@@ -259,6 +307,9 @@ export async function caption(req: IncomingMessage, res: ServerResponse): Promis
     // rewrite route's `limit`.
     limit: spec.limit,
     ...(spec.fold ? { fold: spec.fold } : {}),
+    ...(posts && "lines" in parsed && Array.isArray(parsed.lines)
+      ? { lines: threadLines(parsed.lines, posts.length) }
+      : {}),
   });
 }
 

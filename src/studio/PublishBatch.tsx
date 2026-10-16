@@ -22,7 +22,7 @@ import { resolveDocAssets } from "./library.js";
 import type { Doc } from "./model.js";
 import { PLATFORMS, platformForSize, type Platform } from "./platforms.js";
 import { downloadText, publishDecks, type BatchProgress } from "./publish.js";
-import { buildSheet, SCHEDULERS, type Scheduler } from "./schedulers.js";
+import { buildSheet, isSchedulable, SCHEDULERS, type Scheduler } from "./schedulers.js";
 import { hasCloudSession, sessionUserId } from "./session.js";
 
 type Phase =
@@ -113,7 +113,7 @@ export function PublishBatch({ ids, onClose }: { ids: readonly string[]; onClose
         <div className="scroll-quiet flex-1 overflow-y-auto p-5">
           <span className="text-overline uppercase text-tertiary">Rendered for</span>
           <div className="mt-2 grid grid-cols-3 gap-2">
-            {PLATFORMS.map((p) => (
+            {PLATFORMS.filter((p) => isSchedulable(p.id)).map((p) => (
               <button
                 key={p.id}
                 type="button"

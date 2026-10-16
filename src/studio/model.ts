@@ -184,6 +184,14 @@ export type Doc = {
   series?: { id: string; part: number } | undefined;
   /** Archived work stays yours and stays synced; it just leaves the grid. */
   archived?: boolean | undefined;
+  /**
+   * The carousel this one was reflowed from for another destination (17.5).
+   *
+   * For FINDING the pair, never for syncing it. Editing either one leaves the
+   * other alone, which is correct, nothing is derived, and this field is the
+   * only thing that remembers they were ever the same deck.
+   */
+  variantOf?: string | undefined;
   slides: Slide[];
   createdAt: string;
   updatedAt: string;
@@ -193,6 +201,9 @@ export type Tool = "select" | "text" | "rect" | "ellipse" | "triangle" | "line" 
 
 export const FORMATS = [
   { id: "portrait", label: "4:5", w: 1080, h: 1350 },
+  // Instagram's tall size since May 2025, and the only one its 3:4 profile grid
+  // shows uncropped. Offered beside 4:5, never instead of it.
+  { id: "tall", label: "3:4", w: 1080, h: 1440 },
   { id: "square", label: "1:1", w: 1080, h: 1080 },
   { id: "story", label: "9:16", w: 1080, h: 1920 },
 ] as const;

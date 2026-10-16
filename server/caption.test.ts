@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { groundedTags, phraseIn, stem, tidyTag } from "./caption.js";
+import { groundedTags, phraseIn, postsOf, stem, threadLines, tidyTag } from "./caption.js";
 
 const DECK = [
   "Cutting on the beat makes your edits feel mechanical.",
@@ -154,5 +154,44 @@ describe("a tag has to be a phrase the deck actually says", () => {
   it("does not fall over on a long tag of nonsense", () => {
     expect(phraseIn("x".repeat(40), words)).toBe(false);
     expect(phraseIn("anything", [])).toBe(false);
+  });
+});
+
+/* ── 17.3, one line per post ─────────────────────────────────────────────── */
+
+describe("postsOf, the thread layout a request may carry", () => {
+  it("accepts a layout that adds up to the deck", () => {
+    expect(postsOf([4, 4, 2], 10)).toEqual([4, 4, 2]);
+  });
+
+  it("ignores one that does not describe this deck", () => {
+    expect(postsOf([4, 4, 2], 9)).toBeUndefined();
+    expect(postsOf([10], 10)).toBeUndefined();
+    expect(postsOf([4, 2.5, 3.5], 10)).toBeUndefined();
+    expect(postsOf([4, -1, 7], 10)).toBeUndefined();
+    expect(postsOf("4,4,2", 10)).toBeUndefined();
+  });
+});
+
+describe("threadLines", () => {
+  it("returns exactly one numbered line per post, whatever came back", () => {
+    expect(threadLines(["Why the beat lies", "Cut on movement"], 3)).toEqual([
+      "1/3 Why the beat lies",
+      "2/3 Cut on movement",
+      "3/3",
+    ]);
+    expect(threadLines(["a", "b", "c", "d"], 2)).toEqual(["1/2 a", "2/2 b"]);
+  });
+
+  it("drops a number the model added itself, so it is never doubled", () => {
+    expect(threadLines(["1/2 Why the beat lies", "2. Cut on movement"], 2)).toEqual([
+      "1/2 Why the beat lies",
+      "2/2 Cut on movement",
+    ]);
+  });
+
+  it("keeps each line inside the ceiling", () => {
+    const [line] = threadLines(["x".repeat(400)], 1);
+    expect(line!.length).toBeLessThanOrEqual(210);
   });
 });
