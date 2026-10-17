@@ -296,6 +296,8 @@ export type Slide = {
    * block" can reopen the form. A record of input, never read at render.
    */
   blocks?: BlockRecord[] | undefined;
+  /** Seconds this slide holds in a video export (26.1), when somebody changed it from the formula. */
+  hold?: number | undefined;
   layers: Layer[];
 };
 
@@ -345,6 +347,8 @@ export type Doc = {
    * from where its words put it. Read by generation only, never at render.
    */
   rhythmShift?: number | undefined;
+  /** How this deck is exported as video (Batch 26): shape, fit, transition, animation. */
+  motion?: { target?: string; fit?: "reflow" | "letterbox"; transition?: "cut" | "push" | "fade" | "zoom"; animation?: "none" | "entrances" | "fade" } | undefined;
   /**
    * The icon style a style pack chose (25.6), for a deck with no icon yet.
    * Once it has one, the icons on it decide (21.1's one style per deck).

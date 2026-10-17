@@ -21,6 +21,7 @@ import { ReviewLink } from "./studio/ReviewLink.js";
 import { onPaywall } from "./studio/gate.js";
 import { sessionPlan, sessionUserId } from "./studio/session.js";
 import { Upgrade } from "./studio/Upgrade.js";
+import { VideoToast } from "./studio/VideoToast.js";
 import { tokenFromPath } from "./studio/sharing.js";
 import { Frameworks } from "./studio/Frameworks.js";
 import { makeDoc, type Doc } from "./studio/model.js";
@@ -211,6 +212,8 @@ export function App() {
     <>
       <Screens />
       <PaywallPrompt />
+      {/* A video render is a job people leave while it runs (26.5): heard from every screen. */}
+      <VideoToast />
     </>
   );
 }

@@ -2732,6 +2732,88 @@ slide's description.
 and nowhere else so that a renamed column is one line. These importers ignore unknown columns
 rather than rejecting the file, so a stale name costs one empty field.
 
+A row can also be a **video post** (Batch 26): `PublishedCarousel.videoUrl` set, `urls` empty.
+Metricool gets the URL in `Picture Url 1` (and `LinkedIn Images as Carousel` FALSE), Publer gets
+`Type` `video`, ContentStudio gets `Post Type` `Video`, the value its enum already takes for
+TikTok rows. Unverified against live templates like the rest (D21).
+
+### Video (`motion.ts`, `server/video.ts`, `server/jobs.ts`, `server/videoapi.ts`)
+
+The deck as a slideshow MP4 for Reels, TikTok, Shorts, LinkedIn and X (Batch 26). Opened from the
+header's **Video** button or `export-video` in the palette (`VideoExport.tsx`).
+
+**The arithmetic is shared** (`src/studio/motion.ts`, pure, imported by the server too). A slide
+holds `min(6, 2 + words / 3.5)` seconds, words counted on visible non-furniture text with marks
+stripped; the cover gets +0.5s and the last slide +1s; `Slide.hold` overrides it (0.5 to 30s).
+Seconds are rounded to frames at 30fps once, in `slideFrames`, so the timing strip, the plan and the
+file agree to the frame. `planVideo` lays the slides end to end: a transition (12 frames, at most
+half a slide) is taken from the END of the slide it leaves, so the runtime is the sum of the
+durations. motion.ts states the few model fields it reads structurally rather than importing
+`model.ts`, because the server program typechecks what it imports and the model reaches modules
+only Vite can load.
+
+| Setting (`Doc.motion`) | Values | Default |
+| --- | --- | --- |
+| `target` | `vertical` 1080×1920 (TikTok safe area), `linkedin-45` 1080×1350, `square` 1080×1080, `landscape` 1920×1080 | `vertical` |
+| `fit` | `reflow`, `letterbox` | `reflow` |
+| `transition` | `cut`, `push` (xfade `slideleft`), `fade`, `zoom` (`zoomin`) | `push` |
+| `animation` | `none`, `entrances`, `fade` | `none` |
+
+**Shape.** Reflow is `videoDoc` in `exporter.tsx`: the same path as a canvas resize, `reflowDoc`
+then `fitToSafeArea` and `reseal` for the target's platform, on a copy; the deck is never changed.
+Letterbox sends the deck as it is and the server scales it to fit, centred on the first slide's
+background colour.
+
+**Entrances.** `entrancesFor(slide, animation)` decides by role: plain copy is read biggest type
+first, the biggest **rises**, the rest **fade** in after it, a layer whose whole text is a number
+("73%", "$1,200", "04") **counts up**, a list block's parts (checklist, steps, timeline, icon grid)
+**arrive in order**, and a `==highlight==` is **drawn on** after its line arrives. "Fade in" fades
+every line. Shapes, pictures and furniture never move. `wrapEntrance` wraps LayerView's own markup
+in a `<div data-fcc-anim>` carrying the timing inline, so the painter is unchanged and a still
+deck's markup is byte for byte what every other export sends.
+
+**Rendering is seeked, never played.** `ENTRANCE_CSS` declares paused keyframes; `SEEK_SCRIPT`
+sets every animation's `currentTime` to frame `k / 30` and writes each count-up's digits into its
+text nodes (`COUNT_JS`, a string copy of `countAt` that a test proves agrees with it). No clock is
+read, so the screenshots are the same every run, and the encoder runs with two pinned threads and
+bitexact flags, so the same screenshots are the same bytes: `video.test.ts` renders an animated deck
+with a transition and a track twice and compares the files.
+
+**Cost.** Only frames where something moves are captured one by one (`movingFrames`, at most the
+hold); the settled slide is ONE screenshot, written as many times as the hold needs. A transition
+is drawn by ffmpeg's `xfade` from the outgoing still and the incoming first frame. The 4-slide
+sample deck with Entrances is 84 screenshots for 517 frames; still, it is 4.
+
+**Encoding.** PNG frames piped to the system's ffmpeg (`FFMPEG_PATH`, else PATH; not bundled, the
+static builds carry GPL codecs): H.264 High, yuv420p, BT.709 tags, CRF 20, `+faststart`, no
+metadata. An uploaded track (20 MB at most) is padded, cut to the video and faded over the last
+second, AAC 160k. Silent otherwise; there is no music library. `/api/health` reports `video` and the
+dialog says so when it is false.
+
+**A job, not a request.** `POST /api/video` validates, checks the plan line, queues and answers
+202 with `{id, token}`; `GET /api/video?id&token` is its state; `GET /api/video/file` serves a
+finished file kept here (with byte ranges); `POST /api/video/retry` queues a failed one again.
+
+- **Who.** A still slideshow is free and needs no account, like the PDF export. Anything with a
+  moving frame is Pro (`requirePro`, 402). No credits, no counter of renders (invariant 7).
+- **Ceilings, for abuse.** Two waiting or rendering per owner (account id, or `ip:<address>`
+  signed out) and twelve an hour (`rateLimit`, in-process, D43).
+- **Durable, said in `jobs.ts`.** Each job is `<id>.json` and `<id>.payload.json` in `VIDEO_DIR`
+  (default `.data/video`), written before it is acted on, renamed into place, one write chain per
+  job. SIGTERM stops new work and gives the job in hand `VIDEO_GRACE_MS` (25s); unfinished, it stays
+  `running` on disk. The next start's `recover` re-queues every `queued` and `running` job and
+  renders it from the beginning (deterministic, so the same file). The third interrupted attempt, or
+  a job whose deck is gone, is `failed` with a reason and a retry. Playwright's own signal handlers
+  are off (`render.ts`): they closed Chromium at the first SIGTERM and killed the job the grace
+  period was for. Renders go to `<id>.mp4.part` and are renamed when complete.
+- **Where the file goes.** Signed in, on a server with the secret key: the public `slides` bucket at
+  `<owner>/<doc>/video-<target>.mp4`, replaced on re-render (`?v=` keeps a CDN honest), and the
+  local copy deleted. Otherwise it stays on this server for a week (`sweep`).
+- **The editor's side** (`videojobs.ts`). Jobs it started live in local storage and one poller
+  follows them, so a reload or another screen still knows. `VideoToast`, mounted in `App` outside
+  the screen switch, says when one is done or failed, once, with Download or Retry. A job the server
+  has no record of is reported failed with a retry that sends the deck again.
+
 ---
 
 ## 22. Persistence
@@ -3082,7 +3164,7 @@ all disabled under `prefers-reduced-motion`.
 
 ## 28. Testing
 
-1,861 tests across 89 files (as of Batch 25). They are design guards, not coverage theatre, several encode an argument
+1,900 tests across 93 files (as of Batch 26). They are design guards, not coverage theatre, several encode an argument
 that would otherwise be lost:
 
 - **mean vs median**, five posts and one at 100k, proving a mean baseline would switch outlier
@@ -3442,6 +3524,41 @@ A deck from a kit uses the framework's example copy, and one from a template wit
 uses placeholders. The pre-flight flags what is left; there is no "from a brief" path straight from
 a template yet (draft, then Re-apply template, does it).
 
+### D43, The video queue's ceilings are per process
+
+`activeFor` counts the jobs this process holds and the hourly limit is the in-process `rateLimit`,
+so both reset on a restart and neither is shared by a second node. One node is the deployment
+today; a second node would also need the queue directory shared or the jobs partitioned.
+
+### D44, A slide arrives empty when it has entrances
+
+With Entrances on, a transition brings the next slide in at its first frame, before anything has
+risen or faded in, so a Push slides in a bare background and the words arrive after. Deliberate
+(the entrance is the arrival), but a "Cut + Entrances" deck shows a blank frame per slide.
+
+### D45, A counting number changes width as it counts
+
+Count-ups write digits into the existing text and the bundled faces are not set with tabular
+figures, so a centred "1,200" shifts sideways by a few pixels while it runs.
+
+### D46, Video renders a spanning deck slide by slide
+
+The video path screenshots each slide on its own rather than as one strip (23.5), so a design
+across a seam can show the 1px rasterisation seam the strip export removed, and Push does not keep a
+panorama continuous.
+
+### D47, A vertical video inherits reflow's limits
+
+Reflow to 9:16 is the canvas resize, so D26 and D27 apply: long text can overflow the taller board
+and TikTok's caption band is larger than a re-laid deck always respects. Letterbox is the way out
+for a deck that reflows badly.
+
+### D48, A video kept on the server has no public URL
+
+Signed out, or on a server without the secret key, the file stays on this server and is served by
+a capability URL that a scheduler could fetch but the dialog does not offer for a CSV. Hosted videos
+are never deleted from the bucket, as with slides (D22).
+
 ### D20, Smaller things
 
 - `paint.ts#layerPaint` is dead **and** disagrees with `LayerView` about whether a fill sits under a
@@ -3453,7 +3570,7 @@ a template yet (draft, then Re-apply template, does it).
 - `M = 96` in `compositions.ts`, `M = 88` in `presets.ts`
 - Dead exports: `compositionLabel`, `slidesFromText`, `GRADIENT_STYLE_IDS`, `asChoice`,
   `isValidHex`, `NO_INSET`, `hasSafeZone`, `AuthState`, `setDisplayName`, `fetchBillingStatus`,
-  `closeBrowser`, `boardCounts`, `outlierCount`, `DEMO_COUNT`
+  `boardCounts`, `outlierCount`, `DEMO_COUNT`
 - `educational` slot 4 is labelled "Breakdown" with placeholder "Technique #1" while slots 5–6 are
   "Example" with "Technique #2/#3", labels and placeholders disagree
 - Seven components re-enable transitions that `index.css` and R4 forbid

@@ -1,4 +1,4 @@
-import { ChevronLeft, ClipboardPaste, Dices, Download, Heading, History, Megaphone, Redo2, Send, Shuffle, Sparkles, Undo2, X } from "lucide-react";
+import { ChevronLeft, ClipboardPaste, Dices, Download, Film, Heading, History, Megaphone, Redo2, Send, Shuffle, Sparkles, Undo2, X } from "lucide-react";
 import type { Studio as StudioState } from "./useStudio.js";
 import { brokenSpans, unspan } from "./spans.js";
 import { StripCanvas } from "./StripCanvas.js";
@@ -48,6 +48,7 @@ import { logoResolver } from "./library.js";
 import { BrandMenu } from "./BrandMenu.js";
 import { BlockPicker } from "./BlockPicker.js";
 import { ExportDialog } from "./ExportDialog.js";
+import { VideoExport } from "./VideoExport.js";
 import { furnishWith } from "./furniture.js";
 import { HookPicker } from "./HookPicker.js";
 import { HistoryPanel } from "./HistoryPanel.js";
@@ -82,6 +83,7 @@ export function Studio({
   const [palette, setPalette] = useState(false);
   const [shortcuts, setShortcuts] = useState(false);
   const [finding, setFinding] = useState(false);
+  const [filming, setFilming] = useState(false);
   /** The filmstrip's "+" showing its line (24.5). */
   const [typingSlide, setTypingSlide] = useState(false);
   const [relaid, setRelaid] = useState<number | null>(null);
@@ -212,6 +214,7 @@ export function Studio({
     review: { run: () => setSharing(true) },
     export: { run: () => setExporting({}) },
     "export-last": { run: () => setExporting({ initial: lastDestination(), auto: true }) },
+    "export-video": { run: () => setFilming(true) },
     "new-slide": { run: () => studio.addSlide(studio.index + 1) },
     "type-slide": { run: () => setTypingSlide(true) },
     "duplicate-slide": { run: () => studio.duplicateSlide(studio.index) },
@@ -504,6 +507,16 @@ export function Studio({
           <Send size={14} strokeWidth={2} />
           Review
         </button>
+        <button
+          type="button"
+          data-action="export-video"
+          title="The deck as a slideshow video for Reels, TikTok, Shorts, LinkedIn or X."
+          onClick={() => setFilming(true)}
+          className="flex h-7 items-center gap-1.5 rounded-md border border-hairline bg-surface-1 px-2.5 text-body text-secondary hover:bg-surface-3 hover:text-primary"
+        >
+          <Film size={14} strokeWidth={2} />
+          Video
+        </button>
         <Button hero icon={Download} action="export" onClick={() => setExporting({})}>
           Export
         </Button>
@@ -609,6 +622,21 @@ export function Studio({
           onClose={() => setExporting(null)}
           initial={exporting.initial}
           autoStart={exporting.auto}
+        />
+      ) : null}
+
+      {filming ? (
+        <VideoExport
+          doc={doc}
+          onMotion={(motion) => studio.replaceDoc({ ...doc, motion }, "motion", "Video settings")}
+          onHold={(i, seconds) =>
+            studio.replaceDoc(
+              { ...doc, slides: doc.slides.map((s, k) => (k === i ? { ...s, hold: seconds } : s)) },
+              `hold-${i}`,
+              "Slide timing",
+            )
+          }
+          onClose={() => setFilming(false)}
         />
       ) : null}
 

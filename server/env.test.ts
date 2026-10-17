@@ -77,6 +77,9 @@ describe("loading the environment", () => {
     // that went, billing.ts, paddle.ts and paddleips.ts, all read keys at import
     // time, so whatever replaces them will land back on this list and should
     // arrive with a line in this diff rather than silently.
-    expect(eager).toEqual(["index.ts", "supabase.ts"]);
+    //
+    // `videoapi.ts` (Batch 26) reads where the video queue lives and how many
+    // workers it runs as it builds the queue; it is imported only by index.ts.
+    expect(eager).toEqual(["index.ts", "supabase.ts", "videoapi.ts"]);
   });
 });

@@ -212,6 +212,25 @@ Invariants worth keeping:
 - `slidePaint` uses `backgroundColor`, never the `background` shorthand next to
   `backgroundImage` (React warns and misorders when one replaces the other).
 
+## Motion export (Batch 26)
+
+- **A slide's duration is arithmetic** (`motion.ts`, pure, shared with the server): 2s plus words
+  over 3.5, capped at 6, cover +0.5, last slide +1, `Slide.hold` overrides. Rounded to frames once
+  in `slideFrames`; the timing strip and the server read the same numbers. A model never picks a
+  duration (invariant 5). `motion.ts` types the model fields it reads structurally: importing
+  `model.ts` would pull Vite-only modules into the server's typecheck.
+- **Entrances are seeked, never played.** A new animation is a paused keyframe in `ENTRANCE_CSS` on
+  the `wrapEntrance` wrapper, driven by `__fccSeek(t)`; nothing reads a clock, and a render twice
+  must be the same bytes (`video.test.ts`). LayerView's markup goes in unchanged. A slide with
+  nothing moving is ONE screenshot.
+- **The video queue is durable, on disk** (`jobs.ts`): state written before it is acted on,
+  unfinished jobs re-queued by `recover` on start, SIGTERM drains with a grace period, a job that
+  keeps dying is reported failed with a retry, never dropped. Playwright's signal handlers stay off
+  (`render.ts`) or a deploy kills the job in hand.
+- **The Pro line is "something moves"** (`isAnimated`): a still slideshow is free with no account.
+  The two-at-once and twelve-an-hour ceilings are abuse limits, never a meter (invariant 7).
+- ffmpeg is the system's (`FFMPEG_PATH`), never bundled; `/api/health` reports `video`.
+
 ## Pictures
 
 - **A stock API is not a scrape.** Batch 13 refused to fetch somebody else's page, and that stands:

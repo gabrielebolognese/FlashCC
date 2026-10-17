@@ -28,7 +28,11 @@ import { inlineDoc, inlineSources } from "./inline.js";
 import { LayerView } from "./LayerView.js";
 import type { Doc, Slide } from "./model.js";
 import { slidePaint } from "./paint.js";
-import type { Platform } from "./platforms.js";
+import { entrancesFor, movingFrames, slideFrames, videoTarget, wrapEntrance, type Entrance, type MotionSettings } from "./motion.js";
+import { platformById, type Platform, type PlatformId } from "./platforms.js";
+import { reflowDoc } from "./reflow.js";
+import { fitToSafeArea } from "./safearea.js";
+import { reseal } from "./furniture.js";
 
 /** The paint on the slide itself, as inline CSS rather than a React style object. */
 function backgroundCss(slide: Slide): string {
@@ -39,10 +43,14 @@ function backgroundCss(slide: Slide): string {
     .join("; ");
 }
 
-function slideHtml(slide: Slide): string {
+function slideHtml(slide: Slide, entrances?: ReadonlyMap<string, Entrance>): string {
   const layers = slide.layers
     .filter((l) => l.visible)
-    .map((l) => renderToStaticMarkup(<LayerView layer={l} />))
+    .map((l) => {
+      const markup = renderToStaticMarkup(<LayerView layer={l} />);
+      // A video's entrances (26.3) wrap the SAME markup: the painter is unchanged.
+      return entrances ? wrapEntrance(markup, l, entrances.get(l.id), entrances.get(`${l.id}#mark`)) : markup;
+    })
     .join("");
 
   return `<div style="position:absolute; inset:0; ${backgroundCss(slide)}">${layers}</div>`;
@@ -195,4 +203,67 @@ export async function exportDeck(
   // The size check is about what the platform receives, which is the rendered
   // file, not the repacked one.
   return { ok: true, filename: file.filename, bytes: rendered.blob.size };
+}
+
+/* ── video (Batch 26) ─────────────────────────────────────────────────────── */
+
+export type VideoPayload = {
+  name: string;
+  docId: string;
+  css: string;
+  width: number;
+  height: number;
+  target: string;
+  backdrop: string;
+  transition: MotionSettings["transition"];
+  slides: { html: string; frames: number; moving: number }[];
+  audio?: { base64: string; type: string } | undefined;
+};
+
+/**
+ * The deck in the video's shape. Reflow is the default (26.2): the same path
+ * as a canvas resize, safe area and furniture included, so a 4:5 deck becomes
+ * a 9:16 one with its headline clear of TikTok's caption band. Letterbox sends
+ * the deck as it is and the server fits it, centred.
+ */
+export function videoDoc(doc: Doc, motion: MotionSettings): Doc {
+  const target = videoTarget(motion.target);
+  if (motion.fit === "letterbox" || (doc.width === target.w && doc.height === target.h)) return doc;
+  const reflowed = reflowDoc(doc, target.w, target.h);
+  if (!target.platform) return reflowed;
+  const platform = platformById(target.platform as PlatformId);
+  return reseal(fitToSafeArea(reflowed, platform), { platform, replace: true });
+}
+
+/**
+ * What the video route renders: the same serialised LayerView markup as every
+ * other export, each slide's frames from the reading-time formula, and the
+ * frames where something moves. Durations are counted on the deck as written,
+ * so the runtime the timing strip shows is the runtime of the file.
+ */
+export async function videoPayload(doc: Doc, motion: MotionSettings, audio?: VideoPayload["audio"]): Promise<VideoPayload> {
+  const shaped = videoDoc(doc, motion);
+  const [carried, css] = await Promise.all([inlineDoc(shaped), fontCss(shaped)]);
+  const n = doc.slides.length;
+  const first = doc.slides[0];
+  return {
+    name: doc.name,
+    docId: doc.id,
+    css,
+    width: carried.width,
+    height: carried.height,
+    target: motion.target,
+    // Behind a letterboxed slide: the deck's own first colour rather than black bars.
+    backdrop: first && /^#[0-9a-f]{3,8}$/i.test(first.background) ? first.background : "#000000",
+    transition: motion.transition,
+    slides: carried.slides.map((s, i) => {
+      const entrances = entrancesFor(s, motion.animation);
+      return {
+        html: slideHtml(s, entrances),
+        frames: slideFrames(doc.slides[i]!, i, n),
+        moving: movingFrames(entrances),
+      };
+    }),
+    ...(audio ? { audio } : {}),
+  };
 }

@@ -47,9 +47,17 @@ const MAX_DIMENSION = 4096;
 
 let browser: Browser | null = null;
 
-async function getBrowser(): Promise<Browser> {
+export async function getBrowser(): Promise<Browser> {
   if (browser?.isConnected()) return browser;
-  browser = await chromium.launch({ args: ["--font-render-hinting=none"] });
+  browser = await chromium.launch({
+    args: ["--font-render-hinting=none"],
+    // The server decides when the browser goes, not Playwright: its own
+    // SIGTERM handler closed Chromium at once, killing the video render a
+    // deploy's grace period exists to let finish (26.5). index.ts closes it.
+    handleSIGTERM: false,
+    handleSIGINT: false,
+    handleSIGHUP: false,
+  });
   return browser;
 }
 

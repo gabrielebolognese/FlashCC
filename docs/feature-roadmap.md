@@ -4210,7 +4210,7 @@ a React warning, older than this batch, from mixing the `background` shorthand w
 
 ## Batch 26, Motion export
 
-**Status:** next
+**Status:** done
 **Size:** large. The first server job in FlashCC that cannot answer inside one request.
 **Why here:** the same carousel is routinely re-posted as a short video for Reels,
 TikTok, Shorts and LinkedIn video, because video formats reach people who never see
@@ -4310,11 +4310,52 @@ is reported as failed with a one-click retry, never silently lost.
 - **No burned-in subtitles.** The slides are already text.
 - **No dependency on the FlashFX engine.** See the scope decision above.
 
+### Built as
+
+All five. Both unknowns are answered. The server is one long-lived Node process, so a job runs in
+it, behind a queue kept on disk. ffmpeg is **not** bundled: the static builds carry GPL codecs
+(libx264), so the server uses the host's (`FFMPEG_PATH` or PATH), `/api/health` reports `video`,
+and the dialog says so when a host has none.
+
+**26.1** as specified. The formula is `motion.ts`, shared by the timing strip and the renderer and
+rounded to frames once, so the done-when is exact rather than within a frame: a nine-slide deck
+decoded from the MP4 changes colour on precisely the plan's frames, and each slide's span is the
+formula. A transition takes 12 frames from the end of the slide it leaves, so it never adds to the
+runtime. H.264 High, yuv420p, level 4.0, BT.709 tags, moov first: phone playable.
+
+**26.2** as specified, with a square and a 16:9 shape beside 9:16 and 4:5. Reflow is the canvas
+resize path (safe area and furniture included) run on a copy; letterbox is the server scaling the
+slide onto the deck's own colour.
+
+**26.3** as specified, plus a quieter "Fade in" choice. By role: the biggest type rises, the rest
+fade after it, a whole-number layer counts up keeping its separators, decimals and leading zeros,
+list blocks arrive in order, a highlight is drawn on after its line. Seeked through the Web
+Animations API, never played. Done-when as tests: an animated deck with a transition and a track
+renders to identical bytes twice; a still slide is one screenshot. The four-slide sample with
+Entrances is 84 screenshots for 517 frames.
+
+**26.4** as specified: an uploaded track, padded, cut and faded out over the last second.
+
+**26.5** as specified, durable. Jobs are files written before they are acted on; a deploy's
+SIGTERM gives the job in hand a grace period; the next start re-queues anything unfinished and
+renders it again from the start. Verified on a real process three ways: killed mid-render (resumed,
+done on attempt 2), SIGTERM with a long grace (finished during the drain), SIGTERM with a short one
+(left running, resumed on restart). That last one found a real bug: Playwright's own SIGTERM
+handler closed Chromium at once, so the grace period protected nothing; its handlers are now off.
+The editor remembers its jobs, so a job the server lost entirely is reported with a retry that
+resends the deck. Two at once and twelve an hour per account, as abuse limits; still is free and
+needs no account, animated is Pro. A hosted video becomes a video row in all three scheduler CSVs.
+
+Verified in the browser: the dialog, the timing strip changing the runtime and resetting, an
+animated render refused while signed out, a still render queued, followed, previewed and announced
+by the toast on top of the studio, the file downloaded and probed, and the toast staying dismissed
+after a reload.
+
 ---
 
 ## Batch 27, Idea bank, lanes and the weekly session
 
-**Status:** queued
+**Status:** next
 **Size:** medium
 **Why here:** the first half's batching evidence says three things about planning,
 and none of them is "give people more ideas". Content goes stale in about a week.

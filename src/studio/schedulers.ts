@@ -46,6 +46,11 @@ export type PublishedCarousel = {
   scheduledFor: string | null;
   /** A PDF at a public URL, when one was published. Publer ingests these. */
   documentUrl?: string | undefined;
+  /**
+   * The deck as a video at a public URL (26.5). When present the row is a
+   * video post: the one URL is the media, and the slides are not listed.
+   */
+  videoUrl?: string | undefined;
 };
 
 export type Scheduler = {
@@ -114,7 +119,8 @@ const METRICOOL: Scheduler = {
   row: (item) => {
     const { date, time } = splitWhen(item.scheduledFor);
     const networks = metricoolNetwork(item.platform);
-    const urls = item.urls.slice(0, PICTURE_COLUMNS);
+    // A video goes in the first media column; Metricool reads the file type from the URL.
+    const urls = item.videoUrl ? [item.videoUrl] : item.urls.slice(0, PICTURE_COLUMNS);
     return [
       item.caption,
       date,
@@ -123,8 +129,8 @@ const METRICOOL: Scheduler = {
       networks.Linkedin ?? "FALSE",
       networks.Tiktok ?? "FALSE",
       ...Array.from({ length: PICTURE_COLUMNS }, (_, i) => urls[i] ?? ""),
-      ...Array.from({ length: PICTURE_COLUMNS }, (_, i) => (urls[i] ? altFor(item, i) : "")),
-      item.platform === "linkedin" ? "TRUE" : "FALSE",
+      ...Array.from({ length: PICTURE_COLUMNS }, (_, i) => (urls[i] && !item.videoUrl ? altFor(item, i) : "")),
+      item.platform === "linkedin" && !item.videoUrl ? "TRUE" : "FALSE",
     ];
   },
 };
@@ -140,6 +146,7 @@ const PUBLER: Scheduler = {
   row: (item) => {
     const { date, time } = splitWhen(item.scheduledFor);
     const urls = item.urls.slice(0, PICTURE_COLUMNS);
+    if (item.videoUrl) return ["video", date, time, item.caption, item.videoUrl, "", "", item.name];
     return [
       // `Post subtype` accepts PDF, so a LinkedIn deck can go as the finished
       // document rather than as ten pictures, which is the shape LinkedIn
@@ -167,13 +174,14 @@ const CONTENTSTUDIO: Scheduler = {
   row: (item) => {
     const { date, time } = splitWhen(item.scheduledFor);
     return [
-      contentStudioType(item.platform),
+      // "Video" is the value its enum already takes for TikTok rows.
+      item.videoUrl ? "Video" : contentStudioType(item.platform),
       date,
       time,
       item.caption,
       // A newline INSIDE a field, which is exactly why the writer below quotes
       // every cell rather than only the ones it thinks need it.
-      item.urls.slice(0, PICTURE_COLUMNS).join("\n"),
+      item.videoUrl ?? item.urls.slice(0, PICTURE_COLUMNS).join("\n"),
       "",
       item.name,
       "",
@@ -251,7 +259,7 @@ export function buildSheet(
         `"${item.name}" has ${item.urls.length} slides. No publishing API takes more than ${scheduler.maxImages}, so the rest were dropped from the row.`,
       );
     }
-    if (item.urls.length === 0) {
+    if (item.urls.length === 0 && !item.videoUrl) {
       warnings.push(`"${item.name}" has no hosted slides, so its row has nothing to import.`);
     }
   }

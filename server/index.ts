@@ -24,10 +24,13 @@ import { revise } from "./revise.js";
 import { rewrite } from "./rewrite.js";
 import { draft, draftConfigured, draftStatus, hooks } from "./draft.js";
 import { exportDeck, renderDocument, renderImages } from "./export.js";
+import { closeBrowser } from "./render.js";
 import { HttpError, json } from "./http.js";
 import { addComment, decide, readShare } from "./review.js";
 import { stockConfigured, stockSearch, stockUsed } from "./stock.js";
 import { devPro, hasSecretKey } from "./supabase.js";
+import { ffmpegAvailable } from "./video.js";
+import { createVideo, queue, readVideo, retryVideo, videoFile } from "./videoapi.js";
 
 const PORT = Number(process.env.PORT ?? 8787);
 
@@ -51,6 +54,8 @@ const ROUTES: Record<string, Record<string, Handler>> = {
     "/api/document": renderDocument,
     "/api/stock": stockSearch,
     "/api/stock/used": stockUsed,
+    "/api/video": createVideo,
+    "/api/video/retry": retryVideo,
     /*
       The four /api/billing routes were here: checkout, portal, webhook and
       status. They were removed with the payment integration, to be rebuilt.
@@ -64,6 +69,9 @@ const ROUTES: Record<string, Record<string, Handler>> = {
   GET: {
     // The one route that answers to somebody with no account. See review.ts.
     "/api/review": readShare,
+    // By id and token, the capability the POST handed back. See videoapi.ts.
+    "/api/video": readVideo,
+    "/api/video/file": videoFile,
   },
 };
 
@@ -75,6 +83,8 @@ const server = createServer((req, res) => {
     return json(res, 200, {
       ok: true,
       export: true,
+      // Whether this server can make videos at all: ffmpeg is the system's, not bundled.
+      video: ffmpegAvailable(),
       draft: draftConfigured(),
       // Which stock photo providers have a key. The picker offers only these.
       stock: stockConfigured(),
@@ -104,11 +114,39 @@ const server = createServer((req, res) => {
   });
 });
 
+/*
+ * The video queue is durable (jobs.ts): unfinished jobs from the last process
+ * are picked up before the first request, and a deploy's SIGTERM gives the
+ * job in hand a grace period, after which it is left for the next start.
+ */
+void queue.recover().then(({ requeued, failed }) => {
+  if (requeued.length || failed.length) console.log(`video queue: ${requeued.length} resumed, ${failed.length} reported failed`);
+});
+const sweeper = setInterval(() => void queue.sweep(), 3600_000);
+sweeper.unref();
+
+let stopping = false;
+for (const signal of ["SIGTERM", "SIGINT"] as const) {
+  process.on(signal, () => {
+    if (stopping) process.exit(1);
+    stopping = true;
+    server.close();
+    void queue
+      .drain(Number(process.env.VIDEO_GRACE_MS ?? 25_000))
+      .then(({ finished }) => {
+        if (!finished) console.warn("video queue: stopping with a render in hand; the next start resumes it");
+        return closeBrowser();
+      })
+      .finally(() => process.exit(0));
+  });
+}
+
 server.listen(PORT, () => {
   const bits = [
     draftConfigured() ? "drafting" : "NO ANTHROPIC_API_KEY",
     "NO BILLING",
     hasSecretKey() ? "secret key" : "NO SUPABASE SECRET KEY",
+    ffmpegAvailable() ? "video" : "NO FFMPEG",
   ];
   console.log(`server on http://localhost:${PORT} (${bits.join(" · ")})`);
 

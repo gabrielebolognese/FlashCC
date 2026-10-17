@@ -212,3 +212,22 @@ describe("what it refuses to pretend", () => {
     expect(buildSheet(schedulerById("publer"), [carousel()]).warnings).toEqual([]);
   });
 });
+
+describe("a video post (26.5)", () => {
+  const video = carousel({ urls: [], alts: [], platform: "tiktok", videoUrl: "https://cdn/u/d1/video-vertical.mp4" });
+
+  it("puts the one video URL where each importer reads media, and lists no slides", () => {
+    expect(cells("metricool", video)["Picture Url 1"]).toBe("https://cdn/u/d1/video-vertical.mp4");
+    expect(cells("metricool", video)["Picture Url 2"]).toBe("");
+    expect(cells("metricool", { ...video, platform: "linkedin" })["LinkedIn Images as Carousel"]).toBe("FALSE");
+    expect(cells("publer", video)).toMatchObject({ Type: "video", "Media URLs": "https://cdn/u/d1/video-vertical.mp4" });
+    expect(cells("contentstudio", { ...video, platform: "instagram" })).toMatchObject({ "Post Type": "Video", "Media URLs": "https://cdn/u/d1/video-vertical.mp4" });
+  });
+
+  it("is not warned about as a row with nothing to import", () => {
+    for (const s of SCHEDULERS) {
+      expect(s.row(video)).toHaveLength(s.columns.length);
+      expect(buildSheet(s, [video]).warnings.join(" ")).not.toMatch(/nothing to import/);
+    }
+  });
+});

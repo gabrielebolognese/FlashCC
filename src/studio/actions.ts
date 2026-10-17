@@ -54,6 +54,7 @@ export const ACTIONS = {
   review: { label: "Send for review", group: "Deck", also: "share link client approval" },
   export: { label: "Export", group: "Export", also: "download pdf images" },
   "export-last": { label: "Export with the last destination", group: "Export", keys: "⌘E" },
+  "export-video": { label: "Export as video", group: "Export", also: "mp4 reels tiktok shorts slideshow motion animate" },
   // Slide
   "new-slide": { label: "New slide after this one", group: "Slide", keys: "N" },
   "type-slide": { label: "Type a slide into existence", group: "Slide", also: "add headline" },
