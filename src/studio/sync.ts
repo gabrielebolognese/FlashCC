@@ -40,6 +40,7 @@ import {
 import { listAssets, saveAssets, type Asset } from "./assets.js";
 import { listBrands, saveBrands, type Brand } from "./brand.js";
 import { listClients, saveClients, type Client } from "./clients.js";
+import { laneToRow, listLanes, rowToLane, saveLanes, type Lane, type LaneRow } from "./lanes.js";
 import { forgetLibrary } from "./library.js";
 import { forgetAllVersions } from "./versions.js";
 import type { Doc } from "./model.js";
@@ -167,6 +168,12 @@ function localClientEntries(): Entry<Client>[] {
   return [...alive, ...gone];
 }
 
+function localLaneEntries(): Entry<Lane>[] {
+  const alive: Entry<Lane>[] = listLanes().map((l) => ({ id: l.id, updatedAt: l.updatedAt, value: l }));
+  const gone: Entry<Lane>[] = listTombstones("lane").map((t) => ({ id: t.id, updatedAt: t.deletedAt, value: null }));
+  return [...alive, ...gone];
+}
+
 function localPostEntries(): Entry<Post>[] {
   const alive: Entry<Post>[] = listPosts().map((p) => ({
     id: p.id,
@@ -205,6 +212,11 @@ const assetRowToEntry = (row: AssetRow): Entry<Asset> =>
   row.deleted_at
     ? { id: row.id, updatedAt: row.deleted_at, value: null }
     : { id: row.id, updatedAt: row.updated_at, value: rowToAsset(row) };
+
+const laneRowToEntry = (row: LaneRow): Entry<Lane> =>
+  row.deleted_at
+    ? { id: row.id, updatedAt: row.deleted_at, value: null }
+    : { id: row.id, updatedAt: row.updated_at, value: rowToLane(row) };
 
 const postRowToEntry = (row: PostRow): Entry<Post> =>
   row.deleted_at
@@ -261,12 +273,13 @@ export async function syncAll(userId: string): Promise<SyncResult> {
   if (!db) return { ok: false, pushed: 0, applied: 0, error: "Cloud is not configured" };
 
   try {
-    const [docsRes, postsRes, brandsRes, assetsRes, clientsRes] = await Promise.all([
+    const [docsRes, postsRes, brandsRes, assetsRes, clientsRes, lanesRes] = await Promise.all([
       db.from("docs").select("*").eq("user_id", userId),
       db.from("posts").select("*").eq("user_id", userId),
       db.from("brands").select("*").eq("user_id", userId),
       db.from("assets").select("*").eq("user_id", userId),
       db.from("clients").select("*").eq("user_id", userId),
+      db.from("lanes").select("*").eq("user_id", userId),
     ]);
 
     if (docsRes.error) throw new Error(docsRes.error.message);
@@ -290,6 +303,10 @@ export async function syncAll(userId: string): Promise<SyncResult> {
     // take the whole account offline over a feature nobody is using.
     const clientsTableMissing = clientsRes.error?.code === "PGRST205";
     if (clientsRes.error && !clientsTableMissing) throw new Error(clientsRes.error.message);
+
+    // Lanes arrive with 12-planning.sql, on the same terms.
+    const lanesTableMissing = lanesRes.error?.code === "PGRST205";
+    if (lanesRes.error && !lanesTableMissing) throw new Error(lanesRes.error.message);
 
     const docMerge = mergeEntries(
       localDocEntries(),
@@ -319,6 +336,10 @@ export async function syncAll(userId: string): Promise<SyncResult> {
           localClientEntries(),
           ((clientsRes.data ?? []) as ClientRow[]).map(clientRowToEntry),
         );
+
+    const laneMerge = lanesTableMissing
+      ? { merged: [], toPush: [], toApply: [] }
+      : mergeEntries(localLaneEntries(), ((lanesRes.data ?? []) as LaneRow[]).map(laneRowToEntry));
 
     /* ── push ── */
     const docRows = docMerge.toPush.map((e) =>
@@ -352,6 +373,14 @@ export async function syncAll(userId: string): Promise<SyncResult> {
           : clientToRow(emptyClient(e.id, e.updatedAt), userId, e.updatedAt),
       ),
     );
+
+    const laneRows = laneMerge.toPush.map((e) =>
+      forWrite(e.value ? laneToRow(e.value, userId) : laneToRow(emptyLane(e.id, e.updatedAt), userId, e.updatedAt)),
+    );
+    if (laneRows.length > 0) {
+      const { error } = await db.from("lanes").upsert(laneRows, { onConflict: "user_id,id" });
+      if (error) throw new Error(error.message);
+    }
 
     if (clientRows.length > 0) {
       const { error } = await db.from("clients").upsert(clientRows, { onConflict: "user_id,id" });
@@ -421,6 +450,10 @@ export async function syncAll(userId: string): Promise<SyncResult> {
       saveClients(live(clientMerge.merged));
     }
 
+    if (laneMerge.toApply.length > 0) {
+      saveLanes(live(laneMerge.merged));
+    }
+
     if (assetMerge.toApply.length > 0) {
       // Locally-pending uploads are kept: they are the ones still carrying their
       // bytes, they are invisible to the server, and a merge that only saw the
@@ -435,19 +468,21 @@ export async function syncAll(userId: string): Promise<SyncResult> {
     clearTombstones("brand", brandMerge.toPush.filter((e) => e.value === null).map((e) => e.id));
     clearTombstones("asset", assetTombstones.map((e) => e.id));
     clearTombstones("client", clientMerge.toPush.filter((e) => e.value === null).map((e) => e.id));
+    clearTombstones("lane", laneMerge.toPush.filter((e) => e.value === null).map((e) => e.id));
 
     writeCursor(new Date().toISOString());
 
     return {
       ok: true,
       pushed:
-        docRows.length + postRows.length + brandRows.length + assetRows.length + clientRows.length,
+        docRows.length + postRows.length + brandRows.length + assetRows.length + clientRows.length + laneRows.length,
       applied:
         docMerge.toApply.length +
         postMerge.toApply.length +
         brandMerge.toApply.length +
         assetMerge.toApply.length +
-        clientMerge.toApply.length,
+        clientMerge.toApply.length +
+        laneMerge.toApply.length,
     };
   } catch (err) {
     return {
@@ -458,6 +493,19 @@ export async function syncAll(userId: string): Promise<SyncResult> {
     };
   }
 }
+
+const emptyLane = (id: string, at: string): Lane => ({
+  id,
+  name: "Deleted",
+  weekday: 1,
+  time: "09:00",
+  platform: "linkedin",
+  framework: "deleted",
+  look: { kind: "style", id: "deleted" },
+  pillar: "",
+  createdAt: at,
+  updatedAt: at,
+});
 
 const emptyClient = (id: string, at: string): Client => ({
   id,
@@ -530,7 +578,8 @@ export function hasLocalWork(): boolean {
     listPosts().length > 0 ||
     listBrands().length > 0 ||
     listAssets().length > 0 ||
-    listClients().length > 0
+    listClients().length > 0 ||
+    listLanes().length > 0
   );
 }
 
@@ -540,6 +589,7 @@ export function forgetLocal(): void {
   savePosts([]);
   saveBrands([]);
   saveClients([]);
+  saveLanes([]);
   forgetLibrary();
   // Swept by prefix, because version keys are per document and there is no index
   // to walk. Without this, signing out on a shared machine leaves whole

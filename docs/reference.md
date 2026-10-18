@@ -2377,6 +2377,71 @@ rearrange anybody's grid. Called from `deleteDoc`, so it happens however a carou
 the three cadences they describe, carrying the time of day across every part and skipping anything
 already posted.
 
+### Planning: ideas, lanes and the weekly session (Batch 27)
+
+Five screens under **Plan** in the rail (`Home.tsx`): Ideas, Lanes, Make next week, Finish, and the
+calendar's week view gains lanes and a stale mark. The research says three things about planning and
+none of them is "more ideas": content goes stale in about a week, experienced creators plan formats
+and lanes rather than finished posts, and the wall is everything after the idea.
+
+**An idea is a post in the `idea` stage** (`ideas.ts`), not a new record. The pipeline has had that
+stage since Batch 3 and a post already carries title, notes, pillar and client and already syncs, so
+pairing an idea with a lane is the same record moving along. `Post.source` says where it came from
+(`capture`, `board`, later `phone` and `extension`); `isIdea` is stage `idea` with no `docId`.
+**The bank is never filled by a model.**
+
+**Capture is Q, from any screen.** `actionForKey` maps `q` to `capture-idea`; the studio's runner
+calls `openCapture`, and `IdeaCapture`, mounted in `App` outside the screen switch, listens for the
+key on every other screen (the studio's handler runs first and marks the event handled, so the editor
+never opens it twice). One line and Enter. The client is the one selected in the rail; a pillar is
+one click on a pillar that already exists (`pillarsOf`, from posts and lanes, taken as written like
+`mixOf`). `filterIdeas` filters by pillar and client, so nothing is ever typed as a tag.
+
+**A lane** (`lanes.ts`) is `{ weekday (ISO, 1 is Monday), time "HH:MM" local, platform, framework,
+look: { kind: style | pack | template, id }, pillar, clientId }`. Stored locally and synced through
+the `lanes` table like clients (optional table, PGRST205 degrades to local-only), with a `lane`
+tombstone kind. A lane is a plan, not a record: editing or deleting one changes no post.
+
+**Make next week** (`week.ts`, pure; `WeekSession.tsx`):
+
+| Export | What it does |
+| --- | --- |
+| `slotsAhead(lanes, posts, from, 7)` | Every lane slot from now to the same time seven days on; a slot already past today is left out; a slot holds the post in that lane on that day |
+| `sessionQueue(slots, pairing, ideas)` | Only open slots the person paired, each idea once (an idea paired twice goes to its earlier slot, the later stays empty) |
+| `moveStep` | Reorders waiting steps only; started and finished steps stay put |
+| `runSession(deps)` | Reads the queue afresh before every step, so a reorder mid-run is followed; `stopped()` is read before each step, so Stop keeps everything done; a failed step is marked and the run goes on |
+| `landIdea` | The idea becomes the carousel's post: `docId`, the snapshot, the lane's platform and `lane`, the lane's pillar if it had none, `scheduledFor` at the lane's slot, stage **drafting** |
+| `laneStructure`, `deckForLane`, `ownWords` | The lane's framework (a template's length when its look is a template), drafted words laid out in the lane's style, pack (`applyPack`) or template (`deckFromTemplate`, which records `Doc.template`) |
+| `openLanesOn`, `isStale`, `STALE_DAYS` | The week view's empty lane slots, and the 7-day stale mark |
+
+Drafting is Batch 16's `draftSlides` call with the idea and its notes as the brief. With no key on
+the server it degrades to "write it yourself": the framework's own example words with the idea on the
+cover. The session dates a carousel on its lane's day but leaves it in **drafting**; the finishing
+pass's last step is what moves it to scheduled, so a post reads as scheduled only once somebody has
+finished it.
+
+**The finishing pass** (`finishing.ts`, `FinishingPass.tsx`): `finishingQueue` is every drafted
+carousel, soonest slot first. Six steps in a fixed order, one screen and one decision each:
+
+| Step | The decision | Writes |
+| --- | --- | --- |
+| hook | slide one's words, previewed live | the slide, through `restateMany` (the outline's path) and `reseal` |
+| payoff | the last slide's words, with complete CTA lines for the platform as one-click options | the slide, the same way |
+| caption | `captionOf`, editable | `Post.caption` |
+| alt | one description per slide, the person's own or `altFromTexts` | `Slide.alt` |
+| pre-flight | the destination's checks; findings about a slide's words (`placeholder-text`, `weak-hook`, not on furniture) are fixed in place; anything else that blocks names the editor | the slides |
+| schedule | the date, the lane's slot unless moved | `schedule()`, stage scheduled |
+
+`stepsLeft` counts what a carousel has left (a scheduled post has none). Progress is kept per post on
+this device (`flashcc.finishing`), because a place in the pass is a working note, not a record.
+
+**The week view** (`PostCalendar.tsx`): from today on, a lane nothing fills on a day is a dashed,
+labelled slot; a post dropped on it is scheduled at the lane's time and joins the lane. A draft
+untouched for more than seven days (the carousel's last edit, else the post's creation) carries a
+"stale?" mark. A mark, not a block: a week-old draft is often fine.
+
+`supabase/12-planning.sql` adds `posts.source`, `posts.lane_id` and the `lanes` table.
+
 ### Caption, transcript and first comment (`transcript.ts`)
 
 All three read the **layers**, not a source text, because what is stored is what renders. Hidden
@@ -3164,7 +3229,7 @@ all disabled under `prefers-reduced-motion`.
 
 ## 28. Testing
 
-1,900 tests across 93 files (as of Batch 26). They are design guards, not coverage theatre, several encode an argument
+1,918 tests across 94 files (as of Batch 27). They are design guards, not coverage theatre, several encode an argument
 that would otherwise be lost:
 
 - **mean vs median**, five posts and one at 100k, proving a mean baseline would switch outlier
@@ -3558,6 +3623,29 @@ for a deck that reflows badly.
 Signed out, or on a server without the secret key, the file stays on this server and is served by
 a capability URL that a scheduler could fetch but the dialog does not offer for a CSV. Hosted videos
 are never deleted from the bucket, as with slides (D22).
+
+### D49, Without a key, a session's carousels start from example words the pre-flight does not flag
+
+`ownWords` fills every slide but the cover with the framework's example copy, and the pre-flight's
+placeholder list catches the generator's own placeholders, not a framework's examples ("Reach follows
+the posts people finish"). The finishing pass puts the hook and payoff in front of the person, but the
+middle slides can go out as the framework's words if nobody opens them.
+
+### D50, A Batch 27 client needs 12-planning.sql before it syncs
+
+Every post sync writes `source` and `lane_id`, so a database without those columns refuses the
+upsert, as `08-pipeline-fields.sql` did for its five. The lanes table itself is optional.
+
+### D51, The finishing pass's progress is per device
+
+`flashcc.finishing` lives in local storage. The same carousel opened on a second device starts the
+pass from the hook again; a scheduled one is still recognised as finished everywhere, because that is
+read from the post's stage.
+
+### D52, Lanes carry no identity, so pack furniture says "Your name"
+
+A pack lane's carousels are stamped with the pack's furniture and no brand identity, so the author
+chip reads "Your name" until a brand is applied; the pre-flight reports it as a check.
 
 ### D20, Smaller things
 

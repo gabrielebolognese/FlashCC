@@ -166,6 +166,16 @@ export type Post = {
 
   metrics: Metrics | null;
 
+  /**
+   * Where an idea came from (27.1): `capture` (the shortcut), `board`, and,
+   * once they exist, `phone` (Batch 32) and `extension` (Batch 31). Kept when
+   * the idea becomes a carousel, so "the ones I captured on the train" stays a
+   * question with an answer.
+   */
+  source?: string | undefined;
+  /** The lane this post fills (27.2), when a weekly session made it. */
+  lane?: string | undefined;
+
   createdAt: string;
   updatedAt: string;
 };

@@ -231,6 +231,22 @@ Invariants worth keeping:
   The two-at-once and twelve-an-hour ceilings are abuse limits, never a meter (invariant 7).
 - ffmpeg is the system's (`FFMPEG_PATH`), never bundled; `/api/health` reports `video`.
 
+## Planning (Batch 27)
+
+- **An idea is a post in the `idea` stage** (`ideas.ts`), never a separate record, and **never
+  generated**: no feature fills the bank with a model. Q captures one from any screen (`actionForKey`
+  plus `IdeaCapture` in `App`); nothing is typed as a tag, pillar and client come from what exists.
+- **A lane is a plan, not a record** (`lanes.ts`). Posts copy what they need from it; editing or
+  deleting a lane changes no post.
+- **The session never pairs an idea for the person** (`week.ts`). `sessionQueue` takes only the
+  pairings made; the runner reads the queue before every step (reorder) and `stopped()` before every
+  step (stop keeps what is done). A new planning feature that fills a slot by itself breaks "no
+  silent calendar filling".
+- A session leaves carousels in **drafting**, dated on their lane's day; only the finishing pass's
+  schedule step moves one to scheduled. The six steps and their order are `FINISH_STEPS`.
+- `12-planning.sql` adds `posts.source`, `posts.lane_id` and `lanes`; the posts columns are required
+  before a Batch 27 client syncs.
+
 ## Pictures
 
 - **A stock API is not a scrape.** Batch 13 refused to fetch somebody else's page, and that stands:

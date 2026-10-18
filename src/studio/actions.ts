@@ -102,6 +102,7 @@ export const ACTIONS = {
   // Insert
   "insert-block": { label: "Insert a block", group: "Insert", keys: "/" },
   projects: { label: "Back to projects", group: "Projects" },
+  "capture-idea": { label: "Capture an idea", group: "Projects", keys: "Q", also: "idea bank note thought later" },
 } as const satisfies Record<string, ActionDef>;
 
 export type ActionId = keyof typeof ACTIONS;
@@ -179,6 +180,9 @@ export function actionForKey(e: KeyLike, typing: boolean): ActionId | null {
     g: "group",
     v: "tool-select",
     i: "tool-icon",
+    // Q for the idea bank (27.1). The one letter that also works off the
+    // editor: App listens for it on every other screen.
+    q: "capture-idea",
   };
   return plain[k] ?? null;
 }
@@ -201,6 +205,7 @@ export const KEY_TABLE: { keys: string; label: string }[] = [
   { keys: "⌘Z / ⇧⌘Z", label: "Undo / redo" },
   { keys: "V · I", label: "Move tool · icon" },
   { keys: "⇧T · ⇧R · ⇧O", label: "Text · rectangle · ellipse tools" },
+  { keys: "Q", label: "Capture an idea, from any screen" },
   { keys: "?", label: "This table" },
 ];
 

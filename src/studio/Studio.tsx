@@ -49,6 +49,7 @@ import { BrandMenu } from "./BrandMenu.js";
 import { BlockPicker } from "./BlockPicker.js";
 import { ExportDialog } from "./ExportDialog.js";
 import { VideoExport } from "./VideoExport.js";
+import { openCapture } from "./ideas.js";
 import { furnishWith } from "./furniture.js";
 import { HookPicker } from "./HookPicker.js";
 import { HistoryPanel } from "./HistoryPanel.js";
@@ -288,6 +289,7 @@ export function Studio({
     "tool-icon": { run: () => studio.setTool("icon") },
     "insert-block": { run: () => studio.setPicker({ mode: "insert" }) },
     projects: { run: onHome },
+    "capture-idea": { run: openCapture },
   };
 
   /** One entry per argument of each family, built when the palette opens. */

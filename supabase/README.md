@@ -125,6 +125,7 @@ it should stay deleted. That second half is the one that catches real bugs.
 | `09-gates.sql` | **After billing**, with `02-pro-gate.sql`. Review links become Pro. |
 | `10-brand-voice.sql` | Now. One `jsonb` column on `brands`, holding how a brand sounds. |
 | `11-billing-columns.sql` | Only for a database created before this file existed, where the two billing columns still carry an old provider's name. A no-op otherwise. |
+| `12-planning.sql` | Now, before a Batch 27 client syncs. `source` and `lane_id` on `posts`, and the `lanes` table. |
 
 Run `npm run check:schema` at any point: it probes the live project with the
 publishable key and names every migration that has not been applied.

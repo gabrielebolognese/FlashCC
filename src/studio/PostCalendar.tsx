@@ -41,6 +41,10 @@ import {
   type Day,
 } from "./calendar.js";
 import { Chip, Empty, Segmented } from "./Dash.js";
+import { frameworkName, lookName } from "./LaneList.js";
+import { laneAt, laneLabel, type Lane } from "./lanes.js";
+import { listDocs } from "./storage.js";
+import { isStale, openLanesOn } from "./week.js";
 import {
   makePost,
   PLATFORMS,
@@ -62,11 +66,14 @@ const timeOf = (p: Post): string => {
 
 export function PostCalendar({
   posts,
+  lanes = [],
   onChange,
   onOpen,
   onBulk,
 }: {
   posts: Post[];
+  /** Batch 27: drawn as labelled empty slots on the days nothing fills them. */
+  lanes?: Lane[];
   onChange: (posts: Post[]) => void;
   onOpen: (p: Post) => void;
   onBulk: () => void;
@@ -86,6 +93,9 @@ export function PostCalendar({
     mode === "week" ? weekOf(anchor, today) : monthOf(anchor, today).flat();
 
   const map = useMemo(() => byDay(posts), [posts]);
+  // When each carousel was last worked on, for the stale mark (27.5).
+  const edited = useMemo(() => new Map(listDocs().map((d) => [d.id, d.updatedAt])), [posts]);
+  const stale = (p: Post): boolean => isStale(p, p.docId ? edited.get(p.docId) : null, today);
   const shelf = useMemo(() => undated(posts), [posts]);
 
   const rhythm = rhythmOf(days, map);
@@ -108,6 +118,13 @@ export function PostCalendar({
     onChange(
       posts.map((p) => (p.id === id ? schedule(p, atSameTimeOn(p.scheduledFor, key)) : p)),
     );
+  };
+
+  /** A drop on a lane's empty slot: that day at the lane's time, and the post joins the lane. */
+  const intoLane = (id: string, lane: Lane, day: Date) => {
+    const post = posts.find((p) => p.id === id);
+    if (!post || post.stage === "posted") return;
+    onChange(posts.map((p) => (p.id === id ? { ...schedule(p, laneAt(lane, day).toISOString()), lane: lane.id } : p)));
   };
 
   const place = (post: Post, key: string) => {
@@ -231,6 +248,13 @@ export function PostCalendar({
             day={day}
             mode={mode}
             posts={map.get(day.key) ?? []}
+            // Only from today on: an empty lane last Tuesday is not a hole anybody can fill.
+            lanes={day.date >= new Date(today.getFullYear(), today.getMonth(), today.getDate()) ? openLanesOn(lanes, posts, day.date) : []}
+            stale={stale}
+            onLaneDrop={(id, lane) => {
+              setOver(null);
+              intoLane(id, lane, day.date);
+            }}
             active={over === day.key}
             dragId={dragId}
             picking={picking === day.key}
@@ -331,6 +355,9 @@ function Cell({
   day,
   mode,
   posts,
+  lanes,
+  stale,
+  onLaneDrop,
   active,
   dragId,
   picking,
@@ -348,6 +375,9 @@ function Cell({
   day: Day;
   mode: Mode;
   posts: Post[];
+  lanes: Lane[];
+  stale: (p: Post) => boolean;
+  onLaneDrop: (id: string, lane: Lane) => void;
   active: boolean;
   dragId: string | null;
   picking: boolean;
@@ -439,6 +469,7 @@ function Cell({
             post={p}
             week={week}
             dragging={dragId === p.id}
+            stale={stale(p)}
             onOpen={() => onOpen(p)}
             onDragStart={() => onDragStart(p.id)}
             onDragEnd={onDragEnd}
@@ -447,6 +478,34 @@ function Cell({
         {hidden > 0 ? (
           <span className="px-1 text-caption text-muted">{hidden} more</span>
         ) : null}
+        {/*
+          A lane nothing fills yet, as a labelled empty slot (27.5). Week view
+          only: a month square has no room for it, and its count would read as
+          posts. A post dropped on one joins the lane at its time.
+        */}
+        {week
+          ? lanes.map((lane) => (
+              <div
+                key={lane.id}
+                data-testid="lane-slot"
+                title={laneLabel(lane, { framework: frameworkName, look: lookName })}
+                onDragOver={(e) => e.preventDefault()}
+                onDrop={(e) => {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  const id = e.dataTransfer.getData("text/plain");
+                  if (id) onLaneDrop(id, lane);
+                }}
+                className="rounded-lg border border-dashed border-hairline px-1.5 py-1"
+              >
+                <span className="block truncate text-caption text-muted">{lane.name.trim() || frameworkName(lane.framework) || lane.framework}</span>
+                <span className="block truncate text-overline uppercase text-muted">
+                  {lane.time} · {lane.platform}
+                  {lane.pillar ? ` · ${lane.pillar}` : ""}
+                </span>
+              </div>
+            ))
+          : null}
       </div>
 
       {picking ? (
@@ -472,6 +531,7 @@ function PostChip({
   post,
   week,
   dragging,
+  stale,
   onOpen,
   onDragStart,
   onDragEnd,
@@ -479,6 +539,8 @@ function PostChip({
   post: Post;
   week: boolean;
   dragging: boolean;
+  /** A draft untouched for a week (27.5): information, never a block. */
+  stale: boolean;
   onOpen: () => void;
   onDragStart: () => void;
   onDragEnd: () => void;
@@ -505,7 +567,7 @@ function PostChip({
         e.stopPropagation();
         onOpen();
       }}
-      title={`${post.title} · ${platformLabel(post.platform)}${iso ? ` · ${timeOf(post)}` : ""}`}
+      title={`${post.title} · ${platformLabel(post.platform)}${iso ? ` · ${timeOf(post)}` : ""}${stale ? " · a draft untouched for over a week" : ""}`}
       className={[
         "flex w-full flex-col items-start rounded-lg border px-1.5 py-1 text-left",
         done ? "cursor-pointer" : "cursor-grab",
@@ -529,6 +591,7 @@ function PostChip({
       {week ? (
         <span className="flex w-full items-center gap-1 truncate text-overline uppercase text-muted">
           {timeOf(post)} · {shortPlatform(post)}
+          {stale ? <span data-testid="stale-mark"> · stale?</span> : null}
           {done ? (
             <ExternalLink size={9} strokeWidth={2.4} className="shrink-0" />
           ) : null}

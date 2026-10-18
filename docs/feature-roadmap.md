@@ -4355,7 +4355,7 @@ after a reload.
 
 ## Batch 27, Idea bank, lanes and the weekly session
 
-**Status:** next
+**Status:** done
 **Size:** medium
 **Why here:** the first half's batching evidence says three things about planning,
 and none of them is "give people more ideas". Content goes stale in about a week.
@@ -4449,11 +4449,48 @@ often fine. The mark is information, the same tier as Batch 15's flags.
 - **No silent calendar filling.** Every scheduled post comes from a choice the user
   made.
 
+### Built as
+
+All five. The unknown is answered: the pipeline already had a week and month calendar
+(`PostCalendar.tsx`, Batch 16.6), so 27.5 extends it rather than adding a second one.
+
+**27.1.** An idea is a post in the pipeline's existing `idea` stage, plus a `source` column, rather
+than a new table: it already had title, notes, pillar and client, already synced, and already sat in
+the board's first column, so an idea becoming a carousel is one record moving along. Q captures from
+any screen, editor included (one shortcut, one line, Enter). The client comes from the rail and a
+pillar is one click on an existing pillar, so the bank filters by both with nothing typed. Nothing
+fills it but the person.
+
+**27.2** as specified, plus a time of day per lane. Synced through a `lanes` table on the clients
+pattern (`12-planning.sql`).
+
+**27.3** as specified, and the done-when is a test: five lanes and five ideas give five carousels,
+each in its lane's framework and look (a template lane records its template), on its lane's
+platform, dated on its lane's day; stopped after the third, three carousels and two empty slots. A
+reorder made mid-run is followed (also a test). "Next seven days" means now until the same time next
+week, so a Sunday-evening session includes next Sunday morning's lane. Drafting is Batch 16's call;
+with no key it degrades to the framework's own words with the idea on the cover. Carousels land in
+**drafting**, dated: the finishing pass's last step is what schedules them.
+
+**27.4** as specified: six screens, one decision each, a "N left" count per carousel. To make "no
+other screen" hold, the pre-flight step fixes a slide's words in place when that is what a finding is
+about; only findings that need the canvas send somebody to the editor. Progress is per device (D51).
+
+**27.5.** Lanes appear in the calendar's week view as labelled empty slots from today on (not on past
+days: a hole last Tuesday cannot be filled), a post dropped on one joins the lane at its time, and a
+draft untouched for over a week is marked "stale?".
+
+Verified in the browser: five lanes, five ideas captured with Q (one with a pillar chip), the bank
+filtered to that pillar, a session pairing all five and making five carousels on their days, one
+carousel walked through all six steps to scheduled, the filled week in the calendar, a seven-slot
+session stopped after the third (three made, four left empty, the stopped ideas back in the bank),
+an open lane slot and a stale mark in the week view, and Q opening the capture inside the editor.
+
 ---
 
 ## Batch 28, Remix what worked
 
-**Status:** queued
+**Status:** next
 **Size:** medium
 **Why here:** structural attribution was the first half's unclaimed ground (zero of
 seventeen tools connect hook shape, framework or slide count to outcome) and the

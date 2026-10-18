@@ -13,14 +13,18 @@ import {
   CalendarDays,
   Flame,
   Images,
+  CalendarRange,
+  CheckCircle2,
   KanbanSquare,
   LayoutGrid,
+  Lightbulb,
+  Rows3,
   Palette,
   Send,
   Upload,
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 
 import { AccountCard } from "./AccountCard.js";
 import { Analytics } from "./Analytics.js";
@@ -29,6 +33,7 @@ import { listAssets } from "./assets.js";
 import { ClientAdmin, ClientSwitcher } from "./ClientAdmin.js";
 import {
   ALL_CLIENTS,
+  UNASSIGNED,
   belongsTo,
   labelFor,
   listClients,
@@ -53,6 +58,13 @@ import {
   type Post,
 } from "./pipeline.js";
 import { PostCalendar } from "./PostCalendar.js";
+import { FinishingPass } from "./FinishingPass.js";
+import { finishingQueue, loadProgress, stepsLeft } from "./finishing.js";
+import { IdeaBank } from "./IdeaBank.js";
+import { ideasOf, onIdeasChanged } from "./ideas.js";
+import { LaneList } from "./LaneList.js";
+import { listLanes, removeLane, upsertLane, type Lane } from "./lanes.js";
+import { WeekSession } from "./WeekSession.js";
 import { PostSheet } from "./PostSheet.js";
 import type { THEMES } from "./presets.js";
 import { Projects } from "./Projects.js";
@@ -64,6 +76,10 @@ import { Upgrade } from "./Upgrade.js";
 
 type View =
   | "projects"
+  | "ideas"
+  | "lanes"
+  | "week"
+  | "finish"
   | "clients"
   | "brands"
   | "library"
@@ -89,6 +105,24 @@ const NAV: { section: string; items: NavItem[] }[] = [
       { id: "clients", label: "Clients", icon: Building2, count: () => listClients().length },
       { id: "brands", label: "Brands", icon: Palette, count: () => listBrands().length },
       { id: "library", label: "Library", icon: Images, count: () => listAssets().length },
+    ],
+  },
+  {
+    // Batch 27: formats and lanes planned ahead, ideas captured, the last mile finished.
+    section: "Plan",
+    items: [
+      { id: "ideas", label: "Ideas", icon: Lightbulb, count: (c) => ideasOf(c.posts).length },
+      { id: "lanes", label: "Lanes", icon: Rows3 },
+      { id: "week", label: "Make next week", icon: CalendarRange },
+      {
+        id: "finish",
+        label: "Finish",
+        icon: CheckCircle2,
+        count: (c) => {
+          const progress = loadProgress();
+          return finishingQueue(c.posts).filter((p) => stepsLeft(p, progress).length > 0).length;
+        },
+      },
     ],
   },
   {
@@ -121,6 +155,10 @@ const NAV: { section: string; items: NavItem[] }[] = [
 
 const TITLES: Record<View, { title: string; sub: string }> = {
   projects: { title: "Projects", sub: "Every carousel you have made, and two ways to start another." },
+  ideas: { title: "Ideas", sub: "Every idea you have had, one line each. Q captures one from any screen." },
+  lanes: { title: "Lanes", sub: "The slots in your week, each with its format already decided." },
+  week: { title: "Make next week", sub: "Next week's lanes as empty slots. Drop an idea into the ones you want made." },
+  finish: { title: "Finish", sub: "Hook, payoff, caption, alt text, pre-flight, schedule. One carousel at a time." },
   clients: {
     title: "Clients",
     sub: "Who each carousel is for. Separate when you want it, all together when you do not.",
@@ -167,6 +205,7 @@ export function Home({
   const [signingIn, setSigningIn] = useState(false);
   const [importing, setImporting] = useState(false);
   const [client, setClient] = useState<string>(() => loadSelectedClient());
+  const [lanes, setLanes] = useState<Lane[]>(() => listLanes());
   const clients = useMemo(() => listClients(), [view]);
 
   // Bumped on every local write. useAccount debounces a push off it, so a burst of
@@ -183,6 +222,23 @@ export function Home({
     savePosts(next);
     setChanges((n) => n + 1);
   };
+
+  /**
+   * For the planning screens, which write from async work (a session landing
+   * carousels one by one): the update is applied to what is stored NOW, never
+   * to the list this render captured, so a carousel landing mid-run cannot
+   * overwrite the one that landed before it.
+   */
+  const update = (fn: (all: Post[]) => Post[]) => commit(fn(listPosts()));
+
+  // An idea captured with Q while this screen is open lands in the store; read it back.
+  useEffect(() => onIdeasChanged(() => setPosts(listPosts())), []);
+
+  const lanesChanged = (next: Lane[]) => {
+    setLanes(next);
+    setChanges((n) => n + 1);
+  };
+  const visibleLanes = useMemo(() => lanes.filter((l) => belongsTo(l, client)), [lanes, client]);
 
   const queue = (post: Post) => {
     commit([post, ...posts]);
@@ -354,6 +410,42 @@ export function Home({
               />
             ) : null}
 
+            {view === "ideas" ? (
+              <IdeaBank
+                posts={visiblePosts}
+                lanes={visibleLanes}
+                client={client}
+                onUpdate={update}
+                onRemove={(id) => {
+                  setPosts(removePost(id));
+                  setChanges((n) => n + 1);
+                }}
+              />
+            ) : null}
+
+            {view === "lanes" ? (
+              <LaneList
+                lanes={visibleLanes}
+                posts={visiblePosts}
+                client={client}
+                onChange={(l) => lanesChanged(upsertLane(l))}
+                onRemove={(id) => lanesChanged(removeLane(id))}
+              />
+            ) : null}
+
+            {view === "week" ? (
+              <WeekSession
+                posts={visiblePosts}
+                lanes={visibleLanes}
+                clientId={client === ALL_CLIENTS || client === UNASSIGNED ? undefined : client}
+                onUpdate={update}
+                onLanes={() => setView("lanes")}
+                onFinish={() => setView("finish")}
+              />
+            ) : null}
+
+            {view === "finish" ? <FinishingPass posts={visiblePosts} onUpdate={update} onOpen={onOpen} /> : null}
+
             {view === "brands" ? <Brands plan={account.profile?.plan} /> : null}
 
             {view === "library" ? <AssetLibrary /> : null}
@@ -365,6 +457,7 @@ export function Home({
             {view === "calendar" ? (
               <PostCalendar
                 posts={visiblePosts}
+                lanes={visibleLanes}
                 onChange={commit}
                 onOpen={setEditing}
                 onBulk={onBulk}

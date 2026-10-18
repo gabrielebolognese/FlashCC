@@ -126,6 +126,9 @@ export type PostRow = {
   reviewer: string;
   approval_notes: string;
   metrics: Metrics | null;
+  /** 12-planning.sql. */
+  source?: string | null;
+  lane_id?: string | null;
   created_at: string;
   updated_at: string;
   server_updated_at: string;
@@ -268,6 +271,8 @@ export function postToRow(post: Post, userId: string, deletedAt: string | null =
     reviewer: post.reviewer,
     approval_notes: post.approvalNotes,
     metrics: post.metrics,
+    source: post.source ?? "",
+    lane_id: post.lane ?? null,
     created_at: post.createdAt,
     updated_at: post.updatedAt,
     server_updated_at: post.updatedAt,
@@ -300,6 +305,8 @@ export const rowToPost = (row: PostRow): Post => ({
   reviewer: row.reviewer ?? "",
   approvalNotes: row.approval_notes ?? "",
   metrics: row.metrics,
+  ...(row.source ? { source: row.source } : {}),
+  ...(row.lane_id ? { lane: row.lane_id } : {}),
   createdAt: row.created_at,
   updatedAt: row.updated_at,
 });
