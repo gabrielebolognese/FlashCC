@@ -25,7 +25,7 @@ import { laneAt, lanesOn, type Lane } from "./lanes.js";
 import { makeDoc, type Doc, type Identity } from "./model.js";
 import type { Theme } from "./presets.js";
 import { applyPack, PACK_PREFIX, packById, packIdOf, packTheme } from "./packs.js";
-import { hookOf, type Post } from "./pipeline.js";
+import { hookOf, shapeOf, type Post } from "./pipeline.js";
 import { CANDIDATES, type Platform as Destination } from "./platforms.js";
 import { nameFromHook } from "./search.js";
 import { shapeFor, slotsFor, structureById, type Structure } from "./structures.js";
@@ -187,6 +187,7 @@ export function landIdea(idea: Post, doc: Doc, slot: Slot): Post {
     styleId: doc.styleId ?? null,
     pillar: idea.pillar.trim() || slot.lane.pillar,
     lane: slot.lane.id,
+    shape: shapeOf(doc),
     scheduledFor: slot.when.toISOString(),
     ...(clientId ? { clientId } : {}),
     updatedAt: new Date().toISOString(),

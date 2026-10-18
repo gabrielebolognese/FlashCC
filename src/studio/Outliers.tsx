@@ -33,7 +33,8 @@ export function Outliers({
 }: {
   posts: Post[];
   onOpen: (p: Post) => void;
-  onMakeAnother: (framework: string | null) => void;
+  /** Make another like this (28.1): the post whose shape to copy. */
+  onMakeAnother: (post: Post) => void;
 }) {
   const [metric, setMetric] = useState<MetricKey>("impressions");
 
@@ -163,7 +164,7 @@ export function Outliers({
 
                   <button
                     type="button"
-                    onClick={() => onMakeAnother(s.post.framework)}
+                    onClick={() => onMakeAnother(s.post)}
                     className="flex h-8 shrink-0 items-center gap-1.5 rounded-xl border border-hairline px-3 text-caption text-secondary hover:border-accent-dim hover:text-accent"
                   >
                     <Zap size={12} strokeWidth={2.2} />

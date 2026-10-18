@@ -15,6 +15,7 @@
  */
 
 import { uid, type Doc } from "./model.js";
+import { isSpanning } from "./spans.js";
 import { markDeleted } from "./tombstones.js";
 
 /* ── stages ───────────────────────────────────────────────────────────── */
@@ -175,10 +176,43 @@ export type Post = {
   source?: string | undefined;
   /** The lane this post fills (27.2), when a weekly session made it. */
   lane?: string | undefined;
+  /**
+   * The rest of the structural snapshot (28.5): what the attribution screens
+   * group by beyond framework, hook and length. Copied when the post is made,
+   * like the fields above, and absent on posts made before Batch 28, which
+   * then simply cannot answer these questions rather than answering wrongly.
+   */
+  shape?: PostShape | undefined;
 
   createdAt: string;
   updatedAt: string;
 };
+
+export type PostShape = {
+  /** Block library ids on the deck, once each (Batch 19). */
+  blocks: string[];
+  /** The furniture set, or null for none (Batch 20). */
+  furniture: string | null;
+  /** The hook formula kind used on the cover, when one was (25.3). */
+  hookKind: string | null;
+  /** A design runs across slides (Batch 23). */
+  panoramic: boolean;
+  /** Posted as a video rather than a carousel (Batch 26). Set by the person; nothing guesses it. */
+  video: boolean;
+};
+
+/** The deck's structure as the attribution screens read it. Deterministic, from the layers. */
+export function shapeOf(doc: Doc, video = false): PostShape {
+  const blocks = [...new Set(doc.slides.flatMap((s) => (s.blocks ?? []).map((b) => b.block)))].sort();
+  const set = doc.furniture?.set;
+  return {
+    blocks,
+    furniture: set && set !== "none" ? set : null,
+    hookKind: doc.hookKind ?? null,
+    panoramic: isSpanning(doc),
+    video,
+  };
+}
 
 const nowISO = (): string => new Date().toISOString();
 
@@ -232,6 +266,7 @@ export function postFromDoc(doc: Doc, platform: Platform = "linkedin"): Post {
     styleId: doc.styleId ?? null,
     ...(doc.clientId ? { clientId: doc.clientId } : {}),
     series: doc.series ?? null,
+    shape: shapeOf(doc),
   });
 }
 

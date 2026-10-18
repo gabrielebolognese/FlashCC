@@ -18,7 +18,7 @@ import {
   liftLabel,
   metricValueLabel,
   METRICS,
-  MIN_GROUP,
+  MIN_SHOWN,
   MIN_TOTAL,
   percent,
   totals,
@@ -85,8 +85,9 @@ export function Analytics({ posts, onOpen }: { posts: Post[]; onOpen: (p: Post) 
       </div>
 
       <p className="text-caption text-muted">
-        Groups of fewer than {MIN_GROUP} are shown but never used to draw a conclusion. Reach is
-        the honest default; engagement rate is the one to watch when your reach swings.
+        A group of fewer than {MIN_SHOWN} posts is named and counted but gets no median: two posts are an
+        anecdote, not a pattern. These are your own numbers, what happened, not a forecast. Reach is the
+        honest default; engagement rate is the one to watch when your reach swings.
       </p>
     </div>
   );
@@ -192,19 +193,20 @@ function Breakdown({
 
       <div className="flex flex-col gap-3">
         {groups.map((g) => {
-          const thin = g.n < MIN_GROUP;
+          // Under MIN_SHOWN nothing but the name and the count (28.5).
+          const thin = g.n < MIN_SHOWN;
           return (
-            <div key={g.value}>
+            <div key={g.value} data-testid="group">
               <div className="flex items-baseline gap-2">
                 <span className={["truncate text-body", thin ? "text-tertiary" : "text-primary"].join(" ")}>
                   {g.value}
                 </span>
                 <span className="text-caption text-muted">
-                  {g.n} post{g.n === 1 ? "" : "s"}
+                  n = {g.n}
                 </span>
                 <div className="flex-1" />
                 <span className="text-caption text-tertiary">
-                  {metricValueLabel(g.median, metric)}
+                  {thin ? "too few to show" : `median ${metricValueLabel(g.median, metric)}`}
                 </span>
                 <span
                   className={[
@@ -215,9 +217,11 @@ function Breakdown({
                   {thin || !ready ? "-" : liftLabel(g.lift)}
                 </span>
               </div>
-              <div className="mt-1.5">
-                <LiftBar ratio={thin || !ready ? 0 : g.lift} max={max} />
-              </div>
+              {thin ? null : (
+                <div className="mt-1.5">
+                  <LiftBar ratio={ready ? g.lift : 0} max={max} />
+                </div>
+              )}
             </div>
           );
         })}

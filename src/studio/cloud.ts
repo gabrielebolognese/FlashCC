@@ -18,7 +18,7 @@ import type { Asset, AssetKind, LogoRole } from "./assets.js";
 import type { Brand } from "./brand.js";
 import type { Client } from "./clients.js";
 import type { Doc } from "./model.js";
-import type { Metrics, Platform, Post, Stage } from "./pipeline.js";
+import type { Metrics, Platform, Post, PostShape, Stage } from "./pipeline.js";
 
 const URL = import.meta.env.VITE_SUPABASE_URL?.trim();
 // Supabase is moving projects from the legacy JWT `anon` key to sb_publishable_*.
@@ -129,6 +129,8 @@ export type PostRow = {
   /** 12-planning.sql. */
   source?: string | null;
   lane_id?: string | null;
+  /** 13-remix.sql. */
+  shape?: PostShape | null;
   created_at: string;
   updated_at: string;
   server_updated_at: string;
@@ -273,6 +275,7 @@ export function postToRow(post: Post, userId: string, deletedAt: string | null =
     metrics: post.metrics,
     source: post.source ?? "",
     lane_id: post.lane ?? null,
+    shape: post.shape ?? null,
     created_at: post.createdAt,
     updated_at: post.updatedAt,
     server_updated_at: post.updatedAt,
@@ -307,6 +310,7 @@ export const rowToPost = (row: PostRow): Post => ({
   metrics: row.metrics,
   ...(row.source ? { source: row.source } : {}),
   ...(row.lane_id ? { lane: row.lane_id } : {}),
+  ...(row.shape ? { shape: row.shape } : {}),
   createdAt: row.created_at,
   updatedAt: row.updated_at,
 });

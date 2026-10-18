@@ -179,15 +179,25 @@ describe("attribution", () => {
     expect(story).toEqual([]);
   });
 
+  it("says nothing about groups of four: under five posts is an anecdote (28.5)", () => {
+    expect(findings(mixed(), REACH)).toEqual([]);
+  });
+
   it("reports a real difference once both gates are cleared, strongest first", () => {
-    const out = findings(mixed(), REACH);
+    const out = findings(
+      [
+        ...Array.from({ length: 5 }, (_, i) => post(4000, { framework: "problem" }, i + 1)),
+        ...Array.from({ length: 5 }, (_, i) => post(1000, { framework: "showcase" }, i + 10)),
+      ],
+      REACH,
+    );
     expect(out.length).toBeGreaterThan(0);
-    expect(out[0]!.n).toBeGreaterThanOrEqual(3);
+    expect(out[0]!.n).toBeGreaterThanOrEqual(5);
     expect(out.every((f) => (f.direction === "up") === (f.lift >= 1))).toBe(true);
   });
 
   it("carries its own sample size so nothing can be quoted without the caveat", () => {
-    for (const f of findings(mixed(), REACH)) {
+    for (const f of findings(mixed(), REACH, 3)) {
       expect(f.n).toBeGreaterThan(0);
       expect(f.note).toBeTruthy();
     }

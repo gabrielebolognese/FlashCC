@@ -4490,7 +4490,7 @@ an open lane slot and a stale mark in the week view, and Q opening the capture i
 
 ## Batch 28, Remix what worked
 
-**Status:** next
+**Status:** done
 **Size:** medium
 **Why here:** structural attribution was the first half's unclaimed ground (zero of
 seventeen tools connect hook shape, framework or slide count to outcome) and the
@@ -4573,11 +4573,48 @@ furniture set (20), hook kind (25.3), panoramic or not (23), video or carousel (
 - **No recommendations of what to post.** The user reads their own numbers and decides.
 - **No automatic reposting.**
 
+### Built as
+
+All five. The unknowns are answered: the insight screens grouped by framework, hook shape, length,
+style, platform, pillar, objective and day posted; `Metrics` already carried saves and shares for any
+platform, entered by hand or imported from LinkedIn only.
+
+**28.1** as specified, and the done-when is a test: a 7-slide post with a stat block in slot 4
+remixes to 7 slides with the stat block in slot 4, the same composition at every position, the same
+style, framework and furniture set, and none of the original's words. That includes the block: its
+fields become bracketed labels rather than the library's sample "3x", which would have been an
+invented figure. Building it found that a block-only slide came back with a placeholder laid out under
+the block; fixed in the template path too, where Batch 25 had the same gap. From the post sheet or an
+outlier; the words come from a brief or a bank idea, drafted only if asked.
+
+**28.2** as specified, as Revisit under Insights: age and metric are the person's choices, the
+staleness check lists years, relative dates, prices, versions and other numbers line by line and
+edits nothing, and Repost as new opens the copy on the hook variants.
+
+**28.3** as specified, on the same screen: strong-or-better posts whose carousel never went out
+elsewhere, each with "Export for" every other platform, which opens the export dialog already on it.
+
+**28.4.** The landmine held: neither Instagram's nor TikTok's current per-post export could be checked
+against a real file (the descriptions found disagree), so no parser assumes its headers. Each export
+has its own aliases, the screen shows how every column was read and lets the person correct it before
+anything is written, and matching only considers posts on that platform, which the same words on two
+platforms (28.3) made necessary. Recorded as D53.
+
+**28.5** as specified, through a structural snapshot on the post (`Post.shape`, `13-remix.sql`). The
+honesty rules are applied to every breakdown, not only the new five: no median under five posts, `n`
+beside every median, and the attribution sentences use the same floor.
+
+Verified in the browser: Revisit at four months (empty, correctly) and two months by shares, the
+staleness dialog, a repost opening on the hook variants, the one-place list and its export hand-off on
+Instagram, a remix from the post sheet with the shape described and the new deck at the same length,
+an Instagram import with its mapping shown, the Instagram row matched to the Instagram post and the
+same-text LinkedIn post left alone, and the five new breakdowns with the floor applied.
+
 ---
 
 ## Batch 29, One deck, several languages
 
-**Status:** queued
+**Status:** next
 **Size:** medium, once Batch 22.5 has made other scripts render.
 **Why here:** PostNitro advertises more than thirteen languages. For a creator or an
 agency working in more than one market, translating a finished carousel today means

@@ -20,6 +20,7 @@ import {
   Lightbulb,
   Rows3,
   Palette,
+  Repeat2,
   Send,
   Upload,
 } from "lucide-react";
@@ -65,9 +66,13 @@ import { ideasOf, onIdeasChanged } from "./ideas.js";
 import { LaneList } from "./LaneList.js";
 import { listLanes, removeLane, upsertLane, type Lane } from "./lanes.js";
 import { WeekSession } from "./WeekSession.js";
+import { RemixDialog } from "./RemixDialog.js";
+import { RepostDialog } from "./RepostDialog.js";
+import { Revisit } from "./Revisit.js";
 import { PostSheet } from "./PostSheet.js";
 import type { THEMES } from "./presets.js";
 import { Projects } from "./Projects.js";
+import type { StudioOpen } from "./Studio.js";
 import { SeriesDue } from "./SeriesDue.js";
 import { SignIn } from "./SignIn.js";
 import { listDocs, loadDoc } from "./storage.js";
@@ -88,7 +93,8 @@ type View =
   | "scheduled"
   | "posted"
   | "analytics"
-  | "outliers";
+  | "outliers"
+  | "revisit";
 
 type NavItem = {
   id: View;
@@ -149,6 +155,7 @@ const NAV: { section: string; items: NavItem[] }[] = [
     items: [
       { id: "analytics", label: "Analytics", icon: BarChart3 },
       { id: "outliers", label: "Outliers", icon: Flame },
+      { id: "revisit", label: "Revisit", icon: Repeat2 },
     ],
   },
 ];
@@ -177,6 +184,7 @@ const TITLES: Record<View, { title: string; sub: string }> = {
   posted: { title: "Posted", sub: "What went live. Add the numbers and the insight screens wake up." },
   analytics: { title: "Analytics", sub: "What happened, grouped by how it was built." },
   outliers: { title: "Outliers", sub: "What beat your own average, and what those posts had in common." },
+  revisit: { title: "Revisit", sub: "What already worked: worth posting again, and posted in one place only." },
 };
 
 export function Home({
@@ -186,7 +194,7 @@ export function Home({
   onLongForm,
   initialView,
 }: {
-  onOpen: (doc: Doc) => void;
+  onOpen: (doc: Doc, open?: StudioOpen) => void;
   onCompose: (theme: keyof typeof THEMES, framework?: string) => void;
   onBulk: () => void;
   onLongForm: () => void;
@@ -201,6 +209,9 @@ export function Home({
   const [view, setView] = useState<View>(initialView ?? "projects");
   const [posts, setPosts] = useState<Post[]>(() => listPosts());
   const [editing, setEditing] = useState<Post | null>(null);
+  /** Make another like this (28.1) and Repost as new (28.2): the post they start from. */
+  const [remixing, setRemixing] = useState<Post | null>(null);
+  const [reposting, setReposting] = useState<Post | null>(null);
   const [pricing, setPricing] = useState(false);
   const [signingIn, setSigningIn] = useState(false);
   const [importing, setImporting] = useState(false);
@@ -355,14 +366,14 @@ export function Home({
             there are. Manual entry is what makes these honest; this is what
             stops it becoming the reason somebody leaves.
           */}
-          {view === "posted" || view === "analytics" || view === "outliers" ? (
+          {view === "posted" || view === "analytics" || view === "outliers" || view === "revisit" ? (
             <button
               type="button"
               onClick={() => setImporting(true)}
               className="flex h-8 shrink-0 items-center gap-1.5 rounded-xl border border-hairline px-3 text-caption text-secondary hover:border-accent-dim hover:text-accent"
             >
               <Upload size={13} strokeWidth={2} />
-              Import from LinkedIn
+              Import analytics
             </button>
           ) : null}
 
@@ -470,6 +481,8 @@ export function Home({
 
             {view === "posted" ? <Posted posts={visiblePosts} onOpen={setEditing} /> : null}
 
+            {view === "revisit" ? <Revisit posts={visiblePosts} onOpen={onOpen} onRepost={setReposting} /> : null}
+
             {view === "analytics" ? (
               visiblePosts.length === 0 ? (
                 <SampleGate onLoad={() => commit(demoPosts())} />
@@ -482,11 +495,7 @@ export function Home({
               visiblePosts.length === 0 ? (
                 <SampleGate onLoad={() => commit(demoPosts())} />
               ) : (
-                <Outliers
-                  posts={visiblePosts}
-                  onOpen={setEditing}
-                  onMakeAnother={(framework) => onCompose("ink", framework ?? undefined)}
-                />
+                <Outliers posts={visiblePosts} onOpen={setEditing} onMakeAnother={setRemixing} />
               )
             ) : null}
           </div>
@@ -500,7 +509,36 @@ export function Home({
           // Through removePost, not a filter: it records the tombstone that carries
           // the deletion to the account's other devices.
           onDelete={(id) => setPosts(removePost(id))}
+          onRemix={(p) => {
+            setEditing(null);
+            setRemixing(p);
+          }}
           onClose={() => setEditing(null)}
+        />
+      ) : null}
+
+      {remixing ? (
+        <RemixDialog
+          post={remixing}
+          onMade={(doc, post) => {
+            // An idea from the bank is the same record moving along; a brief is a new post.
+            update((all) => (all.some((p) => p.id === post.id) ? all.map((p) => (p.id === post.id ? post : p)) : [post, ...all]));
+            setRemixing(null);
+            onOpen(doc);
+          }}
+          onClose={() => setRemixing(null)}
+        />
+      ) : null}
+
+      {reposting ? (
+        <RepostDialog
+          post={reposting}
+          onMade={(doc, post) => {
+            update((all) => [post, ...all]);
+            setReposting(null);
+            onOpen(doc, { hooks: true });
+          }}
+          onClose={() => setReposting(null)}
         />
       ) : null}
 

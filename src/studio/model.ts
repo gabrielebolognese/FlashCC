@@ -377,6 +377,13 @@ export type Doc = {
    */
   variantOf?: string | undefined;
   /**
+   * The hook formula kind (25.3) last used to write the cover, so attribution
+   * can group by it (28.5). A tag read by nothing that renders.
+   */
+  hookKind?: string | undefined;
+  /** The deck this one was remixed from (28.1): its shape, none of its words. A tag, never read at render. */
+  remixOf?: string | undefined;
+  /**
    * Which furniture set this deck carries, and the identity it was stamped
    * with (Batch 20). A SNAPSHOT: changing the brand's avatar does not reach a
    * deck already made, and re-applying the brand is how to update one on

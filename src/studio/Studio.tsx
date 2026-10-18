@@ -65,12 +65,21 @@ import { THEMES } from "./presets.js";
 import { Toolbar } from "./Toolbar.js";
 import { useStudio } from "./useStudio.js";
 
+/**
+ * What the editor opens on, when a screen outside it has a reason to choose:
+ * a repost lands on the hook variants (28.2), "make the Instagram version"
+ * on the export dialog for Instagram (28.3).
+ */
+export type StudioOpen = { hooks?: boolean | undefined; exportFor?: string | undefined };
+
 export function Studio({
   initial,
+  opening,
   onHome,
   onOpen,
 }: {
   initial: Doc;
+  opening?: StudioOpen | undefined;
   onHome: () => void;
   /** Opens another document, saved, in the editor: the panorama deck (23.3) is a new deck. */
   onOpen?: ((doc: Doc) => void) | undefined;
@@ -80,7 +89,9 @@ export function Studio({
   const [naming, setNaming] = useState(false);
   const [pasteOpen, setPasteOpen] = useState(false);
   /** The export dialog, and what it opens on: a destination, and whether to start at once (⌘E). */
-  const [exporting, setExporting] = useState<{ initial?: string | null | undefined; auto?: boolean | undefined } | null>(null);
+  const [exporting, setExporting] = useState<{ initial?: string | null | undefined; auto?: boolean | undefined } | null>(() =>
+    opening?.exportFor ? { initial: opening.exportFor } : null,
+  );
   const [palette, setPalette] = useState(false);
   const [shortcuts, setShortcuts] = useState(false);
   const [finding, setFinding] = useState(false);
@@ -89,7 +100,7 @@ export function Studio({
   const [typingSlide, setTypingSlide] = useState(false);
   const [relaid, setRelaid] = useState<number | null>(null);
   /** Hook variants, optionally in the shape of a formula (25.3). */
-  const [hooking, setHooking] = useState<false | { pattern?: string | undefined }>(false);
+  const [hooking, setHooking] = useState<false | { pattern?: string | undefined }>(() => (opening?.hooks ? {} : false));
   const [formulas, setFormulas] = useState(false);
   const [packs, setPacks] = useState(false);
   const [savingTemplate, setSavingTemplate] = useState(false);
@@ -699,8 +710,8 @@ export function Studio({
         <HookFormulas
           current={deckTexts(doc)[0] ?? ""}
           canAsk
-          onUse={(text) => {
-            studio.replaceDoc(restateSlide(doc, 0, text, themeOf(doc, listBrands())).doc, undefined, "Hook");
+          onUse={(text, kind) => {
+            studio.replaceDoc({ ...restateSlide(doc, 0, text, themeOf(doc, listBrands())).doc, hookKind: kind }, undefined, "Hook");
             setFormulas(false);
           }}
           onAsk={(pattern) => {

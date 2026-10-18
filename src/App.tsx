@@ -29,7 +29,7 @@ import { makeDoc, type Doc } from "./studio/model.js";
 import { THEMES } from "./studio/presets.js";
 import { buildFrameworkSamples } from "./studio/samples.js";
 import { saveDoc } from "./studio/storage.js";
-import { Studio } from "./studio/Studio.js";
+import { Studio, type StudioOpen } from "./studio/Studio.js";
 import { STRUCTURES, type Structure } from "./studio/structures.js";
 import {
   decorScale,
@@ -106,7 +106,7 @@ type Screen =
       findings?: Finding[];
     }
   | { view: "style"; draft: Draft; theme: keyof typeof THEMES }
-  | { view: "studio"; doc: Doc };
+  | { view: "studio"; doc: Doc; open?: StudioOpen | undefined };
 
 /**
  * A review link is checked before anything else, and returns before any of the
@@ -426,6 +426,7 @@ function Screens() {
       <Studio
         key={screen.doc.id}
         initial={screen.doc}
+        opening={screen.open}
         onHome={() => setScreen({ view: "start" })}
         onOpen={(next) => {
           saveDoc(next);
@@ -440,8 +441,8 @@ function Screens() {
       // Resolved before the editor sees it. A stored document carries asset
       // REFERENCES, not files; this is where they become URLs the painter can
       // use. Nothing here waits on a network when there are none to resolve.
-      onOpen={(doc) => {
-        void resolveDocAssets(doc).then((ready) => setScreen({ view: "studio", doc: ready }));
+      onOpen={(doc, open) => {
+        void resolveDocAssets(doc).then((ready) => setScreen({ view: "studio", doc: ready, open }));
       }}
       onCompose={(theme, framework) => {
         // "Make another like this" arrives with a framework already chosen, so it skips

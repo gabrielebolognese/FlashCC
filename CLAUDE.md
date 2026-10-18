@@ -247,6 +247,20 @@ Invariants worth keeping:
 - `12-planning.sql` adds `posts.source`, `posts.lane_id` and `lanes`; the posts columns are required
   before a Batch 27 client syncs.
 
+## Remix what worked (Batch 28)
+
+- **The structure is copied without a key; only words may use the model** (`remix.ts`). A remix keeps
+  framework, length, composition per position, blocks, furniture and style, and none of the original's
+  words: block fields become `[Label]` brackets, never a sample figure.
+- **Sorting by a column the person chose is not ranking** (`resurface.ts`). Nothing on Revisit or the
+  insight screens says "best", predicts, or badges; the staleness check flags and never edits.
+- **An analytics import shows its column mapping before writing anything** and matches only posts on
+  its own platform (`linkedin.ts`). Instagram's and TikTok's columns are unverified (D53).
+- **Attribution reads `Post.shape`, a snapshot taken when the post is made**; a post without one
+  cannot answer. Any breakdown shows no median for a group under `MIN_SHOWN` (5) and `n` beside every
+  median it does show.
+- `13-remix.sql` adds `posts.shape`, required before a Batch 28 client syncs.
+
 ## Pictures
 
 - **A stock API is not a scrape.** Batch 13 refused to fetch somebody else's page, and that stands:

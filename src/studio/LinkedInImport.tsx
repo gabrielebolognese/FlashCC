@@ -1,5 +1,6 @@
 /**
- * Backfilling metrics from LinkedIn's own analytics export.
+ * Backfilling metrics from a platform's own analytics export: LinkedIn's, and
+ * since 28.4 Instagram's and TikTok's.
  *
  * Manual entry is what makes the insight screens honest and it is also the thing
  * that stops people using them after a month. This is the release valve: paste a
@@ -23,10 +24,15 @@ import { useMemo, useRef, useState } from "react";
 import { Chip } from "./Dash.js";
 import {
   applyMatches,
+  FIELD_LABELS,
   HOW_LABEL,
+  IMPORT_SOURCES,
+  importSource,
   matchRows,
   parseAnalytics,
   SAMPLE_ANALYTICS,
+  type Field,
+  type ImportSource,
   type Match,
 } from "./linkedin.js";
 import type { Post } from "./pipeline.js";
@@ -45,12 +51,18 @@ export function LinkedInImport({
 }) {
   const input = useRef<HTMLInputElement>(null);
   const [source, setSource] = useState("");
+  /** Which export this is (28.4). Matching only ever looks at posts on its platform. */
+  const [from, setFrom] = useState<ImportSource>("linkedin");
+  /** The person's corrections to how the columns were read, by column index. */
+  const [overrides, setOverrides] = useState<Record<number, Field | null>>({});
+  const origin = importSource(from);
+  const onPlatform = useMemo(() => posts.filter((p) => p.platform === origin.platform), [posts, origin.platform]);
   /** Rows somebody placed by hand, keyed by the row's line number. */
   const [manual, setManual] = useState<Record<number, string>>({});
   const [done, setDone] = useState<{ changed: number; filled: number } | null>(null);
 
-  const parsed = useMemo(() => parseAnalytics(source), [source]);
-  const auto = useMemo(() => matchRows(parsed.rows, posts), [parsed.rows, posts]);
+  const parsed = useMemo(() => parseAnalytics(source, from, overrides), [source, from, overrides]);
+  const auto = useMemo(() => matchRows(parsed.rows, posts, origin.platform), [parsed.rows, posts, origin.platform]);
 
   const chosen: Match[] = useMemo(() => {
     const byHand: Match[] = auto.unmatched.flatMap((row) => {
@@ -76,6 +88,7 @@ export function LinkedInImport({
     reader.onload = () => {
       setSource(String(reader.result));
       setManual({});
+      setOverrides({});
       setDone(null);
     };
     reader.readAsText(file);
@@ -87,7 +100,7 @@ export function LinkedInImport({
 
       <div className="fixed left-1/2 top-1/2 z-modal flex max-h-[86vh] w-[680px] max-w-[calc(100vw-32px)] -translate-x-1/2 -translate-y-1/2 flex-col rounded-3xl border border-hairline bg-surface-2 shadow-modal">
         <header className="flex h-14 shrink-0 items-center gap-2 border-b border-hairline px-5">
-          <span className="text-title text-primary">Import from LinkedIn</span>
+          <span className="text-title text-primary">Import analytics</span>
           {parsed.rows.length > 0 ? <Chip>{parsed.rows.length} rows</Chip> : null}
           <div className="flex-1" />
           <button
@@ -120,12 +133,33 @@ export function LinkedInImport({
             </div>
           ) : null}
 
+          <div className="mb-3 flex gap-1.5" data-testid="import-source">
+            {IMPORT_SOURCES.map((x) => (
+              <button
+                key={x.id}
+                type="button"
+                aria-pressed={from === x.id}
+                onClick={() => {
+                  setFrom(x.id);
+                  setOverrides({});
+                  setManual({});
+                  setDone(null);
+                }}
+                className={[
+                  "flex h-7 items-center rounded-md border px-2.5 text-caption",
+                  from === x.id ? "border-accent text-primary" : "border-hairline text-tertiary hover:border-accent-dim hover:text-primary",
+                ].join(" ")}
+              >
+                {x.label}
+              </button>
+            ))}
+          </div>
+
           {!source ? (
             <>
               <p className="text-body leading-5 text-tertiary">
-                In LinkedIn, go to your profile, open <b>Analytics</b>, then <b>Post impressions</b>,
-                and use <b>Export</b>. Drop the file here and the numbers land on the posts they
-                belong to.
+                {origin.howTo} Drop the file here and the numbers land on your {origin.label} posts, and only those: the same
+                carousel on another platform keeps its own numbers.
               </p>
 
               <input
@@ -149,13 +183,15 @@ export function LinkedInImport({
                   <Upload size={14} strokeWidth={2.4} />
                   Choose the file
                 </button>
-                <button
-                  type="button"
-                  onClick={() => setSource(SAMPLE_ANALYTICS)}
-                  className="text-caption text-tertiary hover:text-accent"
-                >
-                  Or try a sample
-                </button>
+                {from === "linkedin" ? (
+                  <button
+                    type="button"
+                    onClick={() => setSource(SAMPLE_ANALYTICS)}
+                    className="text-caption text-tertiary hover:text-accent"
+                  >
+                    Or try a sample
+                  </button>
+                ) : null}
               </div>
 
               <label className="mt-4 block">
@@ -182,12 +218,41 @@ export function LinkedInImport({
             </p>
           ))}
 
-          {/* What it understood, so a changed export is visible rather than silent. */}
-          {source && parsed.ignored.length > 0 ? (
-            <p className="mt-3 text-caption leading-4 text-muted">
-              Columns it did not recognise and ignored: {parsed.ignored.join(", ")}. If a number you
-              expected is missing, that is where it went.
-            </p>
+          {/*
+            How every column was read, and the person's say over it (28.4). None of
+            these exports could be checked against a current real file, so the
+            reading is shown before anything is written, never applied silently.
+          */}
+          {source && parsed.columns.length > 0 ? (
+            <div className="mt-3 rounded-2xl border border-hairline bg-surface-1 p-3" data-testid="column-map">
+              <span className="text-overline uppercase text-tertiary">How the columns were read</span>
+              {origin.verified ? null : (
+                <p className="mt-1 text-caption leading-4 text-muted">
+                  {origin.label}&rsquo;s export changes without notice and these names could not be checked against a current file.
+                  Check each one against yours; change any it got wrong. Nothing is written until you press Fill in.
+                </p>
+              )}
+              <div className="mt-2 grid grid-cols-2 gap-x-4 gap-y-1">
+                {parsed.columns.map((c) => (
+                  <label key={c.index} className="flex items-center gap-2">
+                    <span className="min-w-0 flex-1 truncate text-caption text-secondary">{c.header || `Column ${c.index + 1}`}</span>
+                    <select
+                      aria-label={`Column ${c.header}`}
+                      value={c.field ?? ""}
+                      onChange={(e) => setOverrides((o) => ({ ...o, [c.index]: (e.target.value || null) as Field | null }))}
+                      className="h-7 w-[130px] shrink-0 rounded-lg border border-hairline bg-surface-2 px-1.5 text-caption text-primary outline-none"
+                    >
+                      <option value="">Ignore</option>
+                      {(Object.keys(FIELD_LABELS) as Field[]).map((f) => (
+                        <option key={f} value={f}>
+                          {FIELD_LABELS[f]}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+                ))}
+              </div>
+            </div>
           ) : null}
 
           {auto.matches.length > 0 ? (
@@ -255,7 +320,7 @@ export function LinkedInImport({
                       className="h-7 w-[230px] shrink-0 rounded-lg border border-hairline bg-surface-2 px-2 text-caption text-primary outline-none"
                     >
                       <option value="">Leave it</option>
-                      {posts
+                      {onPlatform
                         .filter((p) => !taken.has(p.id) || manual[row.line] === p.id)
                         .map((p) => (
                           <option key={p.id} value={p.id}>

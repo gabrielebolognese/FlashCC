@@ -30,11 +30,71 @@
  */
 
 import { parseDelimited } from "./csv.js";
-import type { Metrics, Post } from "./pipeline.js";
+import type { Metrics, Platform, Post } from "./pipeline.js";
+
+/* ── which export (28.4) ──────────────────────────────────────────────────── */
+
+export type ImportSource = "linkedin" | "instagram" | "tiktok";
+
+/**
+ * The three exports this reads. None of the three has been checked against a
+ * current real file: LinkedIn's is D25, and Instagram's (Meta Business Suite,
+ * Insights, Content, Export) and TikTok's (TikTok Studio, Analytics, Export)
+ * could not be checked when this was written, with the third-party
+ * descriptions disagreeing on the header names. So `verified` is null for all
+ * three, and the import screen shows its reading of every column for the
+ * person to correct before anything is written. That is what "verify the
+ * columns" means for a file only the person has.
+ */
+export const IMPORT_SOURCES: {
+  id: ImportSource;
+  label: string;
+  platform: Platform;
+  howTo: string;
+  /** When the column names were last checked against a real export, or null. */
+  verified: string | null;
+}[] = [
+  {
+    id: "linkedin",
+    label: "LinkedIn",
+    platform: "linkedin",
+    howTo: "In LinkedIn, open your profile's Analytics, then Post impressions, and use Export.",
+    verified: null,
+  },
+  {
+    id: "instagram",
+    label: "Instagram",
+    platform: "instagram",
+    howTo: "In Meta Business Suite, open Insights, then Content, use Export data, choose Instagram and Posts, and download the CSV.",
+    verified: null,
+  },
+  {
+    id: "tiktok",
+    label: "TikTok",
+    platform: "tiktok",
+    howTo: "In TikTok Studio on a computer, open Analytics and use Export data. Choose the per-post (content) export, as CSV.",
+    verified: null,
+  },
+];
+
+export const importSource = (id: ImportSource) => IMPORT_SOURCES.find((s) => s.id === id)!;
 
 /* ── what the columns are called ──────────────────────────────────────────── */
 
-type Field = keyof Metrics | "url" | "title" | "postedAt";
+export type Field = keyof Metrics | "url" | "title" | "postedAt";
+
+export const FIELD_LABELS: Record<Field, string> = {
+  url: "Link",
+  title: "Post text",
+  postedAt: "Date posted",
+  impressions: "Reach",
+  likes: "Likes",
+  comments: "Comments",
+  shares: "Shares",
+  saves: "Saves",
+  follows: "Follows",
+  clicks: "Clicks",
+};
 
 /**
  * Header aliases, longest-lived first.
@@ -61,13 +121,52 @@ const COLUMNS: { field: Field; aliases: string[] }[] = [
   { field: "clicks", aliases: ["clicks", "clickscount", "linkclicks"] },
 ];
 
+/**
+ * What each export calls things, ahead of the shared list. Earlier is
+ * preferred when a file has two candidates for one field: Instagram's file can
+ * carry both "Views" and "Reach", and reach is what FlashCC calls reach.
+ */
+const SOURCE_COLUMNS: Record<ImportSource, Partial<Record<Field, string[]>>> = {
+  linkedin: {},
+  instagram: {
+    url: ["permalink", "postlink", "link", "url"],
+    title: ["description", "caption", "posttitle", "title"],
+    postedAt: ["publishtime", "publishedtime", "posttime", "publishdate", "date"],
+    impressions: ["reach", "accountsreached", "views", "impressions"],
+    likes: ["likes", "reactions"],
+    shares: ["shares", "reposts"],
+    saves: ["saves", "saved"],
+  },
+  tiktok: {
+    url: ["videolink", "link", "url", "permalink"],
+    title: ["videotitle", "title", "videodescription", "caption", "description"],
+    postedAt: ["posttime", "postdate", "createtime", "publishtime", "date"],
+    impressions: ["videoviews", "totalviews", "views", "reach"],
+    likes: ["totallikes", "likes"],
+    comments: ["totalcomments", "comments"],
+    shares: ["totalshares", "shares"],
+    saves: ["favorites", "addtofavorites", "totalfavorites", "saves"],
+  },
+};
+
 const key = (header: string): string => header.toLowerCase().replace(/[^a-z0-9]/g, "");
 
-const fieldFor = (header: string): Field | null => {
+/** The field a header means for this export, and how strongly (lower is a better alias). */
+function aliasFor(header: string, source: ImportSource): { field: Field; rank: number } | null {
   const k = key(header);
   if (!k) return null;
-  return COLUMNS.find((c) => c.aliases.includes(k))?.field ?? null;
-};
+  for (const [field, aliases] of Object.entries(SOURCE_COLUMNS[source]) as [Field, string[]][]) {
+    const at = aliases.indexOf(k);
+    if (at >= 0) return { field, rank: at };
+  }
+  for (const c of COLUMNS) {
+    const at = c.aliases.indexOf(k);
+    if (at >= 0) return { field: c.field, rank: 100 + at };
+  }
+  return null;
+}
+
+const fieldFor = (header: string, source: ImportSource = "linkedin"): Field | null => aliasFor(header, source)?.field ?? null;
 
 /**
  * "1,234", "1 234", "12.5%", or a dash for nothing at all.
@@ -110,8 +209,13 @@ export type AnalyticsRow = {
   metrics: Partial<Metrics>;
 };
 
+/** One column of the file as it was read: what it is called and which field it fills, if any. */
+export type Column = { index: number; header: string; field: Field | null };
+
 export type ParsedAnalytics = {
   rows: AnalyticsRow[];
+  /** Every column, in file order, with the field it was read as. The import screen shows these and lets them be changed. */
+  columns: Column[];
   /** Headers matched to a field, for "we read these". */
   understood: string[];
   /** Headers we did not recognise. Shown, never silently dropped. */
@@ -139,33 +243,58 @@ const isMetric = (f: Field): f is keyof Metrics => (METRIC_FIELDS as Field[]).in
  * first row that looks like one, two or more recognised columns, rather than
  * assuming, because assuming produces a confident parse of the wrong row.
  */
-function headerRowIndex(rows: string[][]): number {
+function headerRowIndex(rows: string[][], source: ImportSource): number {
   for (let i = 0; i < Math.min(rows.length, 12); i += 1) {
-    const matched = (rows[i] ?? []).filter((cell) => fieldFor(cell) !== null).length;
+    const matched = (rows[i] ?? []).filter((cell) => fieldFor(cell, source) !== null).length;
     if (matched >= 2) return i;
   }
   return 0;
 }
 
-export function parseAnalytics(source: string): ParsedAnalytics {
+/**
+ * `overrides` are the person's corrections, by column index: a field, or null
+ * for "ignore this column". They win over anything recognised.
+ */
+export function parseAnalytics(
+  source: string,
+  from: ImportSource = "linkedin",
+  overrides: Readonly<Record<number, Field | null>> = {},
+): ParsedAnalytics {
   const table = parseDelimited(source);
   const warnings: string[] = [];
 
   if (table.length === 0) {
-    return { rows: [], understood: [], ignored: [], warnings: ["There is nothing in that file."] };
+    return { rows: [], columns: [], understood: [], ignored: [], warnings: ["There is nothing in that file."] };
   }
 
-  const headerAt = headerRowIndex(table);
+  const headerAt = headerRowIndex(table, from);
   const headers = table[headerAt] ?? [];
   const understood: string[] = [];
   const ignored: string[] = [];
 
-  const fields: (Field | null)[] = headers.map((h) => {
-    const field = fieldFor(h);
+  // Recognised, then one column per field: the best alias wins, and a column
+  // the person assigned wins over anything recognised.
+  const guessed = headers.map((h, i) => (i in overrides ? null : aliasFor(h, from)));
+  const best = new Map<Field, { index: number; rank: number }>();
+  guessed.forEach((g, i) => {
+    if (!g) return;
+    const held = best.get(g.field);
+    if (!held || g.rank < held.rank) best.set(g.field, { index: i, rank: g.rank });
+  });
+  const fields: (Field | null)[] = headers.map((h, i) => {
+    const field = i in overrides ? (overrides[i] ?? null) : guessed[i] && best.get(guessed[i]!.field)?.index === i ? guessed[i]!.field : null;
     if (field) understood.push(h.trim());
     else if (h.trim()) ignored.push(h.trim());
     return field;
   });
+  // A field the person assigned to one column is not also read from another.
+  for (const [i, f] of Object.entries(overrides)) {
+    if (!f) continue;
+    fields.forEach((g, j) => {
+      if (g === f && j !== Number(i)) fields[j] = null;
+    });
+  }
+  const columns: Column[] = headers.map((h, i) => ({ index: i, header: h.trim(), field: fields[i] ?? null }));
 
   if (!fields.some((f) => f !== null && isMetric(f))) {
     warnings.push(
@@ -208,7 +337,7 @@ export function parseAnalytics(source: string): ParsedAnalytics {
     warnings.push("The columns were understood but there were no rows under them.");
   }
 
-  return { rows, understood, ignored, warnings };
+  return { rows, columns, understood, ignored, warnings };
 }
 
 /* ── matching a row to a post ─────────────────────────────────────────────── */
@@ -263,7 +392,12 @@ const dayGap = (a: string, b: string): number =>
  * that share an opening line, which is precisely the shape of thing this product
  * encourages people to make.
  */
-export function matchRows(rows: readonly AnalyticsRow[], posts: readonly Post[]): MatchResult {
+export function matchRows(rows: readonly AnalyticsRow[], all: readonly Post[], platform?: Platform): MatchResult {
+  // Only posts on the export's own platform (28.4). The same carousel posted to
+  // LinkedIn and to Instagram has the same words, which is exactly what a
+  // text match keys on, so without this Instagram's numbers could land on the
+  // LinkedIn post.
+  const posts = platform ? all.filter((p) => p.platform === platform) : all;
   const matches: Match[] = [];
   const takenPosts = new Set<string>();
   const takenRows = new Set<number>();

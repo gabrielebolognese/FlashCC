@@ -2543,6 +2543,56 @@ and digits. An unrecognised column is **reported**, see §29 D21 for why that ma
 
 ---
 
+### Remix what worked (Batch 28)
+
+The insight screens show what worked; this turns it into the next carousel. Every decision below is
+deterministic and works with no key; only words ever go to the model, and only when asked.
+
+**Make another like this** (`remix.ts`, `RemixDialog.tsx`), from a measured post's sheet or an
+outlier: Batch 25's template machinery run once without saving. `remixTemplate` is `templateFrom` with
+every word left behind; each block keeps its kind and box and its fields become their own labels in
+brackets (`[Number]`, optional fields empty), never the library's sample figure, which would be an
+invented result. `remixDeck` lays new words (a draft for `remixStructure`, the original's framework at
+its length, or the template's placeholders) into the same composition per position, style, framework
+and furniture set, and stamps `Doc.remixOf`. A slide that held no words (a block on its own) stays
+wordless; `deckFromTemplate` now does the same for a block-only template slide (it used to lay a
+placeholder under the block). The words come from a new brief or an idea in the bank; an idea is the
+same record moving along (`remixPost`), a brief makes a new post, on the source's platform, in drafting.
+
+**Revisit** (`resurface.ts`, `Revisit.tsx`, under Insights):
+
+| Tab | What | Notes |
+| --- | --- | --- |
+| Worth posting again | `worthAgain(posts, metric, months)`: measured posts older than the age (2, 4, 6 or 12 months; default 4, by the calendar), highest first by saves, shares, reach, comments or likes | The person picks the column, so sorting is not ranking: their audience already said so |
+| Posted in one place | `onePlaceOnly`: strong or outlier against the reach baseline, and the carousel never scheduled or posted on another platform | Nothing until the baseline is ready; "Export for X" opens the editor on the export dialog for that platform (`StudioOpen.exportFor`) |
+
+**Repost as new** (`RepostDialog.tsx`) runs the staleness check first: `stalenessFlags` reads each
+line for a year, a relative date ("last month", "this week"), a price, a version number, or else any
+number, and lists them; it never edits. Then `repostDoc` copies the deck (`variantOf` home, out of the
+series) and the editor opens on the hook variants (`StudioOpen.hooks`).
+
+**More analytics sources** (`linkedin.ts`, `LinkedInImport.tsx`, now "Import analytics"): LinkedIn,
+Instagram and TikTok, each with its own aliases ahead of the shared list (`SOURCE_COLUMNS`). When two
+headers claim a field the better alias wins (Instagram's Reach over Views). Every column is shown with
+what it was read as and can be changed (`parseAnalytics(text, source, overrides)`); a correction wins
+and the field is not also read elsewhere. **None of the three exports' columns has been checked
+against a current real file** (`IMPORT_SOURCES[].verified` is null for all three, D25, D53), so the
+mapping is always on screen before anything is written. Matching considers only posts on the export's
+platform: the same carousel on two platforms has the same words, and a text match would otherwise put
+one platform's numbers on the other's post. Batch 8.1's rules stand: absent is not zero, an unmatched
+row is shown and never dropped.
+
+**Attribution by the new dimensions.** `Post.shape` (`PostShape`) is a snapshot taken when the post
+is made (`shapeOf`, in `postFromDoc` and the session's `landIdea`): block ids, furniture set, hook
+formula kind (`Doc.hookKind`, stamped when a formula writes the cover), panoramic, and video (set by
+the person in the post sheet; nothing guesses it). Five dimensions read it: Block used (a post with
+two blocks counts in both groups, `bucketsOf`), Furniture, Hook formula, Across slides, Format. A post
+without a snapshot cannot answer and is left out of those five.
+
+**Honesty rules, every breakdown.** `MIN_SHOWN` is 5: a smaller group is named and counted with no
+median and no bar; every median carries `n` beside it; `findings` (the sentences) use the same floor.
+No significance language, no badge, no prediction. `13-remix.sql` adds `posts.shape`.
+
 ## 19b. Version history
 
 `versions.ts`, `HistoryPanel.tsx`. Nobody names version history as a buying reason, so it is built
@@ -3229,7 +3279,7 @@ all disabled under `prefers-reduced-motion`.
 
 ## 28. Testing
 
-1,918 tests across 94 files (as of Batch 27). They are design guards, not coverage theatre, several encode an argument
+1,934 tests across 95 files (as of Batch 28). They are design guards, not coverage theatre, several encode an argument
 that would otherwise be lost:
 
 - **mean vs median**, five posts and one at 100k, proving a mean baseline would switch outlier
@@ -3646,6 +3696,30 @@ read from the post's stage.
 
 A pack lane's carousels are stamped with the pack's furniture and no brand identity, so the author
 chip reads "Your name" until a brand is applied; the pre-flight reports it as a check.
+
+### D53, Instagram's and TikTok's export columns are unverified
+
+The importer's aliases for both come from third-party descriptions that disagree; neither export could
+be checked against a current real file, and the tests use an assumed header row. The import screen
+shows how every column was read and lets the person correct it before anything is written, which is
+the safeguard, not a substitute for checking a real file.
+
+### D54, A drafted remix leaves its blocks in brackets
+
+When "Draft the words" is on, the model's words for a block's slot go to the slide copy, not into the
+block's fields, so a remixed stat block reads "[Number]" until the person fills it. The pre-flight
+flags it.
+
+### D55, Older posts cannot answer the new dimensions
+
+The structural snapshot exists from Batch 28 on. Posts made before it, and the sample data, have none
+and are left out of Block used, Furniture, Hook formula, Across slides and Format. A hook kind is
+recorded only when a formula writes the cover; a hook drafted by the model from a formula's pattern is
+not. Video is whatever the person ticked.
+
+### D56, A Batch 28 client needs 13-remix.sql before it syncs
+
+Every post sync writes `shape`; a database without the column refuses the upsert.
 
 ### D20, Smaller things
 

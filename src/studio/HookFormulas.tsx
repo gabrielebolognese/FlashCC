@@ -23,7 +23,8 @@ export function HookFormulas({
   current: string;
   /** Hook variants need the drafting server; without it the hint is not offered. */
   canAsk: boolean;
-  onUse: (text: string) => void;
+  /** The words, and the kind of formula they came from (recorded on the deck for 28.5). */
+  onUse: (text: string, kind: HookKind) => void;
   onAsk: (pattern: string) => void;
   onClose: () => void;
 }) {
@@ -135,7 +136,7 @@ export function HookFormulas({
             type="button"
             data-control
             disabled={!chosen || !isFilled(filled)}
-            onClick={() => onUse(filled)}
+            onClick={() => onUse(filled, chosen?.kind ?? kind)}
             className="flex h-9 items-center rounded-xl px-3.5 text-body-strong disabled:opacity-40"
             style={{ background: "var(--brand-gold)", color: "var(--on-brand-gold)" }}
           >

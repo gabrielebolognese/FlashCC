@@ -1,0 +1,21 @@
+-- FlashCC, the structural snapshot for attribution (Batch 28)
+--
+-- Run this in the Supabase SQL editor after 12-planning.sql. Safe to re-run.
+--
+-- ─────────────────────────────────────────────────────────────────────────────
+-- A post already copies its framework, slide count, hook and style when it is
+-- made, because the carousel keeps being edited and the version that earned
+-- the numbers is the one that went out. Batch 28 attributes by five more
+-- things: the blocks used, the furniture set, the hook formula kind, whether a
+-- design runs across slides, and whether it went out as a video.
+--
+-- One jsonb column rather than five: the attribution screens read the snapshot
+-- whole and nothing queries one field of it on its own. A post made before
+-- this file has no snapshot and is left out of those five groupings rather
+-- than counted as "none".
+--
+-- Written by every post sync from Batch 28 on, so this is required before a
+-- Batch 28 client syncs, like 08- and 12- before it.
+-- ─────────────────────────────────────────────────────────────────────────────
+
+alter table public.posts add column if not exists shape jsonb;

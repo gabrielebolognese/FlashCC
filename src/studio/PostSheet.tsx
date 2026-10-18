@@ -35,6 +35,8 @@ import {
   engagementRate,
   engagements,
   fromLocalInput,
+  isMeasured,
+  shapeOf,
   toLocalInput,
   type Metrics,
   type Objective,
@@ -199,11 +201,14 @@ export function PostSheet({
   post,
   onSave,
   onDelete,
+  onRemix,
   onClose,
 }: {
   post: Post;
   onSave: (p: Post) => void;
   onDelete: (id: string) => void;
+  /** Make another like this (28.1), offered once the post has numbers and a carousel. */
+  onRemix?: ((p: Post) => void) | undefined;
   onClose: () => void;
 }) {
   const [draft, setDraft] = useState<Post>(post);
@@ -672,6 +677,21 @@ export function PostSheet({
                 Reach is the one that matters: every comparison on the insight screens is a ratio
                 against it, so a post without it is left out rather than counted as zero.
               </p>
+
+              {/* 28.5: nothing guesses this, so attribution by format only counts what somebody said. */}
+              <label className="mt-2.5 flex items-center gap-2 text-caption text-secondary">
+                <input
+                  type="checkbox"
+                  aria-label="Posted as a video"
+                  checked={draft.shape?.video ?? false}
+                  disabled={!draft.shape && !doc}
+                  onChange={(e) => {
+                    const base = draft.shape ?? (doc ? shapeOf(doc) : null);
+                    if (base) set({ shape: { ...base, video: e.target.checked } });
+                  }}
+                />
+                Posted as a video, not a carousel
+              </label>
             </div>
           ) : null}
         </div>
@@ -710,6 +730,15 @@ export function PostSheet({
                 <Trash2 size={14} strokeWidth={2} />
               </button>
               <div className="flex-1" />
+              {onRemix && isMeasured(post) && post.docId ? (
+                <button
+                  type="button"
+                  onClick={() => onRemix(post)}
+                  className="flex h-8 items-center rounded-xl border border-hairline px-3 text-body text-secondary hover:border-accent-dim hover:text-accent"
+                >
+                  Make another like this
+                </button>
+              ) : null}
               <button
                 type="button"
                 onClick={onClose}

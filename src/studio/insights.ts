@@ -30,6 +30,9 @@ import {
   type Metrics,
   type Post,
 } from "./pipeline.js";
+import { blockById } from "./blocks.js";
+import { FURNITURE_SETS } from "./furniture.js";
+import { HOOK_KINDS } from "./hooks.js";
 import { STRUCTURES } from "./structures.js";
 import { styleById } from "./styles.js";
 
@@ -83,6 +86,12 @@ export const lift = (value: number, against: number): number =>
 
 /** Below this many posts in a group, a difference is noise and is not reported. */
 export const MIN_GROUP = 3;
+/**
+ * Below this many posts, a group's median is not shown at all (28.5): a median
+ * of two posts is an anecdote with a chart around it. The group's name and its
+ * count still are, so nothing disappears without saying so.
+ */
+export const MIN_SHOWN = 5;
 /** Below this many measured posts overall, there is no baseline worth having. */
 export const MIN_TOTAL = 5;
 /** At or above this multiple of your baseline, a post is an outlier. */
@@ -188,9 +197,24 @@ const frameworkName = (id: string | null): string | null =>
 export type Dimension = {
   id: string;
   label: string;
-  /** The bucket this post falls in, or null when the post cannot answer. */
-  of: (p: Post) => string | null;
+  /**
+   * The bucket this post falls in, or null when the post cannot answer. A post
+   * can fall in several (a deck with two blocks is in both blocks' groups).
+   */
+  of: (p: Post) => string | string[] | null;
 };
+
+/** Every bucket a post falls in for a dimension, as a list. */
+export const bucketsOf = (d: Dimension, p: Post): string[] => {
+  const v = d.of(p);
+  return v === null ? [] : Array.isArray(v) ? v : [v];
+};
+
+const blockName = (id: string): string => blockById(id)?.label ?? id;
+const furnitureName = (id: string | null): string =>
+  id ? (FURNITURE_SETS.find((f) => f.id === id)?.label ?? id) : "No furniture";
+const hookKindName = (id: string | null): string =>
+  id ? (HOOK_KINDS.find((k) => k.id === id)?.label ?? id) : "Written freehand";
 
 export const DIMENSIONS: Dimension[] = [
   { id: "framework", label: "Framework", of: (p) => frameworkName(p.framework) },
@@ -204,6 +228,13 @@ export const DIMENSIONS: Dimension[] = [
   { id: "pillar", label: "Pillar", of: (p) => (p.pillar.trim() ? p.pillar.trim() : null) },
   { id: "objective", label: "Objective", of: (p) => objectiveLabel(p.objective) },
   { id: "weekday", label: "Day posted", of: (p) => weekdayOf(p.postedAt) },
+  // Batch 28: what this half added. Read from the snapshot taken when the post
+  // was made; a post made before it has none and cannot answer.
+  { id: "block", label: "Block used", of: (p) => (p.shape ? (p.shape.blocks.length ? p.shape.blocks.map(blockName) : "No block") : null) },
+  { id: "furniture", label: "Furniture", of: (p) => (p.shape ? furnitureName(p.shape.furniture) : null) },
+  { id: "hookKind", label: "Hook formula", of: (p) => (p.shape ? hookKindName(p.shape.hookKind) : null) },
+  { id: "panoramic", label: "Across slides", of: (p) => (p.shape ? (p.shape.panoramic ? "Panoramic" : "Slide by slide") : null) },
+  { id: "format", label: "Format", of: (p) => (p.shape ? (p.shape.video ? "Video" : "Carousel") : null) },
 ];
 
 export const dimensionById = (id: string): Dimension | undefined => DIMENSIONS.find((d) => d.id === id);
@@ -231,9 +262,9 @@ export function groupBy(posts: Post[], dimension: Dimension, metric: MetricKey):
 
   const buckets = new Map<string, number[]>();
   for (const p of live) {
-    const key = dimension.of(p);
-    if (key === null) continue;
-    buckets.set(key, [...(buckets.get(key) ?? []), readMetric(p.metrics!, metric)]);
+    for (const key of bucketsOf(dimension, p)) {
+      buckets.set(key, [...(buckets.get(key) ?? []), readMetric(p.metrics!, metric)]);
+    }
   }
 
   return [...buckets.entries()]
@@ -258,7 +289,7 @@ export type Finding = Group & {
  * The honest headlines: every dimension, every bucket big enough to mean something,
  * far enough from average to be worth saying out loud, strongest first.
  */
-export function findings(posts: Post[], metric: MetricKey, minGroup = MIN_GROUP): Finding[] {
+export function findings(posts: Post[], metric: MetricKey, minGroup = MIN_SHOWN): Finding[] {
   const live = posts.filter(isMeasured);
   if (live.length < MIN_TOTAL) return [];
 
@@ -294,12 +325,11 @@ export function whatOutliersShare(posts: Post[], metric: MetricKey, baseline?: B
     const counts = new Map<string, number>();
     for (const p of live) {
       if (!top.has(p.id)) continue;
-      const key = d.of(p);
-      if (key !== null) counts.set(key, (counts.get(key) ?? 0) + 1);
+      for (const key of bucketsOf(d, p)) counts.set(key, (counts.get(key) ?? 0) + 1);
     }
 
     for (const [value, inOutliers] of counts) {
-      const restShare = rest.length === 0 ? 0 : rest.filter((p) => d.of(p) === value).length / rest.length;
+      const restShare = rest.length === 0 ? 0 : rest.filter((p) => bucketsOf(d, p).includes(value)).length / rest.length;
       const topShare = inOutliers / top.size;
       // Has to be common among the winners AND rarer among everything else.
       if (topShare >= 0.5 && topShare > restShare * 1.2) {

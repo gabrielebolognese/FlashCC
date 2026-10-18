@@ -23,7 +23,7 @@ import { stampFurniture } from "./furniture.js";
 import { cloneLayer, makeDoc, uid, type BlockRecord, type Doc, type Identity, type Layer, type Slide, type SlideTexture } from "./model.js";
 import type { Platform } from "./platforms.js";
 import type { Theme } from "./presets.js";
-import { restateMany, slideCopy, textsOf } from "./regenerate.js";
+import { copyLayers, restateMany, slideCopy, textsOf } from "./regenerate.js";
 
 export type TemplateSlide = {
   composition?: string | undefined;
@@ -134,12 +134,17 @@ export function deckFromTemplate(t: Template, opts: UseOptions): Doc {
 
 /** One generated slide in its template slide's clothes: background, blocks, decoration. */
 function dress(slide: Slide, ts: TemplateSlide, theme: Theme, t: Template): Slide {
+  // A template slide with blocks and no layout of its own held no words: the
+  // placeholder generated for it would sit under the block (found by 28.1).
+  const wordless = !ts.composition && ts.blocks.length > 0;
+  const generated = wordless ? new Set(copyLayers(slide).map((l) => l.id)) : null;
   let out: Slide = {
     ...slide,
+    ...(generated ? { composition: undefined } : {}),
     background: ts.background,
     ...(ts.gradient ? { gradient: ts.gradient } : { gradient: undefined }),
     // Fresh ids, so two decks from one template never share a layer.
-    layers: [...ts.decor.map((l) => cloneLayer(l, 0, 0)), ...slide.layers],
+    layers: [...ts.decor.map((l) => cloneLayer(l, 0, 0)), ...(generated ? slide.layers.filter((l) => !generated.has(l.id)) : slide.layers)],
   };
   for (const b of ts.blocks) {
     const block = blockById(b.block);
