@@ -37,6 +37,7 @@ export const ACTIONS = {
   "unspan-broken": { label: "Unspan the designs whose seams broke", group: "Deck", also: "panorama strip" },
   "safe-areas": { label: "Safe areas", group: "View", also: "platform interface overlay" },
   "find-replace": { label: "Find and replace in this deck", group: "Deck", also: "search rename" },
+  legibility: { label: "Legibility: contrast, phone size, colour vision, density", group: "View", also: "accessibility readable contrast wcag phone preview grid colour blind colorblind dense" },
   // Deck
   undo: { label: "Undo", group: "Deck", keys: "⌘Z" },
   redo: { label: "Redo", group: "Deck", keys: "⇧⌘Z" },

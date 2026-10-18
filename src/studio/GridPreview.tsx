@@ -20,7 +20,7 @@ import { loadDoc } from "./storage.js";
 const TILE = 3 / 4;
 
 /** A slide rendered to cover a 3:4 tile, centred, the way the grid crops it. */
-function Cropped({ slide, w, h }: { slide: Slide | undefined; w: number; h: number }) {
+export function Cropped({ slide, w, h }: { slide: Slide | undefined; w: number; h: number }) {
   const board = w / h;
   // Wider than the tile: fill the height and let the sides fall off. Taller:
   // fill the width and lose the top and bottom.

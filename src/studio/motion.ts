@@ -32,7 +32,7 @@ type Layer = {
   furnitureOptOut?: string | undefined;
   block?: { block: string } | undefined;
 };
-type Slide = { layers: readonly Layer[]; hold?: number | undefined };
+type Slide = { layers: readonly Layer[]; hold?: number | undefined } & Ground;
 type Doc = { motion?: Partial<MotionSettings> | undefined };
 
 export const FPS = 30;
@@ -185,9 +185,10 @@ const LIST_BLOCKS = new Set(["checklist", "steps", "timeline", "icon-grid"]);
  * them back: the biggest is the headline. A block's parts keep their block's
  * order, so a checklist's items arrive top to bottom.
  */
-export function entrancesFor(slide: Pick<Slide, "layers">, animation: Animation): Map<string, Entrance> {
+export function entrancesFor(slide: Pick<Slide, "layers">, animation: Animation, reduced = false): Map<string, Entrance> {
   const out = new Map<string, Entrance>();
   if (animation === "none") return out;
+  if (reduced) return reducedOf(entrancesFor(slide, animation));
 
   const copy = slide.layers.filter(
     (l) => l.kind === "text" && l.visible && !l.furniture && !l.furnitureOptOut && (l.text ?? "").trim() !== "",
@@ -222,6 +223,21 @@ export function entrancesFor(slide: Pick<Slide, "layers">, animation: Animation)
     const own = out.get(l.id);
     const after = own ? own.delay + own.duration : 0;
     out.set(`${l.id}#mark`, { kind: "highlight", delay: after, duration: 0.5 });
+  }
+  return out;
+}
+
+/**
+ * The reduced-motion variant of any preset (30.5): every entrance a fade, at
+ * the same moment and for the same time, nothing travels; a count-up shows
+ * its number and fades in; a highlight is simply there. Derived from the
+ * preset rather than listed beside it, so every preset, now and later, has one.
+ */
+export function reducedOf(entrances: ReadonlyMap<string, Entrance>): Map<string, Entrance> {
+  const out = new Map<string, Entrance>();
+  for (const [id, e] of entrances) {
+    if (e.kind === "highlight") continue;
+    out.set(id, { kind: "fade", delay: e.delay, duration: Math.max(e.duration, 0.4) });
   }
   return out;
 }
@@ -363,9 +379,94 @@ export type MotionSettings = {
   fit: VideoFit;
   transition: Transition;
   animation: Animation;
+  /** Reduced motion (30.5): fades only, nothing travels, a push or zoom becomes a fade. */
+  reduced?: boolean | undefined;
 };
 
 export const DEFAULT_MOTION: MotionSettings = { target: "vertical", fit: "reflow", transition: "push", animation: "none" };
+
+/** The transition the file gets: under reduced motion, nothing slides or grows. */
+export const transitionOf = (m: Pick<MotionSettings, "transition" | "reduced">): Transition =>
+  m.reduced && (m.transition === "push" || m.transition === "zoom") ? "fade" : m.transition;
+
+/* ── flashing (30.5) ──────────────────────────────────────────────────────── */
+
+/**
+ * WCAG 2.3.1: nothing flashes more than three times in any one second. A
+ * flash is a pair of opposing changes in relative luminance of at least 10%
+ * where the darker state is under 0.8, over a large part of the screen.
+ *
+ * In a slideshow the large-area changes are the cuts and transitions between
+ * slides, so each slide's ground is what counts: `luma` per slide, null when
+ * it cannot be known without rendering (a photograph), which is counted as a
+ * change every time, the safe assumption. With holds of at least half a
+ * second no deck reaches the limit today; the check is what keeps a future
+ * preset, a shorter hold or a strobing entrance from shipping one.
+ */
+export const FLASHES_PER_SECOND = 3;
+
+type Ground = { background?: string | undefined; gradient?: { stops: readonly { colour: string }[] } | undefined; image?: { src?: string | undefined } | undefined };
+
+const lumaOfHex = (hex: string): number | null => {
+  const m = hex.trim().match(/^#([0-9a-f]{6})/i);
+  if (!m) return null;
+  const n = Number.parseInt(m[1]!, 16);
+  const lin = (v: number) => (v / 255 <= 0.04045 ? v / 255 / 12.92 : ((v / 255 + 0.055) / 1.055) ** 2.4);
+  return 0.2126 * lin((n >> 16) & 255) + 0.7152 * lin((n >> 8) & 255) + 0.0722 * lin(n & 255);
+};
+
+/** A slide's ground as a relative luminance, or null for a picture. A gradient is the mean of its stops. */
+export function slideLuma(slide: Ground): number | null {
+  if (slide.image?.src) return null;
+  const stops = slide.gradient?.stops.map((s) => lumaOfHex(s.colour)) ?? [];
+  if (stops.length) {
+    const known = stops.filter((l): l is number => l !== null);
+    return known.length === stops.length ? known.reduce((a, b) => a + b, 0) / known.length : null;
+  }
+  return slide.background ? lumaOfHex(slide.background) : null;
+}
+
+/** The most flashes in any one second of the plan. */
+export function flashRate(plan: Plan, lumas: readonly (number | null | undefined)[]): { rate: number; at: number } {
+  // Each boundary between two slides that differ enough is a change, signed.
+  const changes: { t: number; sign: number }[] = [];
+  let last = 0;
+  for (let k = 0; k + 1 < plan.slides.length; k += 1) {
+    const a = lumas[k];
+    const b = lumas[k + 1];
+    const t = (plan.slides[k + 1]!.start - plan.slides[k]!.out) / FPS;
+    if (a === null || a === undefined || b === null || b === undefined) {
+      // Unknown: assume the worst, a change against the last one.
+      last = last === 1 ? -1 : 1;
+      changes.push({ t, sign: last });
+      continue;
+    }
+    if (Math.abs(a - b) < 0.1 || Math.min(a, b) >= 0.8) continue;
+    last = b > a ? 1 : -1;
+    changes.push({ t, sign: last });
+  }
+  let rate = 0;
+  let at = 0;
+  for (let i = 0; i < changes.length; i += 1) {
+    let flashes = 0;
+    let open: number | null = null;
+    for (let j = i; j < changes.length && changes[j]!.t < changes[i]!.t + 1; j += 1) {
+      const sign = changes[j]!.sign;
+      if (open === null) open = sign;
+      else if (sign !== open) {
+        flashes += 1;
+        open = null;
+      } else open = sign;
+    }
+    if (flashes > rate) {
+      rate = flashes;
+      at = changes[i]!.t;
+    }
+  }
+  return { rate, at };
+}
+
+export const flashSafe = (plan: Plan, lumas: readonly (number | null | undefined)[]): boolean => flashRate(plan, lumas).rate <= FLASHES_PER_SECOND;
 
 export const motionOf = (doc: Pick<Doc, "motion">): MotionSettings => ({ ...DEFAULT_MOTION, ...(doc.motion ?? {}) });
 

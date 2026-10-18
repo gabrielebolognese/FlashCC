@@ -39,6 +39,8 @@ import {
   TRANSITIONS,
   VIDEO_TARGETS,
   XFADE,
+  FLASHES_PER_SECOND,
+  flashRate,
   type Plan,
   type Transition,
 } from "../src/studio/motion.js";
@@ -51,6 +53,8 @@ export type VideoSlide = {
   frames: number;
   /** Frames at the start of the hold where an entrance is moving (26.3); 0 for a still slide. */
   moving: number;
+  /** The slide's ground as a relative luminance, null for a picture (30.5). Absent counts as unknown. */
+  luma?: number | null | undefined;
 };
 
 export type VideoRequest = {
@@ -99,6 +103,11 @@ export function validateVideo(req: VideoRequest): { w: number; h: number; plan: 
     req.slides.map((s) => s.moving),
   );
   if (plan.frames > MAX_VIDEO_FRAMES) throw new HttpError(400, "A video can run at most ten minutes");
+  // Refused, never trimmed: which slide to hold longer is the person's call (30.5).
+  const flash = flashRate(plan, req.slides.map((s) => (typeof s.luma === "number" ? s.luma : null)));
+  if (flash.rate > FLASHES_PER_SECOND) {
+    throw new HttpError(400, `This would flash ${flash.rate} times in one second around ${flash.at.toFixed(1)}s. Over ${FLASHES_PER_SECOND} can trigger seizures; hold those slides longer.`);
+  }
   if (req.audio && Buffer.byteLength(req.audio.base64 ?? "", "base64") > MAX_AUDIO_BYTES) {
     throw new HttpError(413, "That track is over 20 MB");
   }

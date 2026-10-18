@@ -28,7 +28,7 @@ import { inlineDoc, inlineSources } from "./inline.js";
 import { LayerView } from "./LayerView.js";
 import type { Doc, Slide } from "./model.js";
 import { slidePaint } from "./paint.js";
-import { entrancesFor, movingFrames, slideFrames, videoTarget, wrapEntrance, type Entrance, type MotionSettings } from "./motion.js";
+import { entrancesFor, movingFrames, slideFrames, slideLuma, transitionOf, videoTarget, wrapEntrance, type Entrance, type MotionSettings } from "./motion.js";
 import { platformById, type Platform, type PlatformId } from "./platforms.js";
 import { reflowDoc } from "./reflow.js";
 import { fitToSafeArea } from "./safearea.js";
@@ -43,7 +43,7 @@ function backgroundCss(slide: Slide): string {
     .join("; ");
 }
 
-function slideHtml(slide: Slide, entrances?: ReadonlyMap<string, Entrance>): string {
+export function slideHtml(slide: Slide, entrances?: ReadonlyMap<string, Entrance>): string {
   const layers = slide.layers
     .filter((l) => l.visible)
     .map((l) => {
@@ -216,7 +216,7 @@ export type VideoPayload = {
   target: string;
   backdrop: string;
   transition: MotionSettings["transition"];
-  slides: { html: string; frames: number; moving: number }[];
+  slides: { html: string; frames: number; moving: number; luma: number | null }[];
   audio?: { base64: string; type: string } | undefined;
 };
 
@@ -255,13 +255,16 @@ export async function videoPayload(doc: Doc, motion: MotionSettings, audio?: Vid
     target: motion.target,
     // Behind a letterboxed slide: the deck's own first colour rather than black bars.
     backdrop: first && /^#[0-9a-f]{3,8}$/i.test(first.background) ? first.background : "#000000",
-    transition: motion.transition,
+    // Reduced motion (30.5) turns a push or a zoom into a fade, and every entrance into a fade.
+    transition: transitionOf(motion),
     slides: carried.slides.map((s, i) => {
-      const entrances = entrancesFor(s, motion.animation);
+      const entrances = entrancesFor(s, motion.animation, motion.reduced);
       return {
         html: slideHtml(s, entrances),
         frames: slideFrames(doc.slides[i]!, i, n),
         moving: movingFrames(entrances),
+        // Each slide's ground, so the server can refuse a deck that flashes (30.5).
+        luma: slideLuma(doc.slides[i]!),
       };
     }),
     ...(audio ? { audio } : {}),

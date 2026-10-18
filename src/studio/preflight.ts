@@ -25,6 +25,17 @@ import type { Doc, Layer } from "./model.js";
 import { safeBox, shapeOf, type Platform } from "./platforms.js";
 import { stripMarks } from "./marks.js";
 import { layerLines, overflowsBox } from "./text.js";
+import {
+  colourOnly,
+  coverAtTile,
+  denseSlides,
+  feedScale,
+  flatContrast,
+  GRID_PLATFORMS,
+  smallOnPhone,
+  TILE_MIN_PX,
+  VISIONS,
+} from "./legibility.js";
 
 export type Severity = "block" | "warn";
 
@@ -307,6 +318,75 @@ export function preflight(doc: Doc, platform: Platform): Finding[] {
       }
     }
   });
+
+  legibility(doc, platform).forEach(add);
+
+  return out;
+}
+
+const fmt = (n: number): string => (Math.round(n * 10) / 10).toString();
+
+/**
+ * Can it be seen (Batch 30)? Every one a warning, never a block: somebody can
+ * know something the check does not. Contrast over a picture needs rendered
+ * pixels and is checked in the Legibility panel; over a flat colour it is
+ * arithmetic and is here.
+ */
+function legibility(doc: Doc, platform: Platform): Finding[] {
+  const out: Finding[] = [];
+  const scale = feedScale(doc, platform);
+
+  for (const c of flatContrast(doc, scale)) {
+    out.push({
+      severity: "warn",
+      code: "low-contrast",
+      slide: c.slide + 1,
+      layerId: c.layerId,
+      message: `"${c.name}" is ${fmt(c.ratio)}:1 against its background. At the size a phone shows it, it needs ${c.need}:1.`,
+    });
+  }
+
+  for (const s of smallOnPhone(doc, platform)) {
+    out.push({
+      severity: "warn",
+      code: "small-on-phone",
+      slide: s.slide + 1,
+      layerId: s.layerId,
+      message: `"${s.name}" shows at about ${fmt(s.px)}px on a phone in the ${platform.label} feed. Under 10px is hard to read at a glance.`,
+    });
+  }
+
+  if (GRID_PLATFORMS.has(platform.id)) {
+    const cover = coverAtTile(doc);
+    if (cover && cover.px < TILE_MIN_PX) {
+      out.push({
+        severity: "warn",
+        code: "cover-small-in-grid",
+        slide: 1,
+        layerId: cover.layerId,
+        message: `The cover's headline is about ${fmt(cover.px)}px in the ${platform.label} profile grid. Under ${TILE_MIN_PX}px it does not read as a headline there.`,
+      });
+    }
+  }
+
+  for (const c of colourOnly(doc)) {
+    const who = VISIONS.find((v) => v.id === c.vision)!;
+    out.push({
+      severity: "warn",
+      code: "colour-only",
+      slide: c.slide + 1,
+      message: `"${c.a}" and "${c.b}" differ only by colour, and look nearly the same with ${who.label.toLowerCase()}. Label them.`,
+    });
+  }
+
+  for (const d of denseSlides(doc)) {
+    out.push({
+      severity: "warn",
+      code: "dense",
+      slide: d.slide + 1,
+      message: `${d.words} words. Over about ${d.ceiling} on a slide this shape, nobody reads it at swipe speed: give it another slide.`,
+    });
+  }
 
   return out;
 }

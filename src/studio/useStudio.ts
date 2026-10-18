@@ -13,6 +13,7 @@ import {
   type Tool,
 } from "./model.js";
 import type { Gradient } from "./gradient.js";
+import type { Vision } from "./legibility.js";
 import type { PlatformId } from "./platforms.js";
 import { platformForSize } from "./platforms.js";
 import { reflowDoc } from "./reflow.js";
@@ -70,6 +71,8 @@ export function useStudio(initial: Doc) {
   // NOT part of Doc, it is a view setting, not something about the artwork, and
   // it must never reach the export path.
   const [safePlatform, setSafePlatform] = useState<PlatformId | null>(null);
+  /** The canvas seen with a colour-vision deficiency (30.3). A view setting, never part of the doc. */
+  const [vision, setVision] = useState<Vision | null>(null);
   /** Every slide side by side, the only view a seam can be judged in (23.1). A view setting, not the doc. */
   const [stripView, setStripView] = useState(false);
   /** The deck as one text document (24.1). A view, like strip view. */
@@ -645,6 +648,8 @@ export function useStudio(initial: Doc) {
     setEditingId,
     safePlatform,
     setSafePlatform,
+    vision,
+    setVision,
     slideSelection,
     setSlideSelection,
     picker,

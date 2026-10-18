@@ -278,6 +278,20 @@ Invariants worth keeping:
   `verbatim`, is labelled from `translationLabel`, and keeps `original` for Use the original words.
 - `14-glossary.sql` adds `brands.glossary`; a brand sends the key only once a glossary was edited.
 
+## Legibility (Batch 30)
+
+- **Every check is a defect, never a score, and none blocks an export** (`legibility.ts`, pre-flight
+  `warn`s, `LegibilityPanel.tsx`). Thresholds are judged at the size the slide is SEEN (`feedScale`),
+  not at artboard pixels.
+- **Contrast over a picture comes from rendered pixels, through the one painter**: `/api/contrast`
+  renders the export payload with text hidden (`withoutText`) and samples it with `GRID_JS`
+  (`contrastgrid.ts`, shared). The verdict is the worst 24px cell behind any line's glyphs
+  (`inkRects`), never the average. A new fix must be confirmed by the same check running again.
+- Colour-vision matrices live once, in `CVD`; the preview filters are built from them.
+- **A video that would flash more than three times a second is refused, never trimmed**
+  (`flashRate`, client and `validateVideo`). Reduced motion is derived from any preset (`reducedOf`,
+  `transitionOf`), never a second list.
+
 ## Pictures
 
 - **A stock API is not a scrape.** Batch 13 refused to fetch somebody else's page, and that stands:

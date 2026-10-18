@@ -4743,7 +4743,7 @@ and no credits.
 
 ## Batch 30, Legibility and accessibility
 
-**Status:** next
+**Status:** done
 **Size:** small to medium
 **Why here:** the pre-flight from Batch 1.3 checks sizes, strokes, safe zones, file
 size and slide count. It does not check whether the text can actually be **seen**.
@@ -4819,11 +4819,34 @@ three times a second, and offer a reduced-motion variant of every animation pres
 - **No blocking export on a flag.** The user can know something the check does not,
   the same reasoning as Batch 15.
 
+### Built as
+
+- **Where it runs (the unknown):** both. Flat-colour contrast, phone and tile size, colour-only and
+  density are pure and run in the client pre-flight. Contrast over pictures needs pixels: `/api/contrast`
+  renders through `renderSlides` with the text hidden and returns 24px cells (`GRID_JS`, shared), and the
+  verdict and the fixes run in the browser. Free, rate-limited per address like the open export.
+- **30.1:** `legibility.ts`. Thresholds at feed scale; the worst cell behind each line's glyphs
+  (`inkRects`), not the box's average. Three fixes in the roadmap's order, `scrimFix`, `roleFix`,
+  `moveFix`, each confirmed by checking again. Done-when tested by rendering for real
+  (`legibility.render.test.ts`): flagged at 1.1:1 where the average passes, and each fix passes.
+- **30.2:** `feedScale` (360px phone; LinkedIn letterboxes a tall page in 360 by 450; TikTok full screen),
+  `small-on-phone` under 10px, `cover-small-in-grid` under 8px in a 120px tile on Instagram and TikTok.
+  The Legibility panel shows the slide in a phone frame and the cover as a grid tile.
+- **30.3:** Machado et al. matrices (`CVD`), one source for the check and the canvas preview filters;
+  `colour-only` for unlabelled shapes that differ only by a colour one deficiency cannot tell apart.
+- **30.4:** `dense` over 40 words at 4:5 and 30 at 9:16, CJK counted at two characters a word.
+- **30.5:** `flashRate` over each slide's ground; the video dialog and `validateVideo` refuse more than
+  three flashes a second. `reducedOf` and `transitionOf` give every preset a fade-only variant, a
+  checkbox in the video dialog.
+- **Recorded, not done:** feed and tile sizes are estimates (D61), long placeholder hooks trip the tile
+  check on a third of generated covers (D62), picture contrast is only checked in the panel (D63),
+  colour-only meaning in words is not checked (D64), the flash check reads grounds only (D65).
+
 ---
 
 ## Batch 31, Integrations and the public API
 
-**Status:** queued
+**Status:** next
 **Size:** large, split into independent items that can ship one at a time.
 **Why here:** Batch 5.5 made FlashCC "the missing first half of the bulk pipeline"
 through a CSV. A CSV is the right first step and still a manual one: export, open

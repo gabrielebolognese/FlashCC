@@ -1,4 +1,4 @@
-import { ChevronLeft, ClipboardPaste, Dices, Download, Film, Heading, History, Languages, Megaphone, Redo2, Send, Shuffle, Sparkles, Undo2, X } from "lucide-react";
+import { ChevronLeft, ClipboardPaste, Dices, Download, Eye, Film, Heading, History, Languages, Megaphone, Redo2, Send, Shuffle, Sparkles, Undo2, X } from "lucide-react";
 import type { Studio as StudioState } from "./useStudio.js";
 import { brokenSpans, unspan } from "./spans.js";
 import { StripCanvas } from "./StripCanvas.js";
@@ -50,6 +50,7 @@ import { BlockPicker } from "./BlockPicker.js";
 import { ExportDialog } from "./ExportDialog.js";
 import { VideoExport } from "./VideoExport.js";
 import { TranslateDialog } from "./TranslateDialog.js";
+import { LegibilityPanel } from "./LegibilityPanel.js";
 import { restoreOriginal } from "./translate.js";
 import { languageByCode } from "./languages.js";
 import { openCapture } from "./ideas.js";
@@ -100,6 +101,7 @@ export function Studio({
   const [finding, setFinding] = useState(false);
   const [filming, setFilming] = useState(false);
   const [translating, setTranslating] = useState(false);
+  const [legible, setLegible] = useState(false);
   /** The filmstrip's "+" showing its line (24.5). */
   const [typingSlide, setTypingSlide] = useState(false);
   const [relaid, setRelaid] = useState<number | null>(null);
@@ -233,6 +235,7 @@ export function Studio({
     "export-last": { run: () => setExporting({ initial: lastDestination(), auto: true }) },
     "export-video": { run: () => setFilming(true) },
     translate: { run: () => setTranslating(true) },
+    legibility: { run: () => setLegible(true) },
     "new-slide": { run: () => studio.addSlide(studio.index + 1) },
     "type-slide": { run: () => setTypingSlide(true) },
     "duplicate-slide": { run: () => studio.duplicateSlide(studio.index) },
@@ -542,6 +545,16 @@ export function Studio({
         </button>
         <button
           type="button"
+          data-action="legibility"
+          title="Can it be read? Contrast over pictures, the slide at phone size, colour vision, density."
+          onClick={() => setLegible(true)}
+          className="flex h-7 items-center gap-1.5 rounded-md border border-hairline bg-surface-1 px-2.5 text-body text-secondary hover:bg-surface-3 hover:text-primary"
+        >
+          <Eye size={14} strokeWidth={2} />
+          Legibility
+        </button>
+        <button
+          type="button"
           data-action="translate"
           title="This carousel in another language, as its own carousel. Longer languages get more slides, not smaller type."
           onClick={() => setTranslating(true)}
@@ -672,6 +685,8 @@ export function Studio({
           onClose={() => setFilming(false)}
         />
       ) : null}
+
+      {legible ? <LegibilityPanel studio={studio} onClose={() => setLegible(false)} /> : null}
 
       {translating ? (
         <TranslateDialog

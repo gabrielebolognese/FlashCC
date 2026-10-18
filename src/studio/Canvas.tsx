@@ -22,6 +22,7 @@ import { marginLines } from "./compositions.js";
 import { slidePaint } from "./paint.js";
 import { platformById, platformForSize, safeBox } from "./platforms.js";
 import { SafeZones } from "./SafeZones.js";
+import { VisionFilters, visionFilter } from "./VisionFilters.js";
 import { LayerView } from "./LayerView.js";
 import { MEDIA_DRAG_TYPE } from "./MediaPool.js";
 import { makeLayer, type Layer, type Tool } from "./model.js";
@@ -497,8 +498,10 @@ export function Canvas({ studio }: { studio: Studio }) {
             width: doc.width * zoom,
             height: doc.height * zoom,
             ...slidePaint(slide),
+            filter: visionFilter(studio.vision),
           }}
         >
+          <VisionFilters />
           <div
             className="absolute left-0 top-0 origin-top-left"
             style={{ width: doc.width, height: doc.height, transform: `scale(${zoom})` }}

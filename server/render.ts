@@ -17,6 +17,7 @@
  */
 import { chromium, type Browser } from "playwright";
 
+import { slidePage } from "../src/studio/contrastgrid.js";
 import { HttpError } from "./http.js";
 
 export type SlideMarkup = { html: string };
@@ -92,15 +93,8 @@ function validate(req: RenderRequest): void {
  * default margin shifts every slide by 8px, which is invisible on screen and
  * obvious once ten of them are swiped through.
  */
-const page = (req: RenderRequest, body: string): string => `<!doctype html>
-<html><head><meta charset="utf-8">
-<style>
-  *, *::before, *::after { box-sizing: border-box; }
-  html, body { margin: 0; padding: 0; background: transparent; }
-  #slide { position: relative; width: ${req.width}px; height: ${req.height}px; overflow: hidden; }
-  ${req.css}
-</style>
-</head><body><div id="slide">${body}</div></body></html>`;
+// Shared with the contrast check's test (30.1), so both render into the same root.
+const page = (req: RenderRequest, body: string): string => slidePage(req.width, req.height, req.css, body);
 
 /** The widest strip rendered in one screenshot; Chromium's limit is about 16k pixels. */
 const MAX_STRIP_PX = 16_000;

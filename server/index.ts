@@ -17,6 +17,7 @@ import { createServer, type IncomingMessage, type ServerResponse } from "node:ht
 
 import { angles } from "./angles.js";
 import { alt, caption } from "./caption.js";
+import { contrast } from "./contrast.js";
 import { distil } from "./distil.js";
 import { tally } from "./tally.js";
 import { learnVoice } from "./voice.js";
@@ -52,6 +53,7 @@ const ROUTES: Record<string, Record<string, Handler>> = {
     "/api/review/comment": addComment,
     "/api/review/decision": decide,
     "/api/export": exportDeck,
+    "/api/contrast": contrast,
     "/api/slides": renderImages,
     "/api/document": renderDocument,
     "/api/stock": stockSearch,

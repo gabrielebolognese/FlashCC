@@ -19,7 +19,7 @@ is still current.
 | **Orientation** | [1 What it is](#1-what-it-is) · [2 Running it](#2-running-it) · [3 The invariants](#3-the-invariants) |
 | **The canvas** | [4 Data model](#4-the-data-model) · [5 Canvas](#5-the-canvas) · [6 Text](#6-text-measurement-and-fitting) · [6b Type](#6b-type-pairs-ramps-emphasis-effects-scripts) · [7 Colour](#7-colour-and-contrast) · [8 Gradients](#8-gradients) · [9 Format change](#9-changing-format-reflow) · [9b Spans](#9b-designs-across-slides-spans-and-strip-view) · [9c Writing](#9c-writing-outline-mode-typed-slides-find-and-replace-batch-24) |
 | **Making a deck** | [10 Frameworks](#10-the-frameworks) · [10b The sixteen](#10b-the-twelve-added-in-batch-25-and-what-every-framework-now-carries) · [11 Generation](#11-generation) · [11b Blocks and furniture](#11b-blocks-and-deck-furniture) · [12 Styles](#12-styles-and-themes) · [12b Presets](#12b-presets-hooks-calls-to-action-templates-packs-kits-batch-25) · [13 Onboarding](#13-onboarding) · [14 AI drafting](#14-ai-drafting) · [14b Translation](#14b-translation-one-deck-several-languages-batch-29) · [15 Bulk and long form](#15-bulk-create-and-long-form-ingest) · [16 Media, fonts and assets](#16-media-and-fonts) · [16b Imagery](#16b-imagery-icons-and-backgrounds) · [17 Screen flow](#17-screen-flow) |
-| **The product** | [17b Clients and review](#17b-clients-and-review) · [18 Pipeline, calendar and series](#18-the-pipeline) · [19 Analytics](#19-analytics) · [19b History](#19b-version-history) · [20 Library](#20-the-library) · [21 Export](#21-export) |
+| **The product** | [17b Clients and review](#17b-clients-and-review) · [18 Pipeline, calendar and series](#18-the-pipeline) · [19 Analytics](#19-analytics) · [19b History](#19b-version-history) · [20 Library](#20-the-library) · [21 Export](#21-export) · [21b Legibility](#21b-legibility-batch-30) |
 | **Infrastructure** | [22 Persistence](#22-persistence) · [23 Sync](#23-sync) · [24 Auth](#24-auth) · [25 Billing](#25-billing) · [26 Database](#26-database) · [27 Design tokens](#27-design-tokens) · [28 Testing](#28-testing) |
 | **Reality check** | [29 Known defects](#29-known-defects) |
 
@@ -3045,6 +3045,85 @@ finished file kept here (with byte ranges); `POST /api/video/retry` queues a fai
 
 ---
 
+## 21b. Legibility (Batch 30)
+
+The pre-flight checked sizes, strokes, safe zones and slide counts; a slide could pass all of them and be
+unreadable on a phone. `legibility.ts` is the pure half, `LegibilityPanel.tsx` (header button, action
+`legibility`) the screen. Every check is a defect anybody would recognise as one, never a score, and
+**nothing here blocks an export**: each is a pre-flight `warn`.
+
+### Contrast, including over photos (30.1)
+
+- **Thresholds:** WCAG's 4.5:1 for body text, 3:1 for large text, with "large" judged at the size the
+  slide is **seen** (`needFor`: 24 CSS px, or 18.66 bold, at feed scale), not at 1080 artboard pixels.
+- **Where the ink is:** `inkRects` measures each wrapped line with `text.ts` and places it by alignment
+  (right-to-left lines at their own start), so a bright patch in the empty right half of a left-aligned
+  box is not behind any letter. Gradient text is judged on every stop; a layer's opacity counts against it.
+- **Over a flat colour, arithmetic** (`flatGround`, `flatContrast`): the slide's colour, a solid rect
+  covering the box, or a label effect's own box. An outline draws its own edge and is not judged. This
+  runs in the pre-flight (`low-contrast`), so the export dialog shows it.
+- **Over a picture, a gradient or a texture, the rendered pixels.** `/api/contrast` (`server/contrast.ts`,
+  free, 20 a minute per address like the open export) takes the export payload with every text layer
+  hidden (`withoutText`), renders it with `renderSlides` (the one painter), and runs `GRID_JS`
+  (`contrastgrid.ts`, shared) on each screenshot: 24px cells of mean colour. The verdict is the **worst
+  cell** at least half under any line's glyphs, never the box's average: a dark photo with a bright patch
+  behind two letters passes on average and fails where it matters. `scanContrast` asks only for the
+  slides that need it, again after every fix.
+- **The three fixes, in the roadmap's order**, each computed from the same grid and confirmed by the check
+  running again: `scrimFix` (a scrim under the layer whose gradient reaches the alpha the worst cell
+  needs where the words begin, found by bisection over the composited cells), `roleFix` (the nearest of
+  the deck's four colour roles that passes on every cell), `moveFix` (the nearest position, at the layer's
+  size, on grid steps inside the platform's safe box, where every cell passes and no other words sit).
+- **Done when, tested for real** (`legibility.render.test.ts`): white 96px bold over a dark photo with a
+  bright patch on the end of the headline is flagged at 1.1:1 while the box's average colour would pass,
+  and each fix, applied and re-rendered, passes the same check. In the browser the scrim and role fixes
+  cleared a photo slide and a grey-on-grey slide.
+
+### At the size it is seen (30.2)
+
+`feedScale`: a 360 CSS px wide phone (the narrow end of 360 to 430). LinkedIn's document viewer fits a
+page into a 360 by 450 frame, so a 9:16 page is letterboxed and shown smaller; TikTok is the whole
+360 by 640 screen; everywhere else the post fills the width (D61). `smallOnPhone` names the smallest copy
+on each slide under **10px** (`FEED_MIN_PX`, 30px on a 1080 slide in a 4:5 feed), furniture chrome and a
+composition's decorative number left out (`small-on-phone`). Measured first: generated decks never set
+copy under 33px, so the floor flags hand-set small text and no generated deck. `coverAtTile`: the cover's
+biggest copy in a 120 by 160 profile-grid tile (crop scale), flagged under **8px** (`TILE_MIN_PX`) on
+Instagram and TikTok (`cover-small-in-grid`). The panel shows the slide in a 360px phone frame (prev and
+next) and the cover as a grid tile beside two blank ones.
+
+### Colour vision (30.3)
+
+The Machado, Oliveira and Fernandes (2009) severity-1 matrices for protanopia, deuteranopia and
+tritanopia (`CVD`), applied in linear RGB by `simulate` and, for the preview, as SVG `feColorMatrix`
+filters (`VisionFilters.tsx`, whose default colour space is linear RGB, so check and preview agree).
+`studio.vision` is a view setting on the canvas and the panel's previews, never in the doc. The check,
+`colourOnly`: two shapes on a slide of similar size whose fills are clearly different (CIE76 over 20)
+and, to one of the three, nearly the same (under 13) or left with under 40% of the difference, where at
+least one has no words on or within 24px of it (`colour-only`). Block parts are trusted (charts and
+columns label themselves), as are furniture, pictures, gradients and full-bleed grounds. It catches
+matplotlib's red and green and flat UI's red and green, and leaves navy and sky alone.
+
+### Density (30.4)
+
+`slideWords`: words in the copy, marks stripped, furniture out, scripts without spaces counted at one
+word per two characters. Over 40 at 4:5, 3:4 and 1:1, over 30 at 9:16 (`wordCeiling`), flagged as
+`dense`. A defect, not a quality score; it never blocks.
+
+### Motion safety (30.5)
+
+- **Flashing:** WCAG 2.3.1, no more than three flashes in any second. A flash is a pair of opposing
+  changes in relative luminance of at least 0.1 with the darker under 0.8; in a slideshow the large-area
+  changes are the cuts and transitions between slides, so each slide's ground is what counts
+  (`slideLuma`: a colour, a gradient's mean, null for a picture, which is counted as a change every
+  time). `flashRate` finds the worst one-second window. The video dialog disables Render and says when
+  and why; `validateVideo` refuses the same request with a 400. Refused, never trimmed: which slide to
+  hold longer is the person's call. Holds are at least 0.5s, so no deck reaches the limit today; the
+  check holds future presets and holds to it.
+- **Reduced motion:** `MotionSettings.reduced` (a checkbox in the video dialog). `reducedOf` derives the
+  variant of any preset rather than listing one beside it: every entrance a fade at the same moment,
+  nothing rising or sliding, a count-up shown at its number, a highlight simply there; `transitionOf`
+  turns a push or a zoom into a fade.
+
 ## 22. Persistence
 
 | Key | Holds |
@@ -3393,7 +3472,7 @@ all disabled under `prefers-reduced-motion`.
 
 ## 28. Testing
 
-1,990 tests across 98 files (as of Batch 29). They are design guards, not coverage theatre, several encode an argument
+2,029 tests across 103 files (as of Batch 30). They are design guards, not coverage theatre, several encode an argument
 that would otherwise be lost:
 
 - **mean vs median**, five posts and one at 100k, proving a mean baseline would switch outlier
@@ -3859,6 +3938,34 @@ target language when the brand has them"; there is nowhere yet to store samples 
 Furniture pieces (author chip, counter, footer) are left as stamped. A chart's labels and a stat's
 source are not sent. A person's name inside a sentence is protected only by the prompt's rule unless
 it is the deck's author, the brand, or in the glossary.
+
+### D61, Feed and tile sizes are estimates
+
+A 360px phone, LinkedIn's 360 by 450 document frame, TikTok's full screen and a 120 by 160 profile tile
+are reasonable figures, not measured ones; no platform publishes them and they vary by device. The
+thresholds built on them (10px copy, 8px cover headline) are judgement, stated as constants.
+
+### D62, Long hooks get "cover small in the grid" on about a third of generated covers
+
+Across the pack matrix, 128 of 416 Instagram and TikTok decks built from the frameworks' placeholder
+hooks set the cover headline under 8px at tile size (about 7.3px). It is a warning, and arguably a true
+one; a shorter hook fixes it.
+
+### D63, Contrast over pictures is only checked in the Legibility panel
+
+It needs a render, so it runs when the panel is open, not in the export dialog's synchronous pre-flight,
+which shows only the flat-colour half. A deck with a photo can export without anyone having opened the
+panel.
+
+### D64, Colour-only meaning in words is not checked
+
+The colour-vision check looks at shapes. Two words that mean "good" and "bad" only by being green and red
+are not caught, and neither is a picture whose meaning is in its colours.
+
+### D65, The flash check sees slide grounds, not what moves on them
+
+Entrances are fades and small, so they are not counted; a photograph's ground is unknown and counted as a
+change at every boundary, the safe assumption.
 
 ### D20, Smaller things
 

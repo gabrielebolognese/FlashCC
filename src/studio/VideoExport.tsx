@@ -17,11 +17,15 @@ import { looksPaid } from "./gate.js";
 import type { Doc } from "./model.js";
 import {
   ANIMATIONS,
+  flashRate,
+  FLASHES_PER_SECOND,
   formulaSeconds,
   FPS,
   motionOf,
   planVideo,
   slideFrames,
+  slideLuma,
+  transitionOf,
   TRANSITIONS,
   VIDEO_TARGETS,
   videoTarget,
@@ -90,7 +94,10 @@ export function VideoExport({
 
   const n = doc.slides.length;
   const frames = doc.slides.map((s, i) => slideFrames(s, i, n));
-  const plan = useMemo(() => planVideo(frames, motion.transition), [frames.join(","), motion.transition]);
+  const plan = useMemo(() => planVideo(frames, transitionOf(motion)), [frames.join(","), motion.transition, motion.reduced]);
+  // Refused, never trimmed (30.5): which slide to hold longer is the person's call.
+  const flash = flashRate(plan, doc.slides.map(slideLuma));
+  const flashes = flash.rate > FLASHES_PER_SECOND;
   const sameShape = doc.width === target.w && doc.height === target.h;
   const animated = motion.animation !== "none";
 
@@ -176,6 +183,11 @@ export function VideoExport({
               ))}
             </div>
             <p className="mt-2 text-caption text-muted">{ANIMATIONS.find((a) => a.id === motion.animation)?.note}.</p>
+            <label className="mt-2 flex items-center gap-2 text-caption text-secondary">
+              <input type="checkbox" data-control checked={Boolean(motion.reduced)} onChange={(e) => set({ reduced: e.target.checked })} />
+              Reduced motion
+              <span className="text-muted">Fades only: nothing slides, rises or grows, a push or zoom between slides becomes a fade.</span>
+            </label>
           </section>
 
           <section className="mb-4">
@@ -268,9 +280,11 @@ export function VideoExport({
           <span className="flex-1 text-caption text-muted">
             {server === false
               ? "This server has no ffmpeg installed, so it cannot make videos. Images and PDF still export."
-              : error ?? (animated ? "Animated video is part of Pro. A still slideshow is free." : "A still slideshow is free, with or without an account.")}
+              : flashes
+                ? `This would flash ${flash.rate} times in one second around ${flash.at.toFixed(1)}s. Over ${FLASHES_PER_SECOND} can trigger seizures: hold those slides longer.`
+                : error ?? (animated ? "Animated video is part of Pro. A still slideshow is free." : "A still slideshow is free, with or without an account.")}
           </span>
-          <Button hero control icon={Film} disabled={server === false || sending} onClick={() => void render()}>
+          <Button hero control icon={Film} disabled={server === false || sending || flashes} onClick={() => void render()}>
             {sending ? "Sending" : `Render ${runtime(plan.seconds)} video`}
           </Button>
         </div>
