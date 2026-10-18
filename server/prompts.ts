@@ -601,6 +601,12 @@ export type CaptionInput = {
    * one short line per post is wanted as well as the caption.
    */
   posts?: number[] | undefined;
+  /**
+   * The language the slides are in (Batch 29), e.g. "German (Deutsch)". A
+   * caption for a translated deck is written from its own slides, in their
+   * language, never translated from the source deck's caption.
+   */
+  language?: string | undefined;
 };
 
 /** "Post 1 is slides 1 to 4", for the lines that go with a thread. */
@@ -645,6 +651,7 @@ export function assembleCaption(input: CaptionInput): Assembled {
     "",
     `The carousel, slide by slide:\n${deck}`,
     ...(input.posts && input.posts.length > 1 ? ["", postsBlock(input.posts)] : []),
+    ...(input.language ? ["", `Write in ${input.language}, the language the slides are in. Hashtags too.`] : []),
     "",
     `Write ${input.count} caption${input.count === 1 ? "" : "s"}.`,
   ].join("\n");
@@ -652,7 +659,7 @@ export function assembleCaption(input: CaptionInput): Assembled {
   return { system: CAPTION_SYSTEM, user };
 }
 
-export function assembleAlt(deck: readonly string[]): Assembled {
+export function assembleAlt(deck: readonly string[], language?: string | undefined): Assembled {
   const slides = clip(
     deck.map((t, i) => `${i + 1}. ${t.trim() || "(no text on this slide)"}`).join("\n"),
     MAX_DECK_CHARS,
@@ -663,7 +670,7 @@ export function assembleAlt(deck: readonly string[]): Assembled {
     // The count is stated as well as implied. A model given nine slides and no
     // number returns eight often enough to matter, and the entries are consumed
     // positionally, so a short answer silently shifts every later slide's alt.
-    user: `The carousel has ${deck.length} slide${deck.length === 1 ? "" : "s"}.\n\n${slides}\n\nWrite exactly ${deck.length} description${deck.length === 1 ? "" : "s"}, one per slide, in order.`,
+    user: `The carousel has ${deck.length} slide${deck.length === 1 ? "" : "s"}.\n\n${slides}\n\nWrite exactly ${deck.length} description${deck.length === 1 ? "" : "s"}, one per slide, in order.${language ? ` Write them in ${language}, the language the slides are in.` : ""}`,
   };
 }
 
@@ -891,4 +898,57 @@ export function assembleAngles(input: AnglesInput): Assembled {
   ].join("\n");
 
   return { system: ANGLES_SYSTEM, user };
+}
+
+/* ── translating a deck (Batch 29) ────────────────────────────────────────── */
+
+export const TRANSLATE_SYSTEM = `You translate social carousels, slide by slide, for people who will post them under their own name.
+
+You are given numbered units of text and a target language. Each unit is one slide's copy or one short field from a slide (a quote, a label, a step). You return every unit translated, with its number.
+
+Rules:
+- Return every unit, with the number it was given. Never merge two units, split one, or skip one.
+- Translate what each unit says, the way a fluent native writer of the target language would put it on a slide. Not word for word: natural, idiomatic, the same register.
+- **Copy every token like ⟦3⟧ exactly as it appears, once each.** Tokens stand for names, numbers, links, handles, code and fixed brand terms. Put each where it belongs in the translated sentence; never translate, change, drop or repeat one.
+- Keep the line breaks: a unit with two lines comes back with two lines.
+- Keep emphasis marks around the same idea: *word*, **word** and ==word== wrap the translated word or phrase that carries the same meaning. Add none that were not there.
+- Add nothing the unit does not say. No explanation, no translator's note, no brackets, no alternatives.
+- Leave a person's or a product's name as it is written.
+- Keep the length close to the original. A slide is read in two seconds.
+- Use the punctuation of the target language. No em dashes, ever: a comma or a full stop.
+- If a unit is already in the target language, return it unchanged.`;
+
+/** One thing to translate: a slide's copy, or one field of a block on a slide. */
+export type TranslateUnit = { kind: "slide" | "field"; text: string };
+
+export type TranslateInput = {
+  units: readonly TranslateUnit[];
+  /** The language's English name and its own, e.g. "German (Deutsch)". */
+  language: string;
+  voice?: Voice | undefined;
+};
+
+/**
+ * The units as tagged blocks rather than a numbered list: a slide's copy runs
+ * over several lines, and "2." at the start of a line inside unit 1 would be
+ * read as the start of unit 2.
+ */
+export function assembleTranslate(input: TranslateInput): Assembled {
+  const voice = voiceBlock(input.voice);
+  const units = input.units
+    .map((u, i) => `<unit n="${i + 1}" kind="${u.kind}">\n${u.text.trim()}\n</unit>`)
+    .join("\n");
+
+  const user = [
+    `Translate into ${input.language}.`,
+    ...(voice
+      ? ["", "The account's voice, to carry into the translation (its samples, when there are any, are already in the target language):", voice]
+      : []),
+    "",
+    `There are ${input.units.length} units. Return exactly ${input.units.length}, numbered 1 to ${input.units.length}.`,
+    "",
+    units,
+  ].join("\n");
+
+  return { system: TRANSLATE_SYSTEM, user };
 }

@@ -21,6 +21,7 @@ import type { Plan } from "./cloud.js";
 import { luminance } from "./colour.js";
 import { markDeleted } from "./tombstones.js";
 import { makeLayer, uid, type Doc, type Identity, type Layer, type Slide } from "./model.js";
+import type { GlossaryEntry } from "./languages.js";
 import type { Theme } from "./presets.js";
 import { DEFAULT_STYLE, styleById, type Style } from "./styles.js";
 
@@ -102,6 +103,12 @@ export type Brand = {
   logos: BrandLogos;
   /** How this brand sounds. Absent until somebody fills it in. */
   voice?: Voice | undefined;
+  /**
+   * Terms a translation never touches, and terms with a fixed rendering per
+   * language (29.3), beside the voice. Applied by masking on the server, so
+   * the model never sees them as words it could change.
+   */
+  glossary?: GlossaryEntry[] | undefined;
   /** Whose brand this is. See clients.ts. */
   clientId?: string | undefined;
   /** The artboard new carousels start at. */

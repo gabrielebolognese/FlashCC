@@ -56,6 +56,8 @@ export type CaptionAsk = {
   voice?: Voice | undefined;
   /** Slides per post, for a deck that goes out as a thread (17.3). */
   posts?: readonly number[] | undefined;
+  /** The language the slides are in (Batch 29), so the caption is written in it. */
+  language?: string | undefined;
 };
 
 export async function writeCaption(ask: CaptionAsk, signal?: AbortSignal): Promise<CaptionResult> {
@@ -71,6 +73,7 @@ export async function writeCaption(ask: CaptionAsk, signal?: AbortSignal): Promi
       ...(ask.cta ? { cta: ask.cta } : {}),
       ...(hasVoice(ask.voice) ? { voice: ask.voice } : {}),
       ...(ask.posts && ask.posts.length > 1 ? { posts: [...ask.posts] } : {}),
+      ...(ask.language ? { language: ask.language } : {}),
     }),
   });
 
@@ -91,12 +94,12 @@ export async function writeCaption(ask: CaptionAsk, signal?: AbortSignal): Promi
 
 export type AltResult = { alt: string[]; limit: number };
 
-export async function writeAlt(deck: readonly string[], signal?: AbortSignal): Promise<AltResult> {
+export async function writeAlt(deck: readonly string[], signal?: AbortSignal, language?: string | undefined): Promise<AltResult> {
   const res = await fetch("/api/alt", {
     method: "POST",
     headers: await authHeader(),
     ...(signal ? { signal } : {}),
-    body: JSON.stringify({ deck: [...deck] }),
+    body: JSON.stringify({ deck: [...deck], ...(language ? { language } : {}) }),
   });
 
   if (!res.ok) throw await readRefusal(res);

@@ -1,4 +1,4 @@
-import { ChevronLeft, ClipboardPaste, Dices, Download, Film, Heading, History, Megaphone, Redo2, Send, Shuffle, Sparkles, Undo2, X } from "lucide-react";
+import { ChevronLeft, ClipboardPaste, Dices, Download, Film, Heading, History, Languages, Megaphone, Redo2, Send, Shuffle, Sparkles, Undo2, X } from "lucide-react";
 import type { Studio as StudioState } from "./useStudio.js";
 import { brokenSpans, unspan } from "./spans.js";
 import { StripCanvas } from "./StripCanvas.js";
@@ -49,6 +49,9 @@ import { BrandMenu } from "./BrandMenu.js";
 import { BlockPicker } from "./BlockPicker.js";
 import { ExportDialog } from "./ExportDialog.js";
 import { VideoExport } from "./VideoExport.js";
+import { TranslateDialog } from "./TranslateDialog.js";
+import { restoreOriginal } from "./translate.js";
+import { languageByCode } from "./languages.js";
 import { openCapture } from "./ideas.js";
 import { furnishWith } from "./furniture.js";
 import { HookPicker } from "./HookPicker.js";
@@ -96,6 +99,7 @@ export function Studio({
   const [shortcuts, setShortcuts] = useState(false);
   const [finding, setFinding] = useState(false);
   const [filming, setFilming] = useState(false);
+  const [translating, setTranslating] = useState(false);
   /** The filmstrip's "+" showing its line (24.5). */
   const [typingSlide, setTypingSlide] = useState(false);
   const [relaid, setRelaid] = useState<number | null>(null);
@@ -175,6 +179,7 @@ export function Studio({
     picked: picked.length > 0 ? null : "Pick several slides in the filmstrip first (Shift-click).",
   };
   const stampedBlock = studio.selected.find((l) => l.block && slide?.blocks?.some((b) => b.instance === l.block!.instance));
+  const translatedBlock = stampedBlock ? slide?.blocks?.find((b) => b.instance === stampedBlock.block!.instance && b.original) : undefined;
 
   /**
    * What each action does, and why it cannot right now. Typed against the
@@ -227,6 +232,7 @@ export function Studio({
     export: { run: () => setExporting({}) },
     "export-last": { run: () => setExporting({ initial: lastDestination(), auto: true }) },
     "export-video": { run: () => setFilming(true) },
+    translate: { run: () => setTranslating(true) },
     "new-slide": { run: () => studio.addSlide(studio.index + 1) },
     "type-slide": { run: () => setTypingSlide(true) },
     "duplicate-slide": { run: () => studio.duplicateSlide(studio.index) },
@@ -290,6 +296,10 @@ export function Studio({
     "edit-block": {
       run: () => stampedBlock && studio.setPicker({ mode: "edit", instance: stampedBlock.block!.instance }),
       unavailable: stampedBlock ? null : "Select a block first.",
+    },
+    "use-original": {
+      run: () => translatedBlock && studio.replaceDoc(restoreOriginal(doc, studio.index, translatedBlock.instance, theme()), undefined, "Original words"),
+      unavailable: translatedBlock ? null : "Select a translated quote or testimonial first.",
     },
     "tool-select": { run: () => studio.setTool("select") },
     "tool-text": { run: () => studio.setTool("text") },
@@ -530,6 +540,16 @@ export function Studio({
           <Film size={14} strokeWidth={2} />
           Video
         </button>
+        <button
+          type="button"
+          data-action="translate"
+          title="This carousel in another language, as its own carousel. Longer languages get more slides, not smaller type."
+          onClick={() => setTranslating(true)}
+          className="flex h-7 items-center gap-1.5 rounded-md border border-hairline bg-surface-1 px-2.5 text-body text-secondary hover:bg-surface-3 hover:text-primary"
+        >
+          <Languages size={14} strokeWidth={2} />
+          {doc.language ? (languageByCode(doc.language)?.native ?? "Languages") : "Languages"}
+        </button>
         <Button hero icon={Download} action="export" onClick={() => setExporting({})}>
           Export
         </Button>
@@ -650,6 +670,18 @@ export function Studio({
             )
           }
           onClose={() => setFilming(false)}
+        />
+      ) : null}
+
+      {translating ? (
+        <TranslateDialog
+          doc={doc}
+          onReplace={(next) => studio.replaceDoc(next, undefined, "Translation")}
+          onOpen={onOpen ? (d) => {
+            setTranslating(false);
+            onOpen(d);
+          } : undefined}
+          onClose={() => setTranslating(false)}
         />
       ) : null}
 

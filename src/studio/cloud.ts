@@ -17,6 +17,7 @@ import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 import type { Asset, AssetKind, LogoRole } from "./assets.js";
 import type { Brand } from "./brand.js";
 import type { Client } from "./clients.js";
+import type { GlossaryEntry } from "./languages.js";
 import type { Doc } from "./model.js";
 import type { Metrics, Platform, Post, PostShape, Stage } from "./pipeline.js";
 
@@ -149,6 +150,8 @@ export type BrandRow = {
   logos: Record<string, string>;
   /** Tone, samples and banned words. jsonb for the same reason `theme` is. */
   voice: Record<string, unknown> | null;
+  /** Terms for translation (29.3). jsonb; arrives with 14-glossary.sql. */
+  glossary?: GlossaryEntry[] | null;
   client_id: string | null;
   width: number;
   height: number;
@@ -171,6 +174,10 @@ export const brandToRow = (
   theme: brand.theme,
   logos: brand.logos ?? {},
   voice: brand.voice ?? null,
+  // Sent only once somebody has edited a glossary (an empty list after
+  // clearing one), so a brand that never had one syncs on a project that has
+  // not run 14-glossary.sql yet.
+  ...(brand.glossary !== undefined ? { glossary: brand.glossary } : {}),
   client_id: brand.clientId ?? null,
   width: brand.width,
   height: brand.height,
@@ -190,6 +197,7 @@ export const rowToBrand = (row: BrandRow): Brand => ({
   // The column arrives with 10-brand-voice.sql; absent reads as no voice,
   // which is what a brand made before it had one.
   ...(row.voice ? { voice: row.voice as Brand["voice"] } : {}),
+  ...(Array.isArray(row.glossary) ? { glossary: row.glossary } : {}),
   ...(row.client_id ? { clientId: row.client_id } : {}),
   width: row.width,
   height: row.height,

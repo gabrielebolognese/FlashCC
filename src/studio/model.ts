@@ -298,6 +298,13 @@ export type Slide = {
   blocks?: BlockRecord[] | undefined;
   /** Seconds this slide holds in a video export (26.1), when somebody changed it from the formula. */
   hold?: number | undefined;
+  /**
+   * On a translated deck (Batch 29): the source slide this came from, its copy
+   * as the translation left it, and how many layers were hand-edited then. A
+   * stamp read only by Re-translate, which keeps a slide whose words or
+   * layers somebody changed since. Never read at render.
+   */
+  translation?: { source: string; copy: string; edited: number } | undefined;
   layers: Layer[];
 };
 
@@ -310,6 +317,11 @@ export type BlockRecord = {
   parts?: Record<string, { x: number; y: number; w: number; h: number; look: string }> | undefined;
   /** See `BlockStamp.slot`. */
   slot?: true | undefined;
+  /**
+   * A translated quote or testimonial (29.1): the fields as they were before,
+   * so the original words are one click away and come back verbatim.
+   */
+  original?: Record<string, string> | undefined;
 };
 
 export type Doc = {
@@ -376,6 +388,12 @@ export type Doc = {
    * only thing that remembers they were ever the same deck.
    */
   variantOf?: string | undefined;
+  /**
+   * The language this deck is in, when it is a translation (Batch 29): a code
+   * from `languages.ts`, with `variantOf` pointing at the deck it was
+   * translated from. Absent on an original. A tag, never read at render.
+   */
+  language?: string | undefined;
   /**
    * The hook formula kind (25.3) last used to write the cover, so attribution
    * can group by it (28.5). A tag read by nothing that renders.

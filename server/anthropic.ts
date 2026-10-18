@@ -57,6 +57,10 @@ export const MODELS = {
   // Reads the live web and decides what is worth a carousel. Reasoning over
   // search results, which is the job this tier is for.
   angles: "claude-sonnet-5",
+  // Translating somebody's published words into a language they may not read
+  // well enough to check. The most capable model, because a mistake here is
+  // one the person cannot see.
+  translate: "claude-opus-5-5",
 } as const;
 
 /** A hung request otherwise holds a browser tab open until somebody closes it. */

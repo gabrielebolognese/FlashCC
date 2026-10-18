@@ -50,6 +50,7 @@ import {
   type Voice,
 } from "./brand.js";
 import { FURNITURE_SETS } from "./furniture.js";
+import { glossaryText, parseGlossary } from "./languages.js";
 import { importImages, urlFor } from "./library.js";
 import { ACCEPT } from "./media.js";
 import type { Plan } from "./cloud.js";
@@ -606,6 +607,41 @@ function VoiceEditor({ brand, onChange }: { brand: Brand; onChange: (b: Brand) =
   );
 }
 
+/**
+ * Terms a translation never touches, and fixed renderings per language (29.3).
+ * One term per line, typed rather than built from a form: a glossary is a
+ * short list somebody keeps in their head, and the format reads as it is.
+ * Held as text while typing and tidied when the field is left, so a half-typed
+ * "de:" is not tidied away under the cursor.
+ */
+function GlossaryEditor({ brand, onChange }: { brand: Brand; onChange: (b: Brand) => void }) {
+  const [text, setText] = useState(() => glossaryText(brand.glossary ?? []));
+  const commit = () => {
+    const glossary = parseGlossary(text);
+    setText(glossaryText(glossary));
+    if (glossaryText(glossary) === glossaryText(brand.glossary ?? [])) return;
+    onChange({ ...brand, glossary, updatedAt: new Date().toISOString() });
+  };
+  return (
+    <div>
+      <span className="text-overline uppercase text-tertiary">Glossary</span>
+      <p className="mt-1 text-caption leading-4 text-muted">
+        For translations. A term on its own line is never translated. Add <span className="text-secondary">| de: rendering</span> to
+        fix how it reads in a language, the same on every slide.
+      </p>
+      <textarea
+        aria-label="Glossary"
+        value={text}
+        onChange={(e) => setText(e.target.value)}
+        onBlur={commit}
+        rows={3}
+        placeholder={"FlashCC\nSwipe file | de: Ideensammlung | fr: fichier d'idées"}
+        className={`${field} mt-2 h-auto resize-y py-2 leading-4`}
+      />
+    </div>
+  );
+}
+
 /* ── editor ───────────────────────────────────────────────────────────────── */
 
 /* ── a palette from an image (21.6) ──────────────────────────────────────── */
@@ -746,6 +782,8 @@ function Editor({
         <IdentityEditor brand={brand} onChange={set} />
 
         <VoiceEditor brand={brand} onChange={onChange} />
+
+        <GlossaryEditor key={brand.id} brand={brand} onChange={onChange} />
 
         <div>
           <span className="text-overline uppercase text-tertiary">Type pairing</span>

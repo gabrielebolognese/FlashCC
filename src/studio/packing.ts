@@ -87,3 +87,30 @@ export async function bundleZip(
 
   return out;
 }
+
+/**
+ * A language set (Batch 29), one zip, a folder per language: `de/`, `ja/`,
+ * `original/`. Each folder holds that deck's files as its destination would
+ * (a PDF as itself, numbered images unpacked), and its own caption and alt
+ * text, written from that language's slides.
+ */
+export async function languageZip(
+  files: readonly { folder: string; filename: string; blob: Blob; pdf: boolean; caption?: string | undefined; alt?: string | undefined }[],
+): Promise<JSZip> {
+  const out = new JSZip();
+  for (const f of files) {
+    if (f.pdf) {
+      out.file(`${f.folder}/${f.filename}`, await f.blob.arrayBuffer());
+    } else {
+      const inner = await JSZip.loadAsync(f.blob);
+      for (const name of Object.keys(inner.files)) {
+        const entry = inner.files[name];
+        if (!entry || entry.dir) continue;
+        out.file(`${f.folder}/${name}`, await entry.async("uint8array"));
+      }
+    }
+    if (f.caption?.trim()) out.file(`${f.folder}/caption.txt`, `${f.caption.trim()}\n`);
+    if (f.alt?.trim()) out.file(`${f.folder}/alt.txt`, `${f.alt.trim()}\n`);
+  }
+  return out;
+}

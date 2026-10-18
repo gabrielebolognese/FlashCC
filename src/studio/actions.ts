@@ -55,6 +55,7 @@ export const ACTIONS = {
   export: { label: "Export", group: "Export", also: "download pdf images" },
   "export-last": { label: "Export with the last destination", group: "Export", keys: "⌘E" },
   "export-video": { label: "Export as video", group: "Export", also: "mp4 reels tiktok shorts slideshow motion animate" },
+  translate: { label: "Translate this carousel", group: "Deck", also: "languages language german japanese arabic spanish french localise localize" },
   // Slide
   "new-slide": { label: "New slide after this one", group: "Slide", keys: "N" },
   "type-slide": { label: "Type a slide into existence", group: "Slide", also: "add headline" },
@@ -91,6 +92,7 @@ export const ACTIONS = {
   "equal-gap": { label: "Equal gap, top to bottom", group: "Layer" },
   "match-width": { label: "Match width to the widest", group: "Layer" },
   "edit-block": { label: "Edit the selected block", group: "Layer" },
+  "use-original": { label: "Put a translated quote's original words back", group: "Layer", also: "translation verbatim quote testimonial" },
   // Tools
   "tool-select": { label: "Move tool", group: "Tools", keys: "V" },
   "tool-text": { label: "Text tool", group: "Tools", keys: "⇧T" },

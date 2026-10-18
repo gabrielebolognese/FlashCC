@@ -16,6 +16,7 @@
  * roadmap rejected all four on evidence and none of them becomes a better idea
  * for being next to a caption box.
  */
+import { languageByCode } from "../src/studio/languages.js";
 import { stripMarks } from "../src/studio/marks.js";
 import type { IncomingMessage, ServerResponse } from "node:http";
 
@@ -79,6 +80,8 @@ type CaptionRequest = {
   voice?: Voice;
   /** Slides per post. See `postsOf`. */
   posts?: number[];
+  /** The language the slides are in (Batch 29), a code from `languages.ts`. */
+  language?: string;
 };
 
 /**
@@ -262,6 +265,7 @@ export async function caption(req: IncomingMessage, res: ServerResponse): Promis
     ...(body.cta ? { cta: body.cta } : {}),
     ...(body.voice ? { voice: body.voice } : {}),
     ...(posts ? { posts } : {}),
+    ...(languageLine(body.language) ? { language: languageLine(body.language) } : {}),
   });
 
   // Two schemas rather than one with an optional field: a model handed an
@@ -323,7 +327,14 @@ const AltSchema = z.object({
     .describe("One description per slide, in order, each under 125 characters"),
 });
 
-type AltRequest = { deck?: string[] };
+type AltRequest = { deck?: string[]; language?: unknown };
+
+/** "German (Deutsch)" for a known code, nothing for anything else: a deck in its own language needs no line. */
+function languageLine(code: unknown): string | undefined {
+  const lang = typeof code === "string" ? languageByCode(code) : undefined;
+  if (!lang) return undefined;
+  return lang.name === lang.native ? lang.name : `${lang.name} (${lang.native})`;
+}
 
 export async function alt(req: IncomingMessage, res: ServerResponse): Promise<void> {
   if (!draftConfigured()) throw noKey();
@@ -335,7 +346,7 @@ export async function alt(req: IncomingMessage, res: ServerResponse): Promise<vo
   const deck = Array.isArray(body?.deck) ? body.deck : [];
   if (deck.length === 0) throw new HttpError(400, "There are no slides to describe");
 
-  const { system, user } = assembleAlt(deck);
+  const { system, user } = assembleAlt(deck, languageLine(body.language));
 
   const response = await callModel("alt", MODELS.alt, () =>
     anthropic().messages.parse({

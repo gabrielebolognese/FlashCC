@@ -153,6 +153,19 @@ export function splitToFit(text: string, spec: FitSpec, steps = MAX_SHRINK_STEPS
   return [...out, ...queue].filter((p) => p !== "");
 }
 
+/**
+ * One cut, at the sentence (then line, then word) nearest the middle, or null
+ * when there is nowhere to cut. Never rewords.
+ */
+export function splitInTwo(text: string): [string, string] | null {
+  const t = text.trim();
+  const at = bestBreak(t);
+  if (at === null) return null;
+  const head = t.slice(0, at).trim();
+  const tail = t.slice(at).trim();
+  return head && tail ? [head, tail] : null;
+}
+
 /* ── slide-level operations, for the editor ───────────────────────────────── */
 
 /** The layer carrying a slide's copy: the biggest non-empty text layer. */

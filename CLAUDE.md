@@ -261,6 +261,23 @@ Invariants worth keeping:
   median it does show.
 - `13-remix.sql` adds `posts.shape`, required before a Batch 28 client syncs.
 
+## Several languages (Batch 29)
+
+- **The model translates words; layout does the rest** (`translate.ts`). Translated copy goes through
+  `restateMany` with each slide's composition pinned, block words through `rebuildBlock`, and a slide
+  that runs long, or would be set more than `SHRINK_ALLOWANCE` smaller than the original, is split,
+  never shrunk. The report names the slide-count change.
+- **What must not change is masked on the server** (`languages.ts`, shared, imports nothing that
+  reaches `model.ts`): names, handles, links, code, numbers, glossary terms. A new kind of
+  never-translated text gets a mask, not a prompt rule.
+- **The number check flags, never corrects** (`numberDrift`, numeral systems normalised).
+- `/api/translate` is `claude-opus-5-5` with server-side refusal fallbacks
+  (`server-side-fallback-2026-07-01`, `fallbacks: "default"`), Pro, an abuse ceiling, no credits.
+- **A translation is its own deck** (`variantOf` + `language`); editing the original reaches none.
+  Re-translate keeps every slide `editedSince` its `translation` stamp. A translated quote loses
+  `verbatim`, is labelled from `translationLabel`, and keeps `original` for Use the original words.
+- `14-glossary.sql` adds `brands.glossary`; a brand sends the key only once a glossary was edited.
+
 ## Pictures
 
 - **A stock API is not a scrape.** Batch 13 refused to fetch somebody else's page, and that stands:

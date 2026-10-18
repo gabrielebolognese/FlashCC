@@ -4614,7 +4614,7 @@ same-text LinkedIn post left alone, and the five new breakdowns with the floor a
 
 ## Batch 29, One deck, several languages
 
-**Status:** next
+**Status:** done
 **Size:** medium, once Batch 22.5 has made other scripts render.
 **Why here:** PostNitro advertises more than thirteen languages. For a creator or an
 agency working in more than one market, translating a finished carousel today means
@@ -4709,11 +4709,41 @@ and no credits.
 - **No machine-translated testimonials passed off as originals.** A translated
   testimonial is labelled as translated, like a quote.
 
+### Built as
+
+- **Route:** `/api/translate` (`server/translate.ts`), `claude-opus-5-5` through
+  `beta.messages.parse`, server-side refusal fallbacks on (`fallbacks: "default"`), Pro, 30 an hour,
+  no credits. Takes `deck`, plus `fields` (the words inside blocks) and `keep` (the author's and the
+  brand's names) beside `target`, `voice` and `glossary`. Units go as tagged blocks and come back
+  aligned by number.
+- **Masking:** `src/studio/languages.ts`, shared and pure: `mask`/`unmask` with `⟦n⟧` tokens for the
+  honesty blank, code, links, handles, glossary terms, names and numbers; a fixed rendering is
+  restored as the rendering. Twenty target languages, the ones the bundled faces draw.
+- **Checks:** repair (house punctuation while masked, marks capped at the source's), retry
+  (missing, untranslated by script or by identity, placeholder, dropped token, over twice the
+  length), flag (`numberDrift`, numeral systems normalised). One content retry.
+- **29.2:** `applyTranslation` pins each slide's composition (the cycle is seeded from the words),
+  splits a slide that overflows, passes the margin, or would be set more than 12% smaller than the
+  original in the same layout, and never splits the cover unless it truly overflows. "5 slides became
+  6 in German, slide 3 was split." Tested with fixture German, Japanese and Arabic: zero overflow,
+  zero safe-zone findings for Instagram and LinkedIn, every word present; checked in Chromium and
+  exported (one zip, a folder per language, the Arabic PDF drawing Arabic).
+- **Quotes:** translated, labelled under the attribution in the target language, no longer verbatim,
+  the original fields kept on the block record; Use the original words restores them, verbatim again.
+- **29.3:** `Brand.glossary`, edited beside the voice as one term per line, `14-glossary.sql`.
+- **29.5:** each translation a `Doc` with `variantOf` and `language`; slides stamped with
+  `translation`; Re-translate merges a fresh translation and keeps every slide edited since; the
+  Languages dialog lists the set and exports it with a caption and alt text per language, written
+  from that language's slides.
+- **Not done, recorded:** numbers keep the source's separators (D57), a glossary needs its migration
+  before it syncs (D58), Latin-script voice samples are not sent (D59), furniture, chart data and
+  names in prose are not translated (D60).
+
 ---
 
 ## Batch 30, Legibility and accessibility
 
-**Status:** queued
+**Status:** next
 **Size:** small to medium
 **Why here:** the pre-flight from Batch 1.3 checks sizes, strokes, safe zones, file
 size and slide count. It does not check whether the text can actually be **seen**.

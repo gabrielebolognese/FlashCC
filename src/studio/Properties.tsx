@@ -32,7 +32,8 @@ import { useState, type ReactNode } from "react";
 import { IconButton } from "../ui/IconButton.js";
 import { GradientEditor } from "./GradientEditor.js";
 import { averageColour, makeGradient, type Gradient } from "./gradient.js";
-import { brandIdentity, brandIdOf, furnitureLogo, listBrands } from "./brand.js";
+import { brandIdentity, brandIdOf, furnitureLogo, listBrands, themeOf } from "./brand.js";
+import { restoreOriginal } from "./translate.js";
 import { clearFurniture, FURNITURE_SETS, stampFurniture } from "./furniture.js";
 import { logoResolver } from "./library.js";
 import { FORMATS, allFonts, type Layer, type MediaItem, type SlideImage } from "./model.js";
@@ -156,6 +157,27 @@ export function Properties({
                 Verbatim quote. Changing the words removes the mark.
               </p>
             ) : null}
+            {(() => {
+              // A translated quote or testimonial (29.1): labelled on the slide,
+              // no longer verbatim, and its original words one click away.
+              const rec = slide?.blocks?.find((b) => b.instance === stamped.block!.instance);
+              if (!rec?.original) return null;
+              return (
+                <div className="mt-1.5">
+                  <p className="text-caption leading-4 text-muted">
+                    A translation of: &ldquo;{Object.values(rec.original).find((v) => v.trim()) ?? ""}&rdquo;
+                  </p>
+                  <button
+                    type="button"
+                    data-action="use-original"
+                    onClick={() => studio.replaceDoc(restoreOriginal(doc, studio.index, rec.instance, themeOf(doc, listBrands())), undefined, "Original words")}
+                    className="mt-1 flex h-7 w-full items-center justify-center rounded-md border border-hairline text-caption text-secondary hover:border-accent-dim hover:text-accent"
+                  >
+                    Use the original words
+                  </button>
+                </div>
+              );
+            })()}
           </Field>
         ) : null;
       })()}

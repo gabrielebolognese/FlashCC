@@ -22,6 +22,7 @@ import { tally } from "./tally.js";
 import { learnVoice } from "./voice.js";
 import { revise } from "./revise.js";
 import { rewrite } from "./rewrite.js";
+import { translate } from "./translate.js";
 import { draft, draftConfigured, draftStatus, hooks } from "./draft.js";
 import { exportDeck, renderDocument, renderImages } from "./export.js";
 import { closeBrowser } from "./render.js";
@@ -42,6 +43,7 @@ const ROUTES: Record<string, Record<string, Handler>> = {
     "/api/hooks": hooks,
     "/api/rewrite": rewrite,
     "/api/revise": revise,
+    "/api/translate": translate,
     "/api/angles": angles,
     "/api/caption": caption,
     "/api/alt": alt,

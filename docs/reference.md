@@ -18,7 +18,7 @@ is still current.
 | --- | --- |
 | **Orientation** | [1 What it is](#1-what-it-is) · [2 Running it](#2-running-it) · [3 The invariants](#3-the-invariants) |
 | **The canvas** | [4 Data model](#4-the-data-model) · [5 Canvas](#5-the-canvas) · [6 Text](#6-text-measurement-and-fitting) · [6b Type](#6b-type-pairs-ramps-emphasis-effects-scripts) · [7 Colour](#7-colour-and-contrast) · [8 Gradients](#8-gradients) · [9 Format change](#9-changing-format-reflow) · [9b Spans](#9b-designs-across-slides-spans-and-strip-view) · [9c Writing](#9c-writing-outline-mode-typed-slides-find-and-replace-batch-24) |
-| **Making a deck** | [10 Frameworks](#10-the-frameworks) · [10b The sixteen](#10b-the-twelve-added-in-batch-25-and-what-every-framework-now-carries) · [11 Generation](#11-generation) · [11b Blocks and furniture](#11b-blocks-and-deck-furniture) · [12 Styles](#12-styles-and-themes) · [12b Presets](#12b-presets-hooks-calls-to-action-templates-packs-kits-batch-25) · [13 Onboarding](#13-onboarding) · [14 AI drafting](#14-ai-drafting) · [15 Bulk and long form](#15-bulk-create-and-long-form-ingest) · [16 Media, fonts and assets](#16-media-and-fonts) · [16b Imagery](#16b-imagery-icons-and-backgrounds) · [17 Screen flow](#17-screen-flow) |
+| **Making a deck** | [10 Frameworks](#10-the-frameworks) · [10b The sixteen](#10b-the-twelve-added-in-batch-25-and-what-every-framework-now-carries) · [11 Generation](#11-generation) · [11b Blocks and furniture](#11b-blocks-and-deck-furniture) · [12 Styles](#12-styles-and-themes) · [12b Presets](#12b-presets-hooks-calls-to-action-templates-packs-kits-batch-25) · [13 Onboarding](#13-onboarding) · [14 AI drafting](#14-ai-drafting) · [14b Translation](#14b-translation-one-deck-several-languages-batch-29) · [15 Bulk and long form](#15-bulk-create-and-long-form-ingest) · [16 Media, fonts and assets](#16-media-and-fonts) · [16b Imagery](#16b-imagery-icons-and-backgrounds) · [17 Screen flow](#17-screen-flow) |
 | **The product** | [17b Clients and review](#17b-clients-and-review) · [18 Pipeline, calendar and series](#18-the-pipeline) · [19 Analytics](#19-analytics) · [19b History](#19b-version-history) · [20 Library](#20-the-library) · [21 Export](#21-export) |
 | **Infrastructure** | [22 Persistence](#22-persistence) · [23 Sync](#23-sync) · [24 Auth](#24-auth) · [25 Billing](#25-billing) · [26 Database](#26-database) · [27 Design tokens](#27-design-tokens) · [28 Testing](#28-testing) |
 | **Reality check** | [29 Known defects](#29-known-defects) |
@@ -1719,6 +1719,120 @@ see §11, rather than writing new text onto a layer whose box was measured for t
 
 ---
 
+## 14b. Translation: one deck, several languages (Batch 29)
+
+A finished carousel into another language, as its own carousel. The model translates words; the
+layout machinery every other source of words goes through does the rest, and a slide that runs long
+in the new language gets another slide, never smaller type.
+
+### The route (`/api/translate`, `server/translate.ts`)
+
+`{ deck: string[], fields?: string[], target, voice?, glossary?: {term, rendering?}[], keep? }` in,
+`{ slides, fields, findings, retried }` out, positionally. `deck` is each slide's copy
+(`slideCopy`); `fields` are the words inside blocks (below); `keep` is names the client knows (the
+deck's author, the brand). Ceiling: 12,000 characters across every unit (`MAX_TRANSLATE_CHARS`),
+120 units, twenty languages (`LANGUAGES` in `languages.ts`, the ones the bundled faces draw: no
+Hindi, Bengali or Thai until a face does).
+
+- **Model:** `claude-opus-5-5` (`MODELS.translate`), through `beta.messages.parse` with a zod
+  output format, effort `medium`, the system block cached. The person often cannot read the result
+  well enough to check it, so this route gets the most capable model.
+- **Server-side refusal fallbacks are on:** `betas: ["server-side-fallback-2026-07-01"]` with
+  `fallbacks: "default"`. A policy decline on somebody's own copy is retried by the API on its
+  default substitute; only a refusal from the whole chain reaches the person, as a 422.
+- **Pro, the Batch 9 way, with an abuse ceiling of 30 an hour and no credits (29.6).** There is no
+  deterministic half: a dictionary translation would be worse than none, so the screen says so when
+  the server has no key.
+- Units go to the model as `<unit n="3" kind="slide">` blocks, because a slide's copy runs over
+  several lines and a numbered list would be misread. Answers are aligned by `n`, never by position.
+
+### What is never translated: masking (`src/studio/languages.ts`, shared)
+
+Before the call, on the server, `mask` replaces with tokens (`⟦3⟧`): the honesty blank, code spans
+and fences, links and emails and bare domains, @handles and #tags, glossary terms and kept names
+(longest first, whole words where words have edges, anywhere in CJK), and numbers in any numeral
+system. `unmask` restores them after; a fixed glossary rendering is restored **as the rendering**,
+so "Swipe file" is "Ideensammlung" on every German slide. The model is told to copy every token
+once; a prompt asking it not to translate "FlashCC" would be a request, a token it never sees as
+words is a guarantee.
+
+Numbers are restored exactly as the source wrote them, separators included (D57).
+
+### The checks (Batch 15 tiers)
+
+| Tier | Check |
+| --- | --- |
+| Repair | house punctuation (`repair`, run while the masks still stand, so a link or code is restored byte for byte), no more emphasis marks than the source unit had, every mask restored |
+| Retry | a unit missing; left in the source language (`untranslated`: a non-Latin target with none of its script, or a Latin target word for word the same); a placeholder the source did not have; a masked term, name, link or number dropped; a unit over `ceilingOf` (twice the source, at least source + 80) |
+| Flag | **a number that differs from the source** (`numberDrift`): digits compared after normalising Arabic-Indic, Persian, full-width and Devanagari and dropping separators, so "1,200", "1.200" and "١٬٢٠٠" agree |
+
+At most one content retry (`withContentRetry`), the better answer kept. Retry findings that survive
+it are returned as flags. Flags are never corrected: the dialog lists them by slide.
+
+### Laying it out (`src/studio/translate.ts`, 29.2)
+
+`applyTranslation(source, translated, { target, theme, id })`:
+
+1. **Block words first.** `WORD_FIELDS` names the fields of each block a reader reads as words
+   (a checklist's items with their `x ` crosses kept, a table's and a timeline's cells, an icon
+   grid's labels and never its icon names, a column preset's headings made explicit and the preset
+   set to Custom). Names, figures, links, code and chart data are not words here. Each block is
+   rebuilt with `rebuildBlock`; a part that no longer fits is reported, never shrunk silently.
+2. **Every slide's copy** through `restateMany`, **with each slide's composition pinned**: the cycle
+   is seeded from the words, so new words would otherwise deal the deck different layouts.
+3. **Split, never shrink.** A slide is `crowded` when a copy layer needs more lines than its box,
+   grows past the compositions' 140px vertical margin, or (same composition as the original) is set
+   more than `SHRINK_ALLOWANCE` (12%, two ladder steps) smaller than the original's main copy. It is
+   cut in two at the sentence nearest the middle (`splitInTwo`); the second half takes the first's
+   layout and ground. A slide whose copy layer the person edited is split with `splitSlide`. The
+   cover is split only when it truly overflows: a hook in two halves is no hook.
+4. The report: `reportLine` gives "8 slides became 9 in German, slide 4 was split", or "6 slides in
+   Japanese, the same as the original".
+
+**Done when, as tested** (`translate.test.ts`): an English deck with fixture German, Japanese and
+Arabic translations lays out in all three with zero `text-overflows` and zero `outside-safe-zone`
+findings for Instagram and LinkedIn, every word of each translation present across its pieces, the
+long German slide split (5 became 6), Arabic mirrored, and every unsplit slide in its original
+composition. The same decks were checked in Chromium and exported: one zip, `original/`, `de/`,
+`ja/`, `ar/`, the Arabic PDF drawing Arabic.
+
+### Quotes and testimonials
+
+A quote marked `verbatim` is no longer verbatim once translated. It is translated, its attribution
+labelled in the target language ("Dana Ruiz, founder (Übersetzung)", `translationLabel`, a checked
+table, not a translation), the verbatim mark is gone (the rebuilt words match no verified quote),
+and the block record keeps `original`. Properties shows "A translation of: ..." and **Use the
+original words** (`restoreOriginal`, action `use-original`), which rebuilds the block from the
+original fields and so marks it verbatim again. A testimonial is labelled the same way, on its role.
+
+### A language set (29.5)
+
+Each translation is its own `Doc` with `variantOf` the original's id and `language` its code, named
+"Slide two (Deutsch)", out of the original's series, its slides' English alt text dropped. Each
+slide carries `translation: { source, copy, edited }`, a stamp read only by Re-translate.
+
+- **Editing the original reaches no translation.** Re-translate is the explicit way: a fresh
+  translation of the original merged by `retranslate`. A source slide whose pieces nobody touched
+  takes the fresh pieces; one whose words changed or that gained hand-edited layers since
+  (`editedSince`) is kept exactly; a slide added by hand stays where it was. The dialog says how many
+  were kept.
+- **Languages** (`TranslateDialog.tsx`, the header button, action `translate`) lists the set
+  (`languageSet`: the original, then translations by name), translates into a language not yet in
+  it, re-translates one, opens one, and **exports the set**: one zip, a folder per language
+  (`languageZip`, `languageFolder`), each with its own files and, when asked and the server can,
+  its own `caption.txt` and `alt.txt`. Captions and alt text are written from that language's own
+  slides by `/api/caption` and `/api/alt` with a `language` line, never translated from the
+  original's, and the alt text is kept on the slides.
+
+### The brand glossary (29.3)
+
+`Brand.glossary: { term, renderings? }[]`, edited beside the voice in Brands as one term per line
+(`FlashCC`, `Swipe file | de: Ideensammlung | fr: fichier d'idées`, `parseGlossary`/`glossaryText`),
+tidied when the field is left. `glossaryFor(entries, target)` gives a call its terms and that
+language's renderings. Stored in `brands.glossary` (`14-glossary.sql`); a brand that never had a
+glossary sends no key, so it syncs before the migration (D58). The voice goes with the call as tone
+and banned words, plus samples only when they are in the target's script (`voiceFor`, D59).
+
 ## 15. Bulk create, and long-form ingest
 
 ### The run (`run.ts`, `BulkRun.tsx`)
@@ -3279,7 +3393,7 @@ all disabled under `prefers-reduced-motion`.
 
 ## 28. Testing
 
-1,934 tests across 95 files (as of Batch 28). They are design guards, not coverage theatre, several encode an argument
+1,990 tests across 98 files (as of Batch 29). They are design guards, not coverage theatre, several encode an argument
 that would otherwise be lost:
 
 - **mean vs median**, five posts and one at 100k, proving a mean baseline would switch outlier
@@ -3720,6 +3834,31 @@ not. Video is whatever the person ticked.
 ### D56, A Batch 28 client needs 13-remix.sql before it syncs
 
 Every post sync writes `shape`; a database without the column refuses the upsert.
+
+### D57, Numbers keep the source's separators
+
+Numbers are masked and restored exactly as written, so "61,000" stays "61,000" in a German deck,
+where a reader expects "61.000", and "3.5" stays "3.5" where French writes "3,5". Localising them
+would mean knowing which convention the source used, which "1,200" alone does not say. The number
+check compares digits only, so it neither causes nor catches this.
+
+### D58, A glossary needs 14-glossary.sql before it syncs
+
+A brand sends `glossary` once somebody has typed a term (an empty list after clearing one). A
+database without the column refuses that brand's upsert until the migration runs.
+
+### D59, A brand's voice samples rarely reach a translation
+
+Samples go with a translation only when they are written in the target's script. For a Latin target
+(German, Spanish, ...) English samples cannot be told apart from German ones by their letters, so
+none are sent and only the tone and banned words carry over. The roadmap asked for "samples in the
+target language when the brand has them"; there is nowhere yet to store samples per language.
+
+### D60, Furniture, chart data and names in prose are not translated
+
+Furniture pieces (author chip, counter, footer) are left as stamped. A chart's labels and a stat's
+source are not sent. A person's name inside a sentence is protected only by the prompt's rule unless
+it is the deck's author, the brand, or in the glossary.
 
 ### D20, Smaller things
 
