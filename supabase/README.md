@@ -128,6 +128,7 @@ it should stay deleted. That second half is the one that catches real bugs.
 | `12-planning.sql` | Now, before a Batch 27 client syncs. `source` and `lane_id` on `posts`, and the `lanes` table. |
 | `13-remix.sql` | Now, before a Batch 28 client syncs. One `jsonb` column on `posts`: the structural snapshot attribution groups by. |
 | `14-glossary.sql` | Before anybody types a glossary term (Batch 29). One `jsonb` column on `brands`: terms a translation never touches, and fixed renderings per language. |
+| `15-integrations.sql` | Before anybody connects Publer, adds a webhook or makes an API key (Batch 31). Three server-only tables (RLS on, no policies): `webhooks`, `api_keys` (SHA-256 only), `scheduler_connections` (sealed). Nothing in them counts usage. |
 
 Run `npm run check:schema` at any point: it probes the live project with the
 publishable key and names every migration that has not been applied.

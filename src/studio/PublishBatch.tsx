@@ -14,7 +14,7 @@
  * numbers on it.
  */
 import { Check, Table, X } from "lucide-react";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 
 import { Chip } from "./Dash.js";
 import { loadDoc } from "./storage.js";
@@ -24,19 +24,29 @@ import { PLATFORMS, platformForSize, type Platform } from "./platforms.js";
 import { downloadText, publishDecks, type BatchProgress } from "./publish.js";
 import { buildSheet, isSchedulable, SCHEDULERS, type Scheduler } from "./schedulers.js";
 import { hasCloudSession, sessionUserId } from "./session.js";
+import { readConnections, reportEvent, sendPublerDrafts, type PublerConnection } from "./integrations.js";
 
 type Phase =
   | { at: "idle" }
   | { at: "working"; progress: BatchProgress }
-  | { at: "done"; rows: number; slides: number; filename: string; problems: string[] }
+  | { at: "done"; rows: number; slides: number; filename: string; problems: string[]; drafts?: number | undefined }
   | { at: "failed"; error: string };
 
 export function PublishBatch({ ids, onClose }: { ids: readonly string[]; onClose: () => void }) {
   const [scheduler, setScheduler] = useState<Scheduler>(() => SCHEDULERS[0]!);
   const [platform, setPlatform] = useState<Platform>(() => PLATFORMS[0]!);
   const [phase, setPhase] = useState<Phase>({ at: "idle" });
+  /** Where the carousels go (31.1): a CSV for any scheduler, or drafts straight into a connected Publer. */
+  const [publer, setPubler] = useState<PublerConnection | null>(null);
+  const [target, setTarget] = useState<"csv" | "publer">("csv");
 
   const canPublish = hasCloudSession();
+  useEffect(() => {
+    if (!canPublish) return;
+    readConnections()
+      .then((c) => setPubler(c.publer))
+      .catch(() => setPubler(null));
+  }, [canPublish]);
 
   const run = async () => {
     const userId = sessionUserId();
@@ -69,6 +79,32 @@ export function PublishBatch({ ids, onClose }: { ids: readonly string[]; onClose
       setPhase({
         at: "failed",
         error: result.failures[0]?.error ?? "Nothing could be published.",
+      });
+      return;
+    }
+
+    // The owner's webhooks (31.2): which carousel, and where its slides are.
+    for (const c of result.published) reportEvent("carousel.published", { docId: c.id, platform: c.platform, urls: c.urls });
+
+    if (target === "publer") {
+      // One draft per carousel; one that fails is named and the rest are sent (the Batch 4.4 rule).
+      let sent: Awaited<ReturnType<typeof sendPublerDrafts>>["results"] = [];
+      try {
+        sent = (await sendPublerDrafts(result.published)).results;
+      } catch (e) {
+        setPhase({ at: "failed", error: e instanceof Error ? e.message : "Publer could not be reached." });
+        return;
+      }
+      setPhase({
+        at: "done",
+        rows: result.published.length,
+        slides: result.published.reduce((n, c) => n + c.urls.length, 0),
+        filename: "",
+        drafts: sent.filter((r) => r.ok).length,
+        problems: [
+          ...sent.flatMap((r) => (r.ok ? [] : [`"${r.name}" was not sent to Publer: ${r.error}`])),
+          ...result.failures.map((f) => `"${f.name}" could not be published: ${f.error}`),
+        ],
       });
       return;
     }
@@ -133,7 +169,33 @@ export function PublishBatch({ ids, onClose }: { ids: readonly string[]; onClose
             ))}
           </div>
 
-          <div className="mt-5">
+          {publer ? (
+            <div className="mt-5">
+              <span className="text-overline uppercase text-tertiary">Where it goes</span>
+              <div className="mt-2 grid grid-cols-2 gap-2">
+                {(["csv", "publer"] as const).map((t) => (
+                  <button
+                    key={t}
+                    type="button"
+                    onClick={() => setTarget(t)}
+                    className={[
+                      "rounded-2xl border p-2.5 text-left",
+                      t === target ? "border-accent-dim bg-accent-wash" : "border-hairline bg-surface-1 hover:border-surface-5",
+                    ].join(" ")}
+                  >
+                    <div className="text-body-strong text-primary">{t === "csv" ? "A CSV to import" : "Drafts in Publer"}</div>
+                    <div className="mt-1 text-caption leading-4 text-muted">
+                      {t === "csv"
+                        ? "Any of the three schedulers, imported by you."
+                        : `One draft per carousel on its date, on your connected ${publer.accounts.length} account${publer.accounts.length === 1 ? "" : "s"}. Nothing is published.`}
+                    </div>
+                  </button>
+                ))}
+              </div>
+            </div>
+          ) : null}
+
+          <div className={target === "publer" ? "hidden" : "mt-5"}>
             <span className="text-overline uppercase text-tertiary">Sheet for</span>
             <div className="mt-2 grid grid-cols-3 gap-2">
               {SCHEDULERS.map((s) => (
@@ -183,8 +245,10 @@ export function PublishBatch({ ids, onClose }: { ids: readonly string[]; onClose
             <div className="mt-4 rounded-2xl border border-hairline bg-surface-1 px-3.5 py-3">
               <div className="flex items-center gap-2">
                 <Check size={14} strokeWidth={2.4} className="shrink-0 text-success" />
-                <span className="text-body text-primary">
-                  {phase.rows} rows, {phase.slides} slides hosted. {phase.filename} saved.
+                <span className="text-body text-primary" data-testid="publish-done">
+                  {phase.drafts !== undefined
+                    ? `${phase.drafts} of ${phase.rows} sent to Publer as drafts, ${phase.slides} slides hosted. Nothing was published.`
+                    : `${phase.rows} rows, ${phase.slides} slides hosted. ${phase.filename} saved.`}
                 </span>
               </div>
               {phase.problems.map((p) => (
@@ -205,7 +269,9 @@ export function PublishBatch({ ids, onClose }: { ids: readonly string[]; onClose
         <footer className="flex h-16 shrink-0 items-center gap-2 border-t border-hairline px-5">
           <span className="flex-1 text-caption text-muted">
             {canPublish
-              ? "Import the CSV with no edits. The URLs are already in it."
+              ? target === "publer"
+                ? "Publer stays the thing that publishes. Check the drafts there."
+                : "Import the CSV with no edits. The URLs are already in it."
               : "Publishing needs an account."}
           </span>
           <button

@@ -24,6 +24,7 @@
  * than it sounds: the thing people distrust is a model choosing their material,
  * and a heading is a choice the author already made.
  */
+import { sourceFromText } from "./fileimport.js";
 import {
   AlertTriangle,
   ArrowLeft,
@@ -67,16 +68,19 @@ anybody noticing why.
 Do it too often and it reads as a nervous tic. Twice an answer is plenty.`;
 
 export function Repurpose({
+  initialSource,
   onHome,
   onOpen,
   onBrief,
 }: {
+  /** Words selected in the browser and sent by the extension (31.4). */
+  initialSource?: string | undefined;
   onHome: () => void;
   onOpen: (doc: Doc) => void;
   /** An angle chosen from a distilled source, on its way to the framework picker. */
   onBrief: (brief: string, quotes: string[]) => void;
 }) {
-  const [source, setSource] = useState("");
+  const [source, setSource] = useState(initialSource ?? "");
   /**
    * Which of the two readings is running.
    *
@@ -324,6 +328,31 @@ export function Repurpose({
                 <span className="text-overline uppercase text-tertiary">What you wrote</span>
                 {source ? <Chip>{shapeLabel(read.shape)}</Chip> : null}
                 <div className="flex-1" />
+                {/* The same as dropping one on the box (31.5), for whoever does not drag. */}
+                <label className="cursor-pointer text-caption text-tertiary hover:text-accent">
+                  Open a file
+                  <input
+                    type="file"
+                    accept={SOURCE_TYPES}
+                    aria-label="Open a text file"
+                    className="hidden"
+                    onChange={(e) => {
+                      const file = e.target.files?.[0];
+                      e.target.value = "";
+                      if (!file) return;
+                      if (!isReadableFile(file.name)) {
+                        setDropError(`${file.name} is not a text file. Accepted: ${SOURCE_TYPES}`);
+                        return;
+                      }
+                      setDropError(null);
+                      void file.text().then((text) => {
+                        setSource(sourceFromText(text));
+                        setPicked(new Set());
+                        setRead2({ at: "idle" });
+                      });
+                    }}
+                  />
+                </label>
                 {source ? null : (
                   <button
                     type="button"

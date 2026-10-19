@@ -97,10 +97,24 @@ export async function draft(req: IncomingMessage, res: ServerResponse): Promise<
   if (!body?.brief?.trim()) throw new HttpError(400, "Brief is empty");
   if (!body.structure?.slots?.length) throw new HttpError(400, "No framework given");
 
+  json(res, 200, await draftWords(body.brief, body.structure, body.voice));
+}
+
+/**
+ * The words for one carousel: the prompt, the model, the checks and the one
+ * content retry. Shared by the route and by an API run (31.3), so both draft
+ * the same way.
+ */
+export async function draftWords(
+  brief: string,
+  structure: Structure,
+  voice?: Voice | undefined,
+): Promise<{ slides: { role: string; text: string; fields?: string[] }[]; findings: ReturnType<typeof flagged> }> {
+  const body = { brief, structure };
   const { system, user } = assembleDraft({
     brief: body.brief,
     structure: body.structure,
-    ...(body.voice ? { voice: body.voice } : {}),
+    ...(voice ? { voice } : {}),
   });
 
   const slots = body.structure.slots;
@@ -169,7 +183,7 @@ export async function draft(req: IncomingMessage, res: ServerResponse): Promise<
    * longer empty is noise. A flag is the one thing the server could not settle,
    * and the person reading it knows things the brief does not contain.
    */
-  json(res, 200, { slides: out.slides, findings: flagged(findings) });
+  return { slides: out.slides, findings: flagged(findings) };
 }
 
 /** The longest a block field may be. A big number's label is a few words. */

@@ -13,6 +13,7 @@ import {
   CalendarDays,
   Flame,
   Images,
+  Plug,
   CalendarRange,
   CheckCircle2,
   KanbanSquare,
@@ -69,6 +70,7 @@ import { WeekSession } from "./WeekSession.js";
 import { RemixDialog } from "./RemixDialog.js";
 import { RepostDialog } from "./RepostDialog.js";
 import { Revisit } from "./Revisit.js";
+import { IntegrationSettings } from "./IntegrationSettings.js";
 import { PostSheet } from "./PostSheet.js";
 import type { THEMES } from "./presets.js";
 import { Projects } from "./Projects.js";
@@ -94,7 +96,8 @@ type View =
   | "posted"
   | "analytics"
   | "outliers"
-  | "revisit";
+  | "revisit"
+  | "integrations";
 
 type NavItem = {
   id: View;
@@ -111,6 +114,7 @@ const NAV: { section: string; items: NavItem[] }[] = [
       { id: "clients", label: "Clients", icon: Building2, count: () => listClients().length },
       { id: "brands", label: "Brands", icon: Palette, count: () => listBrands().length },
       { id: "library", label: "Library", icon: Images, count: () => listAssets().length },
+      { id: "integrations", label: "Integrations", icon: Plug },
     ],
   },
   {
@@ -185,6 +189,7 @@ const TITLES: Record<View, { title: string; sub: string }> = {
   analytics: { title: "Analytics", sub: "What happened, grouped by how it was built." },
   outliers: { title: "Outliers", sub: "What beat your own average, and what those posts had in common." },
   revisit: { title: "Revisit", sub: "What already worked: worth posting again, and posted in one place only." },
+  integrations: { title: "Integrations", sub: "Drafts into your scheduler, webhooks for everything else, and API keys." },
 };
 
 export function Home({
@@ -460,6 +465,8 @@ export function Home({
             {view === "brands" ? <Brands plan={account.profile?.plan} /> : null}
 
             {view === "library" ? <AssetLibrary /> : null}
+
+            {view === "integrations" ? <IntegrationSettings /> : null}
 
             {view === "board" ? (
               <Board posts={visiblePosts} onChange={commit} onOpen={setEditing} />

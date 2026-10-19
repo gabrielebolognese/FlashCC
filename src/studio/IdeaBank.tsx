@@ -5,6 +5,7 @@
  * Never filled by a model. The empty state says how to put one in, which is
  * the Q key on any screen.
  */
+import { ImportIdeas } from "./ImportIdeas.js";
 import { Lightbulb, Trash2 } from "lucide-react";
 import { useMemo, useState } from "react";
 
@@ -31,6 +32,7 @@ export function IdeaBank({
   const [pillar, setPillar] = useState("");
   const [line, setLine] = useState("");
   const [open, setOpen] = useState<string | null>(null);
+  const [importing, setImporting] = useState(false);
   const bank = useMemo(() => ideasOf(posts), [posts]);
   const pillars = useMemo(() => pillarsOf(bank, lanes), [bank, lanes]);
   const shown = filterIdeas(bank, { pillar, client });
@@ -61,7 +63,22 @@ export function IdeaBank({
           placeholder="An idea, one line. Q does this from any screen."
           className="h-10 min-w-0 flex-1 bg-transparent text-body text-primary outline-none placeholder:text-muted"
         />
+        <button
+          type="button"
+          onClick={() => setImporting(true)}
+          className="flex h-7 shrink-0 items-center rounded-md border border-hairline px-2.5 text-caption text-secondary hover:border-accent-dim hover:text-accent"
+        >
+          Import a CSV
+        </button>
       </div>
+      {importing ? (
+        <ImportIdeas
+          pillars={pillars}
+          clients={clients}
+          onImport={(made) => onUpdate((all) => [...made, ...all])}
+          onClose={() => setImporting(false)}
+        />
+      ) : null}
 
       <div className="mb-4 flex flex-wrap items-center gap-1.5" data-testid="pillar-filter">
         {[{ id: "", label: `All ${bank.length}` }, ...pillars.map((p) => ({ id: p, label: p })), { id: NO_PILLAR, label: "No pillar" }].map((f) => (

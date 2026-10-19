@@ -51,6 +51,9 @@ const EXPECTED = [
   { migration: "07-review.sql", table: "comments" },
   { migration: "08-pipeline-fields.sql", table: "posts", column: "pillar" },
   { migration: "08-pipeline-fields.sql", table: "profiles", column: "plan_ends_at_period_end" },
+  { migration: "15-integrations.sql", table: "webhooks" },
+  { migration: "15-integrations.sql", table: "api_keys" },
+  { migration: "15-integrations.sql", table: "scheduler_connections" },
 ];
 
 const probe = async (table, column) => {

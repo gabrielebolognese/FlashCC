@@ -14,7 +14,7 @@ import { useEffect, useState } from "react";
 
 import { actionForKey } from "./actions.js";
 import { ALL_CLIENTS, UNASSIGNED, clientById, listClients, loadSelectedClient } from "./clients.js";
-import { captureIdea, onCapture, pillarsOf } from "./ideas.js";
+import { captureIdea, onCapture, pillarsOf, type IdeaSource } from "./ideas.js";
 import { listLanes } from "./lanes.js";
 import { listPosts } from "./pipeline.js";
 
@@ -23,8 +23,22 @@ export function IdeaCapture() {
   const [line, setLine] = useState("");
   const [pillar, setPillar] = useState("");
   const [saved, setSaved] = useState<string | null>(null);
+  /** The rest of a selection sent from the extension, kept as the idea's notes. */
+  const [notes, setNotes] = useState("");
+  const [source, setSource] = useState<IdeaSource>("capture");
 
-  useEffect(() => onCapture(() => setOpen(true)), []);
+  useEffect(
+    () =>
+      onCapture((prefill) => {
+        if (prefill) {
+          setLine(prefill.line);
+          setNotes(prefill.notes);
+          setSource(prefill.source);
+        }
+        setOpen(true);
+      }),
+    [],
+  );
 
   // The shortcut off the editor. The studio's own handler runs first (a child's
   // effect is registered before its parent's) and marks the event handled, so
@@ -57,10 +71,12 @@ export function IdeaCapture() {
     setOpen(false);
     setLine("");
     setPillar("");
+    setNotes("");
+    setSource("capture");
   };
 
   const save = () => {
-    const idea = captureIdea(line, { pillar, clientId, source: "capture" });
+    const idea = captureIdea(line, { pillar, clientId, source, ...(notes ? { notes } : {}) });
     if (!idea) return;
     setSaved(idea.title);
     close();
@@ -97,6 +113,11 @@ export function IdeaCapture() {
                 className="h-8 min-w-0 flex-1 bg-transparent text-body text-primary outline-none placeholder:text-muted"
               />
             </div>
+            {notes ? (
+              <p className="mt-2 line-clamp-3 text-caption leading-4 text-muted" data-testid="capture-notes">
+                From your selection, kept as notes: {notes}
+              </p>
+            ) : null}
             <div className="mt-3 flex flex-wrap items-center gap-1.5">
               {pillars.map((p) => (
                 <button

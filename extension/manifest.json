@@ -1,0 +1,10 @@
+{
+  "manifest_version": 3,
+  "name": "Send to FlashCC",
+  "version": "1.0.0",
+  "description": "Send the words you select to FlashCC, as an idea or as a source to distil. Only what you select, and only when you choose.",
+  "permissions": ["contextMenus", "storage"],
+  "background": { "service_worker": "background.js", "type": "module" },
+  "options_page": "options.html",
+  "action": { "default_title": "FlashCC: select words, then right-click" }
+}

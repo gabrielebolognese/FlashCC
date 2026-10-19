@@ -111,7 +111,38 @@ export class HttpError extends Error {
   constructor(
     readonly status: number,
     message: string,
+    /** Sent with the error: a 429's `Retry-After` and reset time (31.3). */
+    readonly headers?: Record<string, string> | undefined,
   ) {
     super(message);
   }
+}
+
+/**
+ * The same fixed window as `rateLimit`, for a caller who is owed the numbers:
+ * an API key over its ceiling gets a 429 that says when it resets, never a
+ * bill (31.3). Headers on every answer, the way every public API does it.
+ */
+export function limitWithReset(key: string, max: number, windowMs: number, now = Date.now()): Record<string, string> {
+  let hit = windows.get(key);
+  if (!hit || hit.until < now) {
+    hit = { n: 0, until: now + windowMs };
+    windows.set(key, hit);
+    sweep(now);
+  }
+  hit.n += 1;
+  const reset = Math.ceil(hit.until / 1000);
+  const headers = {
+    "x-ratelimit-limit": String(max),
+    "x-ratelimit-remaining": String(Math.max(0, max - hit.n)),
+    "x-ratelimit-reset": String(reset),
+  };
+  if (hit.n > max) {
+    const wait = Math.max(1, Math.ceil((hit.until - now) / 1000));
+    throw new HttpError(429, `Over this key's ceiling of ${max} until ${new Date(hit.until).toISOString()}. A need beyond it is a conversation, not an invoice.`, {
+      ...headers,
+      "retry-after": String(wait),
+    });
+  }
+  return headers;
 }

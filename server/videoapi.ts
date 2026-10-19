@@ -24,6 +24,7 @@ import type { IncomingMessage, ServerResponse } from "node:http";
 import { join } from "node:path";
 
 import { bearer, callerKey, HttpError, json, rateLimit, readJson } from "./http.js";
+import { emit } from "./webhooks.js";
 import { MAX_ACTIVE_PER_OWNER, MAX_PER_HOUR, VideoQueue, view, type Job } from "./jobs.js";
 import { hasSecretKey, requireCaller, requirePro, serviceClient } from "./supabase.js";
 import { ffmpegAvailable, isAnimated, renderVideo, validateVideo, type VideoRequest } from "./video.js";
@@ -60,7 +61,10 @@ export const queue = new VideoQueue(
     // To a partial name first: a render killed mid-file never looks finished.
     await renderVideo(payload as VideoRequest, `${file}.part`, (done, total) => progress(done / total));
     await rename(`${file}.part`, file);
-    return { url: (await host(job, file)) ?? `/api/video/file?id=${job.id}&token=${job.token}` };
+    const hosted = await host(job, file);
+    // The owner's webhooks (31.2), for a signed-in owner: the hosted URL, never a token-bearing one.
+    if (job.signedIn) void emit(job.owner, "export.ready", { jobId: job.id, ...(job.docId ? { docId: job.docId } : {}), ...(hosted ? { url: hosted } : {}) });
+    return { url: hosted ?? `/api/video/file?id=${job.id}&token=${job.token}` };
   },
   VIDEO_WORKERS,
 );

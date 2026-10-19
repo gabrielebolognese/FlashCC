@@ -3124,6 +3124,136 @@ word per two characters. Over 40 at 4:5, 3:4 and 1:1, over 30 at 9:16 (`wordCeil
   nothing rising or sliding, a count-up shown at its number, a highlight simply there; `transitionOf`
   turns a push or a zoom into a fade.
 
+## 21c. Integrations and the public API (Batch 31)
+
+The CSV (Batch 5.5) was the right first step and still a manual one. This batch removes the remaining
+copy and paste, and opens the pipeline to people who build their own. The screen is **Integrations**
+(Home rail, Library section, `IntegrationSettings.tsx`, client wrappers in `integrations.ts`); it needs an
+account, because every connection, webhook and key belongs to one. Server state lives in three
+server-only tables (`supabase/15-integrations.sql`, RLS on and no policies) behind `server/store.ts`
+(`IntegrationStore`: `supabaseStore()` in production, `memoryStore()` in tests). **Nothing in any of it
+counts usage** (invariant 7).
+
+### Secrets (`server/secrets.ts`)
+
+- Every secret is shown **once**, in the answer that made it, and kept only on the server.
+- API keys are `fcc_` plus 32 random bytes (base64url), stored as their **SHA-256** and a 12-character
+  prefix for the list. A webhook's signing secret is `whsec_...`.
+- A scheduler's own API key is **sealed** with AES-256-GCM under `CONNECTIONS_KEY` (64 hex characters or
+  32 base64 bytes, read when called). Without it, connecting is refused with a 503.
+- `signature(secret, body, t)` is `t=<unix>,v1=<hex HMAC-SHA256 of "t.body">`; `verifySignature` (five
+  minutes' tolerance, constant-time compare) is the receiver's half, the same code `docs/api.md` prints.
+
+### Drafts in a scheduler (31.1, `server/publer.ts`)
+
+- **Verified first, as the roadmap required.** Publer's API reference and quickstart were read on
+  2026-10-19 (`PUBLER.verified`, `sources`); no live call, no account (D66). `Authorization: Bearer-API
+  <key>` plus `Publer-Workspace-Id`; media by `POST /media/from-url`, then `POST /posts/schedule` with
+  `bulk.state: "draft"`; both answer with a job polled at `/job_status/{id}` (`waitForJob` accepts
+  "complete" and "completed", because the docs use both). API keys are on Publer's Business and
+  Enterprise plans.
+- **Metricool was checked and is not integrated**: its scheduler API documents a `draft` flag but one
+  media object per post, so it cannot hold a carousel. It stays on the CSV path, with every other tool.
+- **Drafts, never published posts.** `connectPubler` (Pro) validates the key by reading its workspaces
+  and accounts, then seals and stores it. `publerDrafts` (Pro, 20 sends an hour as an abuse limit) takes
+  the carousels Publish already hosted, `sendDrafts` sends them **one at a time, each its own upload and
+  its own draft** (the Batch 4.4 rule): a failure names its carousel and the rest still go. Each draft is
+  dated from the post's own date (16.6, 27.3) when it has one, undated otherwise (dated in Publer), at
+  most 10 images (`MAX_IMAGES`).
+- In the app: **Publish for scheduling** (`PublishBatch.tsx`) gains "Where it goes": the CSV, or
+  "Drafts in Publer" once connected. The summary names each carousel that failed and why.
+
+### Webhooks (31.2, `server/webhooks.ts`)
+
+- Events: `carousel.published`, `run.progress`, `run.finished`, `review.approved`,
+  `review.changes_requested`, `export.ready`, plus `ping`. Emitted by `review.ts` (`decide`),
+  `videoapi.ts` (a signed-in job), `v1.ts` (runs) and by the client through `/api/events`, which takes
+  only `carousel.published` and `run.finished`.
+- **Ids and URLs, never document contents**: `sanitise` keeps ids, https URLs, numbers, booleans and ISO
+  dates and drops everything else, whoever emitted it.
+- **Durable outbox**: `Outbox` writes `outbox.json` (`WEBHOOK_DIR`, default `.data/webhooks`, `.part`
+  then rename) before acting, ticks every 30s and on start. Retries after 1m, 5m, 30m, 2h and 12h
+  (`BACKOFF`, six attempts, about fifteen hours), then `failed`, shown in the screen's delivery list.
+- **SSRF guard**: `checkHookUrl` takes https only, no credentials, no localhost or private address;
+  `isPrivateAddress` is checked again on the DNS answer at **every** delivery, `redirect: "manual"`, a
+  10s timeout. Up to 10 webhooks an account (`MAX_HOOKS`); adding one needs Pro.
+
+### The public API (31.3, `server/v1.ts`, `docs/api.md`)
+
+- **Keys on Agency** (`requireAgency`, 402 otherwise), up to 10 live. `authKey` takes the bearer, looks
+  the hash up, refuses a revoked key, checks the plan, stamps `last_used_at` and logs
+  `[v1] <route> key=<prefix> user=<id>`: **every request is attributed to a key.**
+- **Ceilings, not a meter**: `limitWithReset` per key and endpoint, per hour: 600 decks, 120 renders, 10
+  runs of up to 50 ideas (`CEILINGS`). Every answer carries `x-ratelimit-*`; over one, a **429** with
+  `retry-after` and "A need beyond it is a conversation, not an invoice." No call is priced.
+- **The layout runs in the app's own code.** `compositions.ts` and the type metrics are Vite modules
+  (`import.meta.glob`), so the server cannot import them. `server/engine.ts` keeps one headless page at
+  `${APP_ORIGIN}/engine.html` (`src/engine.ts`, built as a second Vite entry) and calls
+  `window.__fccEngine` on it, one call at a time; the page may load only from that origin and data: or
+  blob: URLs. An input error comes back as a 400, an unreachable engine as a 503 (D68).
+- `GET /v1/decks`: the catalogue (frameworks with ranges, looks including `pack:` ids, platforms).
+  `POST /v1/decks` (`apideck.ts`): one string per slide, or long-form text split by distil's own reader
+  (`readLongForm`, `toSlides`), into a framework and a look, reflowed and fitted to the platform's safe
+  area. Deterministic; no key involved. **This is the splitter** the Contentdrips audit found missing.
+- `POST /v1/render`: a document in, the platform's file out (`renderPdf` for LinkedIn, a zip of `NN.png`
+  or `.jpg` otherwise), through the engine's `payload` (`renderPayload`, so `slideHtml`, so LayerView).
+  Pictures must be data URLs: the server fetches nothing on a document's say-so (`remoteSources`).
+- `POST /v1/runs`: 202 with a poll URL; `executeRun` makes each idea (`draft: true` drafts the words with
+  `draftWords`, extracted from `/api/draft`, then lays them out in the engine; otherwise the framework's
+  scaffold around the idea), emits `run.progress` per carousel and `run.finished`, and writes the run to
+  disk (`RUN_DIR`). `recoverRuns` marks a run cut off by a restart failed with what it finished (D71).
+  `GET /v1/runs?id=` answers only the key's own account.
+
+### Only what the user selects (31.4, `extension/`)
+
+A Manifest V3 extension with two permissions, `contextMenus` and `storage`, and **no host permissions**:
+it cannot read a page. The selection's context menu offers "Send to FlashCC as an idea" or "as a
+source to distil"; `background.js` opens `${origin}/app#send=idea|distil&text=...`. The words travel in
+the URL **fragment**, which no server receives. `readHandoff` (`fileimport.ts`) reads it once at load,
+caps it (2,000 for an idea, 40,000 for distil) and `App` clears the hash, so a reload captures nothing
+twice. An idea opens the capture dialog prefilled (`openCapture`, first line the idea, the rest notes,
+source "extension"); a source opens distil with the words in place. A hand-off skips the first-run
+welcome. Nothing is fetched by FlashCC's server, which is why this is consistent with Batch 13.
+
+### Imports (31.5, `fileimport.ts`)
+
+- **Ideas from a CSV** (`ImportIdeas.tsx`, "Import a CSV" on the idea bank): columns are mapped by header
+  aliases and **shown, editable, before anything is written** (the 28.4 rule). Pillars and clients only
+  match ones that exist; anything else is named and left off, never created (27.1). Empty rows are
+  counted and skipped; 500 ideas at most; each is an idea post with source `import`.
+- **A Markdown or text file** (2 MB at most): into distil as it is (`sourceFromText`), or into outline mode
+  as an outline (`outlineFromText`: any heading starts a slide, list items and paragraphs are its body,
+  front matter and HTML comments dropped; a file with no headings gives each paragraph a slide). Outline's
+  "Open a file" goes through the outline's own apply, so it is one Undo.
+
+### Editable exports (31.6, `editable.ts`, `pptx.ts`, `svgdeck.ts`, `editablerender.ts`)
+
+- **The plan comes first.** `editablePlan(doc, target)` decides, per layer, what the target can hold
+  exactly: text with bold, italic and accent runs in a flat colour, solid rects (rounded), ellipses and
+  triangles, plain pictures, and (SVG only) paths. Everything else is **flattened**, with its reason:
+  a span, a shadow, a gradient, a text effect, highlight marks, a colour that is not flat, an icon, a
+  path in PowerPoint, a picture with a mask, filter or rounded corners, and any background that is not
+  one colour. The export dialog's "For another tool" (`EditableFiles.tsx`) lists them **by slide, before
+  the file is written**, with the faces to install (`fontName`: the system stacks as one installed face
+  each, bundled faces by their own name).
+- **A flattened piece is the real painter's pixels.** `/api/flatten` (`server/flatten.ts`, free, 10 a
+  minute per address) renders each piece as a slide holding only that layer on nothing (`layerAlone`) or
+  only the background (`backgroundAlone`), serialised by `slideHtml`, and screenshots its painted area
+  (`paintedArea`: rotated box, shadow or glyph overhang, clipped to the board) with a transparent ground.
+  The page may fetch nothing: every request is aborted. So invariant 3 holds: the .pptx's gradient
+  headline is LayerView's.
+- **PowerPoint** (`writePptx`): one master, one blank layout, a theme, a slide per slide at the deck's
+  size (9525 EMU a pixel). Text boxes have **one paragraph per line as FlashCC wrapped it**
+  (`textLines`, through `layerMeasure`), exact line spacing, letter spacing, caps, underline and
+  right-to-left, zero insets, and 6% more width on the side the text does not align to, so a hair of
+  difference in the receiving face does not wrap a word. Shapes are preset geometry with the CSS border
+  moved onto the edge. Pictures are cropped by `srcRect` exactly where `object-fit` and the focal point
+  crop them (`pictureFit`, from the natural size read in the browser); SVG and WebP pictures are drawn to
+  PNG first. Checked with python-pptx and a LibreOffice render.
+- **SVG per slide** (`writeSvgs`, a zip of `NN.svg`): `<text>` with a `<tspan>` per line on the middle of
+  its line box, shapes and paths as vectors, pictures embedded and cropped in a nested viewport,
+  flattened pieces as PNG images; every element carries the layer's name as `data-name`.
+
 ## 22. Persistence
 
 | Key | Holds |
@@ -3472,7 +3602,7 @@ all disabled under `prefers-reduced-motion`.
 
 ## 28. Testing
 
-2,029 tests across 103 files (as of Batch 30). They are design guards, not coverage theatre, several encode an argument
+2,085 tests across 111 files (as of Batch 31). They are design guards, not coverage theatre, several encode an argument
 that would otherwise be lost:
 
 - **mean vs median**, five posts and one at 100k, proving a mean baseline would switch outlier
@@ -3966,6 +4096,58 @@ are not caught, and neither is a picture whose meaning is in its colours.
 
 Entrances are fades and small, so they are not counted; a photograph's ground is unknown and counted as a
 change at every boundary, the safe assumption.
+
+### D66, Publer is verified from its documentation, not a live call
+
+No Publer account was available, so the dialect was written from the API reference and quickstart
+(2026-10-19) and tested against a fake that answers as the docs say. The least certain part is the body
+of `POST /media/from-url` (`{media: [{url, name}]}`); the docs disagree with themselves on a finished
+job's status and a photo item's type, and both spellings are accepted. The first real send should be
+watched. `npm run check:platforms` does not cover it; `PUBLER.verified` is the date to revisit.
+
+### D67, Every ceiling is per process
+
+The API's per-key ceilings, the Publer send limit and the open render routes' limits live in the
+server's memory (`http.ts`). A deploy resets them and two nodes each hold their own. That is acceptable
+for abuse limits, which is all they are, and wrong for anything that would ever be billed from, which is
+the point (invariant 7).
+
+### D68, The API needs the app served where `APP_ORIGIN` says
+
+`/v1/decks`, `/v1/render` and `/v1/runs` lay out and serialise in the headless engine page. With the app
+not served there, they answer 503. One page serves every key, one call at a time, so a run of fifty
+ideas holds up a deck request behind it.
+
+### D69, An editable file's glyphs are the receiving tool's
+
+Line breaks are FlashCC's, fixed one paragraph a line, but the glyphs are whatever copy of the face the
+other computer has; a bundled face not installed there falls back, and a line may no longer fit its box.
+PowerPoint's exact line spacing places the baseline a little differently from CSS's half-leading, and the
+SVG sets each line on `dominant-baseline: central`, so text can sit a few pixels off. Bold is on or off
+(weights between are rounded to it).
+
+### D70, Every scheduler but Publer stays on the CSV
+
+Metricool's API holds one media object per post, so it cannot take a carousel draft. Buffer, Later,
+Hootsuite and the rest were not verified for this batch.
+
+### D71, A run cut off by a restart is reported failed, not resumed
+
+`recoverRuns` marks it failed with the carousels it finished. Unlike the video queue, nothing re-runs it;
+the caller starts a new run with the ideas that are missing.
+
+### D72, The webhook outbox is one file on one node
+
+Pending deliveries and the delivery list live in `outbox.json` on the node that emitted them. Two nodes
+each deliver their own, and each screen shows only the deliveries of the node that answered.
+
+### D73, The older render routes do not refuse network requests
+
+`/api/flatten` aborts every request its page makes. `/api/export`, `/api/slides`, `/api/document`,
+`/api/contrast` and the video renderer render markup a client posted without that guard; the client
+inlines everything, but a hand-made payload can still make the server's Chromium fetch a URL. The same
+`context.route` line closes it; it was left out of this batch so export behaviour did not change at the
+end of it.
 
 ### D20, Smaller things
 

@@ -3,6 +3,12 @@ import { defineConfig } from "vite";
 
 export default defineConfig({
   plugins: [react()],
+  build: {
+    rollupOptions: {
+      // The engine page (31.3) ships beside the app: the API drives it headless.
+      input: { main: "index.html", engine: "engine.html" },
+    },
+  },
   server: {
     // Overridable, because a stale dev server holding 5173 is common enough that
     // picking another port should not mean editing a config file. Vite falls

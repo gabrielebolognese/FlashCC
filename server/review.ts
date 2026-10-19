@@ -35,6 +35,7 @@ import type { IncomingMessage, ServerResponse } from "node:http";
 import { randomUUID } from "node:crypto";
 
 import { HttpError, json, rateLimit, readJson } from "./http.js";
+import { emit } from "./webhooks.js";
 import { serviceClient } from "./supabase.js";
 
 /** Mirrors `review.ts` in the browser. Both halves have to agree, so both say so. */
@@ -340,6 +341,13 @@ export async function decide(req: IncomingMessage, res: ServerResponse): Promise
     .eq("id", share.id);
 
   if (error) throw new HttpError(500, error.message);
+
+  // The owner's webhooks (31.2): ids only, never the deck or the note.
+  void emit(share.user_id, patch.status === "approved" ? "review.approved" : "review.changes_requested", {
+    shareId: share.id,
+    docId: share.doc_id,
+    decidedAt: patch.decided_at,
+  });
 
   json(res, 200, { status: patch.status, decidedAt: patch.decided_at });
 }

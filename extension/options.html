@@ -1,0 +1,25 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <title>Send to FlashCC</title>
+    <style>
+      body { font: 14px system-ui, sans-serif; margin: 24px; max-width: 520px; color: #1a1a18; }
+      input { width: 100%; height: 28px; padding: 0 8px; box-sizing: border-box; }
+      button { height: 28px; margin-top: 8px; }
+      p { color: #6b665c; }
+    </style>
+  </head>
+  <body>
+    <h1>Send to FlashCC</h1>
+    <label for="origin">Where your FlashCC is</label>
+    <input id="origin" type="url" placeholder="https://your-flashcc.example" />
+    <button id="save" type="button">Save</button>
+    <p id="saved"></p>
+    <p>
+      Selected words open there, in the URL fragment, which no server receives. This extension reads no page and
+      sends nothing anywhere itself.
+    </p>
+    <script type="module" src="options.js"></script>
+  </body>
+</html>

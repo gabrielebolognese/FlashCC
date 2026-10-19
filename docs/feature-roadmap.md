@@ -4846,7 +4846,7 @@ three times a second, and offer a reduced-motion variant of every animation pres
 
 ## Batch 31, Integrations and the public API
 
-**Status:** next
+**Status:** done
 **Size:** large, split into independent items that can ship one at a time.
 **Why here:** Batch 5.5 made FlashCC "the missing first half of the bulk pipeline"
 through a CSV. A CSV is the right first step and still a manual one: export, open
@@ -4942,6 +4942,37 @@ not all survive into PowerPoint. The export lists what it had to flatten into
 images, by slide, before writing the file, rather than producing something that
 looks broken on open.
 
+### Built as
+
+- **Which schedulers (the unknown):** checked against their own documentation, 2026-10-19. **Publer**
+  documents carousel drafts through its API (Business and Enterprise plans), so it is integrated.
+  **Metricool** documents a `draft` flag but one media object per post, so it cannot hold a carousel and
+  stays on the CSV, as does every tool not checked. Verified from the docs, not a live call (D66).
+- **31.1:** `server/publer.ts`, one dialect. The key is validated, then sealed (`CONNECTIONS_KEY`).
+  "Drafts in Publer" in Publish for scheduling sends each carousel as its own upload and its own draft,
+  dated from the post: tested against a fake Publer with a week's run, every draft on its date, nothing
+  published, one failure named and the other carousels sent.
+- **31.2:** `server/webhooks.ts`. Six events plus `ping`, ids and URLs only (`sanitise`), HMAC-signed with
+  a timestamp, from a durable outbox retried over about fifteen hours, private addresses refused at every
+  delivery. Managed on the new Integrations screen, with the delivery list.
+- **31.3:** keys on Agency, hashed, every request logged against one; `GET` and `POST /v1/decks` (the
+  splitter, deterministic), `/v1/render`, `/v1/runs` with progress webhooks and polling. Layout runs in
+  the app's own code in a headless engine page, never re-implemented on the server. Ceilings per key per
+  hour (600, 120, 10), a 429 with `Retry-After`, `X-RateLimit-Reset` and "a conversation, not an
+  invoice". `docs/api.md` has runnable examples and the receiver's signature check.
+- **31.4:** `extension/`, Manifest V3, `contextMenus` and `storage` only, no host permissions. The
+  selection travels in the URL fragment; the app reads it once and clears it.
+- **31.5:** ideas from a CSV with the mapping shown and editable first, unknown pillars and clients named
+  and left off; a Markdown or text file into distil, or into outline mode with headings as slides.
+- **31.6:** `editable.ts` decides what a PowerPoint or an SVG can hold exactly and lists the rest, by slide
+  with a reason, in the export dialog before the file is written. Those parts are drawn by the real
+  painter (`/api/flatten`) and placed as pictures; text stays text, wrapped where FlashCC wrapped it.
+  Checked with python-pptx and a LibreOffice render, which matched the SVG render.
+- **Recorded, not done:** Publer unverified live (D66), ceilings per process (D67), the API needs the app
+  at `APP_ORIGIN` (D68), an editable file's glyphs are the receiving tool's (D69), other schedulers on CSV
+  (D70), interrupted runs are not resumed (D71), the outbox is per node (D72), the older render routes do
+  not refuse network requests (D73).
+
 ### What this batch deliberately does not do
 
 - **No embed SDK or white-label editor for other platforms.** That is PostNitro's
@@ -4953,7 +4984,7 @@ looks broken on open.
 
 ## Batch 32, Phone, capture and offline
 
-**Status:** queued
+**Status:** next
 **Size:** medium
 **Why here:** Instagram and TikTok carousels are posted from a phone, almost always.
 Every export FlashCC makes for those platforms currently ends on a desktop, and then

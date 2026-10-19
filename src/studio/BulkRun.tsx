@@ -20,6 +20,7 @@
  * Thirteen carousels lost to one rate limit is the failure this shape exists to
  * avoid.
  */
+import { reportEvent } from "./integrations.js";
 import {
   AlertCircle,
   ArrowRight,
@@ -381,6 +382,8 @@ export function BulkRun({
     }
 
     if (scheduling && made.length > 0) scheduleAll(made);
+    // The owner's webhooks (31.2): how many, and which, never what they say.
+    if (made.length > 0) reportEvent("run.finished", { count: made.length, docIds: made.map((d) => d.id) });
     setPhase("done");
   }
 

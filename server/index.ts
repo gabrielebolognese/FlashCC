@@ -18,6 +18,11 @@ import { createServer, type IncomingMessage, type ServerResponse } from "node:ht
 import { angles } from "./angles.js";
 import { alt, caption } from "./caption.js";
 import { contrast } from "./contrast.js";
+import { flatten } from "./flatten.js";
+import { closeEngine } from "./engine.js";
+import { createKey, listKeys, recoverRuns, revokeKey, v1Catalogue, v1CreateRun, v1Decks, v1ReadRun, v1Render } from "./v1.js";
+import { connectPubler, disconnectPubler, publerDrafts, readConnections } from "./publer.js";
+import { addWebhook, listWebhooks, removeWebhook, reportEvent, testWebhook, theOutbox } from "./webhooks.js";
 import { distil } from "./distil.js";
 import { tally } from "./tally.js";
 import { learnVoice } from "./voice.js";
@@ -54,6 +59,20 @@ const ROUTES: Record<string, Record<string, Handler>> = {
     "/api/review/decision": decide,
     "/api/export": exportDeck,
     "/api/contrast": contrast,
+    "/api/flatten": flatten,
+    "/api/webhooks": addWebhook,
+    "/api/webhooks/delete": removeWebhook,
+    "/api/webhooks/test": testWebhook,
+    "/api/events": reportEvent,
+    "/api/schedulers/publer/connect": connectPubler,
+    "/api/schedulers/publer/disconnect": disconnectPubler,
+    "/api/schedulers/publer/drafts": publerDrafts,
+    "/api/keys": createKey,
+    "/api/keys/revoke": revokeKey,
+    // The public API (31.3): keyed, Agency, ceilings with a reset time, no meter.
+    "/v1/decks": v1Decks,
+    "/v1/render": v1Render,
+    "/v1/runs": v1CreateRun,
     "/api/slides": renderImages,
     "/api/document": renderDocument,
     "/api/stock": stockSearch,
@@ -76,6 +95,11 @@ const ROUTES: Record<string, Record<string, Handler>> = {
     // By id and token, the capability the POST handed back. See videoapi.ts.
     "/api/video": readVideo,
     "/api/video/file": videoFile,
+    "/api/webhooks": listWebhooks,
+    "/api/schedulers": readConnections,
+    "/api/keys": listKeys,
+    "/v1/decks": v1Catalogue,
+    "/v1/runs": v1ReadRun,
   },
 };
 
@@ -114,7 +138,10 @@ const server = createServer((req, res) => {
 
     // The path, never the body: request bodies here carry access tokens.
     console.error(`[${path}] ${statusCode} ${message}`);
-    if (!res.headersSent) json(res, statusCode, { error: message });
+    if (!res.headersSent) {
+      if (error instanceof HttpError && error.headers) for (const [k, v] of Object.entries(error.headers)) res.setHeader(k, v);
+      json(res, statusCode, { error: message });
+    }
   });
 });
 
@@ -129,6 +156,13 @@ void queue.recover().then(({ requeued, failed }) => {
 const sweeper = setInterval(() => void queue.sweep(), 3600_000);
 sweeper.unref();
 
+// Webhook deliveries owed from the last process go first; then every 30 seconds (31.2).
+const deliveries = setInterval(() => void theOutbox().tick(), 30_000);
+deliveries.unref();
+void theOutbox().tick();
+// An API run cut off by the last process is reported failed, never left "running" (31.3).
+void recoverRuns().then((n) => n && console.log(`api runs: ${n} interrupted by the restart, reported failed`));
+
 let stopping = false;
 for (const signal of ["SIGTERM", "SIGINT"] as const) {
   process.on(signal, () => {
@@ -139,7 +173,7 @@ for (const signal of ["SIGTERM", "SIGINT"] as const) {
       .drain(Number(process.env.VIDEO_GRACE_MS ?? 25_000))
       .then(({ finished }) => {
         if (!finished) console.warn("video queue: stopping with a render in hand; the next start resumes it");
-        return closeBrowser();
+        return closeEngine().then(closeBrowser);
       })
       .finally(() => process.exit(0));
   });

@@ -20,13 +20,14 @@ import { belongsTo, ALL_CLIENTS } from "./clients.js";
 import type { Lane } from "./lanes.js";
 import { listPosts, makePost, savePosts, type Post } from "./pipeline.js";
 
-export type IdeaSource = "capture" | "board" | "phone" | "extension";
+export type IdeaSource = "capture" | "board" | "phone" | "extension" | "import";
 
 export const SOURCE_LABELS: Record<IdeaSource, string> = {
   capture: "Captured",
   board: "Board",
   phone: "Phone",
   extension: "Browser",
+  import: "Imported",
 };
 
 export const sourceLabel = (s: string | undefined): string => SOURCE_LABELS[s as IdeaSource] ?? (s?.trim() || "Board");
@@ -104,16 +105,19 @@ export function captureIdea(line: string, opts: Parameters<typeof makeIdea>[1] =
  * module-level signal that `App` listens to. The studio's key handler and the
  * projects screen both reach it through `openCapture`.
  */
-const openers = new Set<() => void>();
+/** Words to open the capture with: a selection sent from the browser extension (31.4). */
+export type CapturePrefill = { line: string; notes: string; source: IdeaSource };
+
+const openers = new Set<(prefill?: CapturePrefill) => void>();
 const changed = new Set<() => void>();
 
-export function onCapture(listener: () => void): () => void {
+export function onCapture(listener: (prefill?: CapturePrefill) => void): () => void {
   openers.add(listener);
   return () => openers.delete(listener);
 }
 
-export function openCapture(): void {
-  for (const l of openers) l();
+export function openCapture(prefill?: CapturePrefill): void {
+  for (const l of openers) l(prefill);
 }
 
 /** Screens holding a copy of the posts re-read when an idea lands. */

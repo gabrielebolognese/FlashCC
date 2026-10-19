@@ -7,6 +7,7 @@
  * applying is the same answer however many pauses there were, and the session
  * is committed under one coalescing key: ONE undo step, named "Outline".
  */
+import { MAX_FILE_BYTES, outlineFromText, TEXT_FILES } from "./fileimport.js";
 import { useEffect, useMemo, useRef, useState } from "react";
 
 import { identityOf, listBrands, themeOf } from "./brand.js";
@@ -123,6 +124,28 @@ export function OutlineView({ studio }: { studio: Studio }) {
           A block is one line: <code className="text-secondary">[Label] field: value | field: value</code>. Edit it in place.
         </p>
         <p className="mt-2">Slides follow a moment after you stop typing. Anything you moved by hand stays where it is. One Undo takes the whole session back.</p>
+
+        {/* A Markdown or text file as an outline (31.5): headings become slides. */}
+        <label className="mt-3 flex h-7 w-fit cursor-pointer items-center rounded-md border border-hairline px-2.5 text-caption text-secondary hover:border-accent-dim hover:text-accent">
+          Open a file
+          <input
+            type="file"
+            accept={TEXT_FILES}
+            aria-label="Open a text or Markdown file as the outline"
+            className="hidden"
+            onChange={(e) => {
+              const file = e.target.files?.[0];
+              e.target.value = "";
+              if (!file || file.size > MAX_FILE_BYTES) return;
+              void file.text().then((t) => {
+                const next = outlineFromText(t);
+                setText(next);
+                onChange(next);
+              });
+            }}
+          />
+        </label>
+        <p className="mt-1">Replaces the outline; its headings become slides. One Undo takes it back.</p>
 
         {freeForm ? (
           <p className="mt-3 rounded-md border border-hairline bg-surface-2 p-2 text-secondary">

@@ -23,6 +23,8 @@ import { sessionPlan, sessionUserId } from "./studio/session.js";
 import { Upgrade } from "./studio/Upgrade.js";
 import { VideoToast } from "./studio/VideoToast.js";
 import { IdeaCapture } from "./studio/IdeaCapture.js";
+import { ideaFromSelection, readHandoff, type Handoff } from "./studio/fileimport.js";
+import { openCapture } from "./studio/ideas.js";
 import { tokenFromPath } from "./studio/sharing.js";
 import { Frameworks } from "./studio/Frameworks.js";
 import { makeDoc, type Doc } from "./studio/model.js";
@@ -58,6 +60,27 @@ type Draft = {
   quotes?: string[] | undefined;
 };
 
+/**
+ * Words the browser extension sent (31.4), read from the URL fragment once and
+ * cleared, so a reload does not send them twice. A fragment never reaches a
+ * server: only the person's own browser saw the page and chose the words.
+ */
+const HANDOFF: Handoff | null = (() => {
+  if (typeof window === "undefined") return null;
+  const h = readHandoff(window.location.hash);
+  if (h) window.history.replaceState(null, "", window.location.pathname + window.location.search);
+  return h;
+})();
+
+function IdeaHandoff() {
+  useEffect(() => {
+    if (HANDOFF?.kind !== "idea") return;
+    const { line, notes } = ideaFromSelection(HANDOFF.text);
+    openCapture({ line, notes, source: "extension" });
+  }, []);
+  return null;
+}
+
 type Screen =
   | { view: "welcome" }
   | { view: "firstRun" }
@@ -70,7 +93,8 @@ type Screen =
    */
   | { view: "start"; at?: "calendar" }
   | { view: "bulk" }
-  | { view: "longform" }
+  /** `source`: words a person selected in the browser and sent here (31.4). */
+  | { view: "longform"; source?: string | undefined }
   /**
    * `brief` and `quotes` ride along from a distilled source.
    *
@@ -215,16 +239,18 @@ export function App() {
       <PaywallPrompt />
       {/* A video render is a job people leave while it runs (26.5): heard from every screen. */}
       <VideoToast />
-      {/* Q, from any screen (27.1). */}
+      {/* Q, from any screen (27.1), and a selection sent from the browser extension (31.4). */}
       <IdeaCapture />
+      <IdeaHandoff />
     </>
   );
 }
 
 function Screens() {
-  // First run gets the welcome; everyone else goes straight in.
+  // First run gets the welcome; everyone else goes straight in. Words sent
+  // from the extension skip it too: they came to be captured, not toured.
   const [screen, setScreen] = useState<Screen>(() =>
-    hasOnboarded() ? { view: "start" } : { view: "welcome" },
+    HANDOFF?.kind === "distil" ? { view: "longform", source: HANDOFF.text } : HANDOFF || hasOnboarded() ? { view: "start" } : { view: "welcome" },
   );
   const [prefs, setPrefs] = useState<Prefs | null>(() => loadPrefs());
 
@@ -293,6 +319,7 @@ function Screens() {
   if (screen.view === "longform") {
     return (
       <Repurpose
+        initialSource={screen.source}
         onHome={() => setScreen({ view: "start" })}
         onOpen={(doc: Doc) => setScreen({ view: "studio", doc })}
         // An angle is a brief, so it joins the ordinary flow at the framework

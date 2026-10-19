@@ -46,6 +46,7 @@ import {
   variantFor,
   type Destination,
 } from "./destinations.js";
+import { EditableFiles } from "./EditableFiles.js";
 import { exportDeck, renderFile, saveBlob } from "./exporter.js";
 import { GridPreview } from "./GridPreview.js";
 import { uid, type Doc } from "./model.js";
@@ -577,6 +578,8 @@ export function ExportDialog({
           ) : null}
 
           {multi ? null : <AltText doc={doc} platform={platform} onChange={onAlt} />}
+
+          {multi ? null : <EditableFiles doc={doc} />}
         </div>
 
         <footer className="flex h-16 shrink-0 items-center gap-2 border-t border-hairline px-5">

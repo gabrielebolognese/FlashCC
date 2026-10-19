@@ -32,6 +32,7 @@ React + Vite + Tailwind + lucide-react. Node >= 20, ESM, strict tsconfig, vitest
 | `docs/feature-roadmap.md` | The batched plan of record. Worked through with `/next-batch`. |
 | `DESIGN_SYSTEM.md` | FlashFX tokens: colour, type, radii, motion. Paints the **app**. |
 | `docs/interaction-principles.md` | Figma research + rules R1–R15 (timing, feedback, density, control budget) |
+| `docs/api.md` | The public API (Batch 31): keys, the three endpoints with runnable examples, ceilings, webhooks and their signature |
 
 `docs/superseded/` holds four documents describing the design the Photoshop-model rewrite replaced
 (a semantic document, five roles, a template engine). None of them match the code. They are kept for
@@ -125,7 +126,7 @@ Invariants worth keeping:
   `LongForm`/`longform`, `Review`/`review`, so the component takes the compound name:
   `insights.ts` + `Analytics.tsx`, `library.ts` + `AssetLibrary.tsx`, `longform.ts` +
   `Repurpose.tsx`, `review.ts` + `ReviewLink.tsx`, `imagetools.ts` + `PictureTools.tsx`,
-  `texteffects.ts` + `TextEffectField.tsx`, `findreplace.ts` + `ReplaceDialog.tsx`.
+  `texteffects.ts` + `TextEffectField.tsx`, `findreplace.ts` + `ReplaceDialog.tsx`, `integrations.ts` + `IntegrationSettings.tsx`.
 - Source in `src/`, tests colocated as `*.test.ts`.
 - Strict flags in force: `verbatimModuleSyntax` (use `import type`),
   `noUncheckedIndexedAccess` (indexed access is `T | undefined`),
@@ -291,6 +292,32 @@ Invariants worth keeping:
 - **A video that would flash more than three times a second is refused, never trimmed**
   (`flashRate`, client and `validateVideo`). Reduced motion is derived from any preset (`reducedOf`,
   `transitionOf`), never a second list.
+
+## Integrations (Batch 31)
+
+- **Drafts, never published posts.** A scheduler integration creates drafts and the scheduler publishes.
+  One dialect per tool (`server/publer.ts`), **verified against the tool's own documentation before it is
+  written**, with the date in `PUBLER.verified`; a tool that cannot hold a carousel (Metricool) stays on
+  the CSV. Each carousel is its own upload and draft: a failure names it and the rest still go.
+- **Every secret is shown once and kept only on the server.** API keys are stored as SHA-256, a
+  scheduler's key sealed with `CONNECTIONS_KEY`; `15-integrations.sql`'s tables have RLS on and no
+  policies. None of them has a usage column, and none may get one (invariant 7).
+- **Webhooks carry ids and URLs, never words** (`sanitise`), signed (`signature`), from a durable outbox
+  with backoff. A receiver URL is checked for a private address at every delivery, not once.
+- **The API's limits are ceilings, never a meter**: `limitWithReset`, a 429 with the reset time and "a
+  conversation, not an invoice". No call is priced, and the API is a plan feature (Agency), not a quota.
+- **`/v1` lays out in the app's own code**, in the headless engine page (`engine.html`, `src/engine.ts`,
+  driven by `server/engine.ts` at `APP_ORIGIN`). Never re-implement layout on the server: it would be a
+  second layout engine to drift. A new `/v1` capability is a method on `window.__fccEngine`.
+- **Nothing is fetched on a caller's say-so**: `/v1/render` takes data: pictures only, the engine page
+  and `/api/flatten` abort every other request. The extension has no host permissions and its words ride
+  in the URL fragment.
+- **Imports show their mapping before writing** (ideas CSV), match pillars and clients that exist, and
+  never create one from a cell.
+- **Editable exports flatten through the one painter**: anything PowerPoint or SVG cannot hold exactly is
+  rendered by `/api/flatten` from `slideHtml` and placed as a picture, and `editablePlan` lists it by
+  slide before the file is written. A new layer feature needs a line in `flattenReason`, or it ships into
+  a .pptx as something it is not.
 
 ## Pictures
 

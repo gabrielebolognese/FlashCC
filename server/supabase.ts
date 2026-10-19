@@ -170,6 +170,18 @@ export async function setPlan(userId: string, update: PlanUpdate): Promise<void>
   if (error) throw new HttpError(500, `Could not update the plan: ${error.message}`);
 }
 
+/**
+ * A verified caller on Agency (Batch 31.3: API keys). 402, like `requirePro`,
+ * so the client opens the pricing panel. `DEV_PRO` lifts it the same way.
+ */
+export async function requireAgency(token: string | null, feature: string): Promise<Caller & { plan: PlanName }> {
+  const caller = await requireCaller(token);
+  if (devPro()) return { ...caller, plan: "agency" };
+  const { plan } = await readBilling(caller.id);
+  if (plan !== "agency") throw new HttpError(402, `${feature} is part of Agency.`);
+  return { ...caller, plan };
+}
+
 export async function readBilling(
   userId: string,
 ): Promise<{ customerId: string | null; subscriptionId: string | null; plan: PlanName }> {
