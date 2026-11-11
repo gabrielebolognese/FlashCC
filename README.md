@@ -8,7 +8,7 @@ It is aimed at creators, freelancers and small agencies who publish carousels re
 
 ### Making a deck
 
-- **Four frameworks**, each with its own slot-by-slot guidance and examples: Problem → Solution, Showcase, Educational and Story (`src/studio/structures.ts`).
+- **Four frameworks**, each with its own slot-by-slot guidance and examples: Problem → Solution, Showcase / Portfolio, Educational / Value and Story / Case Study (`src/studio/structures.ts`).
 - **Guided flow**: welcome questions, framework choice, draft with AI or write by hand, one field per slot, style gallery, then the studio.
 - **Deterministic layout**: eight compositions (title, heading and body, statement, numbered, quote, underline, caps, block) turn the text into layers at 1080×1350. AI only ever returns words, never positions, sizes or colours.
 - **Fifteen styles**, ten flat and five gradient, each tested for contrast.
@@ -20,7 +20,7 @@ It is aimed at creators, freelancers and small agencies who publish carousels re
 - Tools: select, text, rectangle, ellipse, triangle, line and icon (lucide icons).
 - Move, resize, marquee select, snapping with guides, cursor-anchored zoom, pan with Space or the middle mouse button.
 - Layers panel, properties panel, gradient editor, filmstrip with slide operations, safe-zone overlays per platform.
-- Snapshot undo and redo (120 steps), plus a local version history that keeps a snapshot before each export, review link and brand change.
+- Snapshot undo and redo (120 steps), plus a local version history that keeps a snapshot at each export, review link and brand change, or when saved by hand. Version history is kept only on a paid plan; the free plan keeps none (`src/studio/versions.ts`).
 - Uploaded images and fonts, kept in an account-level asset library.
 - Reflow of an existing deck onto another artboard size.
 
@@ -83,10 +83,10 @@ cp .env.example .env
 
 | Variable | Used by | Purpose |
 | --- | --- | --- |
-| `VITE_SUPABASE_URL` | browser and server | Supabase project URL. Enables accounts, sync and storage. |
+| `VITE_SUPABASE_URL` | browser and server | Supabase project URL. Enables accounts, sync and storage. The server reads `SUPABASE_URL` first if it is set. |
 | `VITE_SUPABASE_PUBLISHABLE_KEY` | browser and server | Supabase publishable key. `VITE_SUPABASE_ANON_KEY` is read as a fallback. |
 | `ANTHROPIC_API_KEY` | server only | Enables the AI routes. |
-| `SUPABASE_SECRET_KEY` | server only | Lets the server read an account's plan. `SUPABASE_SERVICE_ROLE_KEY` is read as a fallback. Never give it a `VITE_` prefix. |
+| `SUPABASE_SECRET_KEY` | server only | Lets the server read an account's plan and serve review links (`server/review.ts`). `SUPABASE_SERVICE_ROLE_KEY` is read as a fallback. Never give it a `VITE_` prefix. |
 | `DEV_PRO` | server only | Set to `1` to treat every signed-in account as Pro. Ignored when `NODE_ENV` is `production`. Not in `.env.example`. |
 | `PORT` | server only | API port, default `8787`. |
 | `VITE_PORT` | dev script | Vite port, default `5173`. |
@@ -95,7 +95,7 @@ cp .env.example .env
 What each level of configuration gives you:
 
 - **Nothing set**: the editor, all frameworks and styles, local storage and PDF export.
-- **Supabase set**: sign-in, sync, the asset library in the cloud, review links and publishing. Follow [`supabase/README.md`](supabase/README.md) to create the project, run the SQL migrations and configure the email template. `npm run check:schema` reports any migration that has not been applied.
+- **Supabase set**: sign-in, sync, the asset library in the cloud, review links (these also need `SUPABASE_SECRET_KEY` on the server) and publishing. Follow [`supabase/README.md`](supabase/README.md) to create the project, run the SQL migrations and configure the email template. `npm run check:schema` reports any migration that has not been applied.
 - **AI**: the AI routes need `ANTHROPIC_API_KEY`, the Supabase variables, a signed-in user, and a Pro plan. Because there is no payment integration, the two ways to get a Pro plan locally are `DEV_PRO=1`, or setting `SUPABASE_SECRET_KEY` and changing your own row in `profiles.plan` to `pro`.
 
 ### Run in development
@@ -171,7 +171,7 @@ The three CSV files at the repository root are YouTube analytics exports and are
 - TypeScript (strict), ESM, Node.js 20+
 - React 19, Vite 6, Tailwind CSS 3, lucide-react
 - Node `http` server run with tsx, zod for request and response schemas
-- Anthropic SDK (`claude-sonnet-5` and `claude-haiku-4-5` are the models configured in `server/anthropic.ts`)
+- Anthropic SDK (`claude-sonnet-5` and `claude-haiku-4-5-20251001` are the models configured in `server/anthropic.ts`)
 - Supabase (auth, Postgres with row level security, storage)
 - Playwright (Chromium) and JSZip for export
 - Vitest
